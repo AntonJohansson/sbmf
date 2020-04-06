@@ -8,63 +8,52 @@
 #include <stdio.h>
 #include <assert.h>
 
-real_t potential(real_t x, real_t y, complex_t u) {
-	real_t cosx = cos(x);
-	real_t cosy = cos(y);
+//real_t potential(real_t x, real_t y, complex_t u) {
+//	real_t cosx = cos(x);
+//	real_t cosy = cos(y);
+//	//return x*x + y*y + cabs(u)*cabs(u);
+//	//return 3*(cosx*cosx + cosy*cosy)*u + u*u*u;
+//	return 3*(cosx*cosx + cosy*cosy) + cabs(u)*cabs(u);
+//	//return x*x + y*y;
+//	//return x*x + y*y;
+//	//return 3*(x*x)*u;
+//	//return (fabs(x) < 15 && fabs(y) < 15) ? 0 : 10*u;
+//}
+
+//complex_t initial_guess(real_t x, real_t y) {
+//	//return (1.0/(10.0*m_pi*10.0*m_pi + 10.0*m_pi*10.0*m_pi))*exp(-(x*x + y*y));
+//	return 1.0/(10.0*m_pi*10.0*m_pi);
+//}
+
+real_t potential(real_t* v, int_t n, complex_t u) {
+	//real_t cosx = cos(x);
+	//real_t cosy = cos(y);
 	//return x*x + y*y + cabs(u)*cabs(u);
+	//
 	//return 3*(cosx*cosx + cosy*cosy)*u + u*u*u;
-	return 3*(cosx*cosx + cosy*cosy) + cabs(u)*cabs(u);
+	real_t temp = 0.0f;
+	for (int_t i = 0; i < n; ++i)
+		temp += cos(v[i])*cos(v[i]);
+	return 3*temp + cabs(u)*cabs(u);
 	//return x*x + y*y;
 	//return x*x + y*y;
 	//return 3*(x*x)*u;
 	//return (fabs(x) < 15 && fabs(y) < 15) ? 0 : 10*u;
 }
 
-complex_t initial_guess(real_t x, real_t y) {
-	//return (1.0/(10.0*M_PI*10.0*M_PI + 10.0*M_PI*10.0*M_PI))*exp(-(x*x + y*y));
+complex_t initial_guess(real_t* v, int_t n) {
+	//return (1.0/(10.0*m_pi*10.0*m_pi + 10.0*m_pi*10.0*m_pi))*exp(-(x*x + y*y));
 	return 1.0/(10.0*M_PI*10.0*M_PI);
 }
 
-void aitem_test() {
-	gss_settings settings = {
-		.resolution = 256,
-		.max_iterations = 500,
-		.error_tol = 1e-10,
-		.c = 0.7,
-		.A = 1.0384,
-		.dt = 1,
-		.length_x = 10.0*M_PI,
-		.length_y = 10.0*M_PI
-	};
-
-	PROFILE_BEGIN("aitem");
-
-	gss_result res = aitem_execute(settings,
-																 potential,
-																 initial_guess);
-	PROFILE_END("aitem");
-
-	FILE* fdwf = fopen("gss_aitem_out", "w");
-	for (int_t i = 0; i < res.rows*res.cols; ++i) {
-		real_t cr = creal(res.wavefunction[i]);
-		real_t ci = cimag(res.wavefunction[i]);
-		fprintf(fdwf, "%lf\n", cabs(res.wavefunction[i]));
-		//fprintf(fdwf, "%lf%s%lfi\n",
-		//				cr,
-		//				(ci < 0.0) ? "-" : "+",
-		//				fabs(ci));
-	}
-
-
-	gss_free_result(res);
-}
 
 void item_test() {
-	const int_t N = 256;
-	grid g = generate_grid(2, (dimension_info[]){
-			{-10.0*M_PI,10.0*M_PI,N},
-			{-10.0*M_PI,10.0*M_PI,N},
-			});
+	const int_t N = 128;
+	grid g = generate_grid(2, 
+			(real_t[]){-5*M_PI, -5*M_PI},
+			(real_t[]){ 5*M_PI,  5*M_PI},
+			(int_t[]){N, N}
+			);
 
 	{
 		FILE* fd = fopen("debug_grid", "w");
@@ -80,15 +69,14 @@ void item_test() {
 		fclose(fd);
 	}
 
-
 	gss_settings settings = {
 		.g = g,
-		.resolution = N,
+		//.resolution = N,
 		.max_iterations = 2000,
 		.error_tol = 1e-10,
 		.dt = 0.01,
-		.length_x = 10.0*M_PI,
-		.length_y = 10.0*M_PI,
+		//.length_x = 10.0*M_PI,
+		//.length_y = 10.0*M_PI,
 
 		.measure_every = 0,
 	};
@@ -102,20 +90,20 @@ void item_test() {
 	PROFILE_END("item");
 
 	printf("Generating FD matrix\n");
-	PROFILE_BEGIN("gen fd");
-	bandmat fdm = generate_fd_matrix(settings.resolution, 4, 2, (real_t[]){
-			settings.length_x/settings.resolution,
-			settings.length_y/settings.resolution});
+	//PROFILE_BEGIN("gen fd");
+	//bandmat fdm = generate_fd_matrix(settings.resolution, 4, 2, (real_t[]){
+	//		settings.length_x/settings.resolution,
+	//		settings.length_y/settings.resolution});
 
-	for (int_t i = 0; i < fdm.size*fdm.bandcount; ++i) {
-		fdm.bands[i] = -fdm.bands[i];
-	}
+	//for (int_t i = 0; i < fdm.size*fdm.bandcount; ++i) {
+	//	fdm.bands[i] = -fdm.bands[i];
+	//}
 
-	for (int_t i = 0; i < fdm.size; ++i) {
-		int_t idx = fdm.size*(fdm.bandcount-1) + i;
-		fdm.bands[idx] += potential(res.X[i], res.Y[i], res.wavefunction[i]);
-	}	
-	PROFILE_END("gen fd");
+	//for (int_t i = 0; i < fdm.size; ++i) {
+	//	int_t idx = fdm.size*(fdm.bandcount-1) + i;
+	//	//fdm.bands[idx] += potential(res.X[i], res.Y[i], res.wavefunction[i]);
+	//}	
+	//PROFILE_END("gen fd");
 
 	printf("Trying to solve the eigenvalue problem\n");
 	//PROFILE_BEGIN("EV prob");
@@ -166,9 +154,9 @@ void item_test() {
 		FILE* fdpt = fopen("gss_item_pt", "w");
 		FILE* fdev = fopen("gss_item_ev", "w");
 		FILE* fdvv = fopen("gss_item_vv", "w");
-		for (int_t i = 0; i < res.rows*res.cols; ++i) {
+		for (int_t i = 0; i < settings.g.total_pointcount; ++i) {
 			fprintf(fdwf, "%lf\n", cabs(res.wavefunction[i]));
-			fprintf(fdpt, "%lf\n", potential(res.X[i], res.Y[i], res.wavefunction[i]));
+			//fprintf(fdpt, "%lf\n", potential(res.X[i], res.Y[i], res.wavefunction[i]));
 			//fprintf(fdev, "%lf\n", outD[i]);
 			//for (int_t j = 0; j < fdm.size; ++j) {
 			//	fprintf(fdvv, "%lf", outQ[i*fdm.size + j]);

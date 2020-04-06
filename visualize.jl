@@ -7,8 +7,8 @@ function load_wf()
 	wf_data = readdlm("gss_item_wf");
 	global wf = reshape(wf_data, N,N);
 
-	pt_data = readdlm("gss_item_pt");
-	global pt = reshape(pt_data, N,N);
+	#pt_data = readdlm("gss_item_pt");
+	#global pt = reshape(pt_data, N,N);
 end
 
 function load_ev()
@@ -31,8 +31,6 @@ end
 
 function plot_wf()
 	p1 = surface(wf);
-	p2 = surface(pt);
-	plot(p1, p2, layout = (2,1));
 end
 
 function plot_vv(n)

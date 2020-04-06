@@ -6,13 +6,13 @@
 typedef struct {
 	grid g;
 
-	int_t resolution;
+	//int_t resolution;
 
 	int_t max_iterations;
 	real_t error_tol;
 
-	real_t length_x;
-	real_t length_y;
+	//real_t length_x;
+	//real_t length_y;
 
 	int_t measure_every;
 
@@ -35,19 +35,19 @@ typedef struct {
 	gss_settings settings;
 	gss_debug debug;
 
-	int_t rows;
-	int_t cols;
+	//int_t rows;
+	//int_t cols;
 
-	real_t* X;
-	real_t* Y;
+	//real_t* X;
+	//real_t* Y;
 	complex_t* wavefunction;
 
 	real_t error;
 	int_t iterations;
 } gss_result;
 
-typedef real_t gss_potential_func(real_t x, real_t y, complex_t u);
-typedef complex_t gss_guess_func(real_t x, real_t y);
+typedef real_t gss_potential_func(real_t* v, int_t n, complex_t u);
+typedef complex_t  gss_guess_func(real_t* v, int_t n);
 
 extern void gss_free_result(gss_result res);
 

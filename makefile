@@ -2,7 +2,10 @@ CC = gcc
 PROJECT = sbmf
 BUILD_DIR = build
 
-PROJ_SRCS = $(shell find src/$(PROJECT) -name "*.c")
+PROJ_SRCS = \
+	src/sbmf/groundstate_solver/groundstate_solver.c  \
+	src/sbmf/groundstate_solver/item.c \
+	src/sbmf/common/profile.c
 TEST_SRCS = $(shell find src/test -name "*.c")
 
 PROJ_LIBS = -lfftw3 -llapacke -lm

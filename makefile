@@ -22,4 +22,4 @@ $(BUILD_DIR)/$(PROJECT): $(BUILD_DIR) $(PROJ_SRCS)
 	$(CC) -Wall -Werror -o $(BUILD_DIR)/lib$(PROJECT).so -shared -fpic $(PROJ_SRCS) -Isrc -g $(PROJ_LIBS)
 
 $(BUILD_DIR)/test: $(TEST_SRCS) $(BUILD_DIR)/$(PROJECT)
-	$(CC) $(TEST_SRCS) -o $(BUILD_DIR)/test -Wl,-rpath=$(BUILD_DIR) -Isrc -L$(BUILD_DIR) $(TEST_LIBS)
+	$(CC) $(TEST_SRCS) -o $(BUILD_DIR)/test -g -Wl,-rpath=$(BUILD_DIR) -Isrc -L$(BUILD_DIR) $(TEST_LIBS)

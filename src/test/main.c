@@ -26,19 +26,16 @@
 //}
 
 real_t potential(real_t* v, int_t n, complex_t u) {
-	//real_t cosx = cos(x);
-	//real_t cosy = cos(y);
-	//return x*x + y*y + cabs(u)*cabs(u);
-	//
-	//return 3*(cosx*cosx + cosy*cosy)*u + u*u*u;
 	real_t temp = 0.0f;
 	for (int_t i = 0; i < n; ++i)
 		temp += cos(v[i])*cos(v[i]);
 	return 3*temp + cabs(u)*cabs(u);
-	//return x*x + y*y;
-	//return x*x + y*y;
-	//return 3*(x*x)*u;
-	//return (fabs(x) < 15 && fabs(y) < 15) ? 0 : 10*u;
+
+	//real_t temp = 0.0f;
+	//for (int_t i = 0; i < n; ++i) {
+	//	temp += v[i]*v[i];
+	//}
+	//return 0.5*temp;
 }
 
 complex_t initial_guess(real_t* v, int_t n) {
@@ -52,7 +49,7 @@ void item_test() {
 	grid g = generate_grid(2, 
 			(real_t[]){-5*M_PI, -5*M_PI},
 			(real_t[]){ 5*M_PI,  5*M_PI},
-			(int_t[]){N, N}
+			 (int_t[]){ N,  	 	 N}
 			);
 
 	{
@@ -166,6 +163,9 @@ void item_test() {
 			//		fprintf(fdvv, "\n");
 			//}
 		}
+		FOREACH_GRIDPOINT(settings.g, i) {
+			fprintf(fdpt, "%lf\n", potential(&settings.g.points[i], settings.g.dimensions, res.wavefunction[i]));
+		}
 		fclose(fdwf);
 		fclose(fdpt);
 		fclose(fdev);
@@ -211,7 +211,7 @@ int main(int argc, char** argv) {
 		}
 		avg /= data.delta_num_samples;
 
-		printf("%10s -- %ld (ms)\n", data.name, avg/1000);
+		printf("%10s -- %ld (ms)\n", data.name, avg/1000000);
 	}
 
 	return 0;

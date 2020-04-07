@@ -22,11 +22,9 @@ static real_t VK(real_t* v, int_t n, complex_t u) {
 //	}
 //}
 
-
-
 static inline void apply_step_op(real_t ds, real_t dt, complex_t* out, gss_potential_func* potential, grid g, complex_t* wavefunction) {
-	FOREACH_GRIDPOINT(g, i) {
-		real_t potval = potential(g.points, g.dimensions, wavefunction[i]);
+	for (int_t i = 0; i < g.total_pointcount; ++i) {
+		real_t potval = potential(&g.points[g.dimensions*i], g.dimensions, wavefunction[i]);
 		real_t opval  = exp(-potval*dt);
 		out[i] = wavefunction[i] * opval * ds;
 	}
@@ -70,13 +68,13 @@ gss_result item_execute(gss_settings settings, gss_potential_func* potential, gs
 	const real_t ifft_factor = 1.0/(settings.g.total_pointcount);
 	const real_t dt = settings.dt;
 	real_t ds = 1.0;
-	real_t V = 1.0;
+	real_t density = 1.0;
 	for (int_t i = 0; i < settings.g.dimensions; ++i) {
 		ds *= settings.g.deltas[i];
-		V *= 1.0/(settings.g.maxs[i] - settings.g.mins[i]);
+		density *= 1.0/(settings.g.maxs[i] - settings.g.mins[i]);
 	}
 
-	gss_debug dbg;
+	gss_debug dbg = {};
 	if (settings.measure_every > 0) {
 		dbg.count = settings.max_iterations/settings.measure_every;
 		dbg.current = 0;
@@ -107,25 +105,60 @@ gss_result item_execute(gss_settings settings, gss_potential_func* potential, gs
 
 	grid kgrid = mimic_grid(settings.g);
 
+	//{
+	//	int_t indices[settings.g.dimensions];
+	//	memset(indices, 0, settings.g.dimensions*sizeof(int_t));
+	//	for (int_t i = 0; i < kgrid.total_pointcount; ++i) {
+	//		for (int_t j = 0; j < kgrid.dimensions; ++j) {
+	//			kgrid.points[kgrid.dimensions*i + j] = 
+	//				(indices[j] < kgrid.pointcounts[j]/2) ? 
+	//					2*M_PI/(kgrid.maxs[j] - kgrid.mins[j]) * indices[j]
+	//				:
+	//					2*M_PI/(kgrid.maxs[j] - kgrid.mins[j]) * (-kgrid.pointcounts[j] + indices[j]);
+	//		}
+
+	//		int_t baseidx = kgrid.dimensions-1;
+	//		indices[baseidx] = (indices[baseidx]+1) % kgrid.pointcounts[baseidx];
+	//		for (int_t j = baseidx; j > 0; --j)
+	//			if (indices[j] % kgrid.pointcounts[j] == 0)
+	//				indices[j-1] = (indices[j-1]+1) % kgrid.pointcounts[j-1];
+	//			else
+	//				break;
+	//	}
+	//}
+
 	{
-		int_t indices[settings.g.dimensions];
-		memset(indices, 0, settings.g.dimensions*sizeof(int_t));
-		for (int_t i = 0; i < kgrid.total_pointcount; ++i) {
-			for (int_t j = 0; j < kgrid.dimensions; ++j) {
-				kgrid.points[kgrid.dimensions*i + j] = 
-					(indices[j] < kgrid.pointcounts[j]/2) ? 
-						2*M_PI/(kgrid.maxs[j] - kgrid.mins[j]) * indices[j]
-					:
-						2*M_PI/(kgrid.maxs[j] - kgrid.mins[j]) * (-kgrid.pointcounts[j] + indices[j]);
+		int_t indices[kgrid.dimensions];
+		memset(indices, 0, kgrid.dimensions*sizeof(int_t));
+		for (int_t index = 0; index < kgrid.total_pointcount; ++index) {
+			int_t prodlen = 1;
+			for (int_t n = kgrid.dimensions-1; n >= 0; --n) {
+				indices[n] = fmod((index / prodlen), kgrid.pointcounts[n]);
+				prodlen *= kgrid.pointcounts[n];
 			}
 
-			indices[0] = (indices[0]+1) % kgrid.pointcounts[0];
-			for (int_t j = 0; j < kgrid.dimensions-1; ++j)
-				if (indices[j] % kgrid.pointcounts[j] == 0)
-					indices[j+1] = (indices[j+1]+1) % kgrid.pointcounts[j+1];
-				else
-					break;
+			for (int_t n = 0; n < kgrid.dimensions; ++n) {
+				if (indices[n] < kgrid.pointcounts[n]/2) {
+					kgrid.points[kgrid.dimensions*index + n] = 2*M_PI / kgrid.lens[n] * indices[n];
+				} else {
+					kgrid.points[kgrid.dimensions*index + n] = 2*M_PI / kgrid.lens[n] * (-kgrid.pointcounts[n] + indices[n]);
+				}
+			}
 		}
+	}
+
+	{
+		FILE* fd = fopen("debug_kgrid", "w");
+		for (int_t i = 0; i < kgrid.total_pointcount; ++i) {
+			for (int_t j = 0; j < kgrid.dimensions; ++j) {
+				fprintf(fd, "%lf", kgrid.points[kgrid.dimensions*i + j]);
+				if (j < kgrid.dimensions-1)
+					fprintf(fd, "\t");
+				else
+					fprintf(fd, "\n");
+			}
+		}
+		fclose(fd);
 	}
 
 	// Variables used in computation
@@ -149,8 +182,8 @@ gss_result item_execute(gss_settings settings, gss_potential_func* potential, gs
 		//	real_t y = Y[idx];
 		//	result.wavefunction[idx] = guess(x,y);
 		//}
-		FOREACH_GRIDPOINT(settings.g, i) {
-			result.wavefunction[i] = guess(&settings.g.points[i], settings.g.dimensions);
+		for (int_t i = 0; i < settings.g.total_pointcount; ++i) {
+			result.wavefunction[i] = guess(&settings.g.points[settings.g.dimensions*i], settings.g.dimensions);
 		}
 
 		real_t sum = 0.0;
@@ -159,7 +192,7 @@ gss_result item_execute(gss_settings settings, gss_potential_func* potential, gs
 		//	real_t tmp = cabs(result.wavefunction[idx]);
 		//	sum += tmp*tmp;
 		//}
-		FOREACH_GRIDPOINT(settings.g, i) {
+		for (int_t i = 0; i < settings.g.total_pointcount; ++i) {
 			real_t tmp = cabs(result.wavefunction[i]);
 			sum  += tmp*tmp;
 		}
@@ -169,7 +202,7 @@ gss_result item_execute(gss_settings settings, gss_potential_func* potential, gs
 		//	int_t idx = mat_idx(N,i,j);
 		//	result.wavefunction[idx] *= scaling;
 		//}
-		FOREACH_GRIDPOINT(settings.g, i) {
+		for (int_t i = 0; i < settings.g.total_pointcount; ++i) {
 			result.wavefunction[i] *= scaling;
 		}
 	}
@@ -184,8 +217,8 @@ gss_result item_execute(gss_settings settings, gss_potential_func* potential, gs
 	//	int_t idx = mat_idx(N,i,j);
 	//	result.wavefunction[idx] = ifft_factor*ifft_out[idx]/(Lx*Ly);
 	//}
-	FOREACH_GRIDPOINT(settings.g, i) {
-		result.wavefunction[i] = ifft_factor * ifft_out[i] / V;
+	for (int_t i = 0; i < settings.g.total_pointcount; ++i) {
+		result.wavefunction[i] = ifft_factor * ifft_out[i] * density;
 	}
 
 	for (; result.iterations < settings.max_iterations; ++result.iterations)  {
@@ -203,8 +236,8 @@ gss_result item_execute(gss_settings settings, gss_potential_func* potential, gs
 			//	int_t idx = mat_idx(N,i,j);
 			//	result.wavefunction[idx] = ifft_factor*ifft_out[idx]/(Lx*Ly);
 			//}
-			FOREACH_GRIDPOINT(settings.g, i) {
-				result.wavefunction[i] = ifft_factor * ifft_out[i] / V;
+			for (int_t i = 0; i < settings.g.total_pointcount; ++i) {
+				result.wavefunction[i] = ifft_factor * ifft_out[i] * density;
 			}
 		}
 		
@@ -216,7 +249,7 @@ gss_result item_execute(gss_settings settings, gss_potential_func* potential, gs
 			//	real_t tmp = cabs(result.wavefunction[idx]);
 			//	sum += tmp*tmp;
 			//}
-			FOREACH_GRIDPOINT(settings.g, i) {
+			for (int_t i = 0; i < settings.g.total_pointcount; ++i) {
 				real_t tmp = cabs(result.wavefunction[i]);
 				sum += tmp*tmp;
 			}
@@ -226,7 +259,7 @@ gss_result item_execute(gss_settings settings, gss_potential_func* potential, gs
 			//	int_t idx = mat_idx(N,i,j);
 			//	result.wavefunction[idx] *= scaling;
 			//}
-			FOREACH_GRIDPOINT(settings.g, i) {
+			for (int_t i = 0; i < settings.g.total_pointcount; ++i) {
 				result.wavefunction[i] *= scaling;
 			}
 		}
@@ -239,7 +272,7 @@ gss_result item_execute(gss_settings settings, gss_potential_func* potential, gs
 			//	real_t diff = cabs(result.wavefunction[idx]-old_wavefunction[idx]);
 			//	sum += diff*diff;
 			//}
-			FOREACH_GRIDPOINT(settings.g, i) {
+			for (int_t i = 0; i < settings.g.total_pointcount; ++i) {
 				real_t diff = cabs(result.wavefunction[i] - old_wavefunction[i]);
 				sum += diff*diff;
 			}

@@ -23,6 +23,10 @@ function load_grid()
 	global grid = readdlm("debug_grid");
 end
 
+function load_kgrid()
+	global grid = readdlm("debug_kgrid");
+end
+
 function load_all()
 	load_wf();
 	load_ev();
@@ -39,7 +43,7 @@ function plot_vv(n)
 end
 
 function plot_grid()
-	scatter(grid[:,1], grid[:,2]);
+	scatter(grid);
 end
 
 #err_data = readdlm("gss_item_error");

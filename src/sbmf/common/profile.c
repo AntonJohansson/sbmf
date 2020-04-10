@@ -48,3 +48,18 @@ void profile_end(char const name[]) {
 	delta->tv_nsec = data->end.tv_nsec - data->start.tv_nsec;
 	data->delta_num_samples = (data->delta_num_samples+1) % PROFILE_DATA_SAMPLE_LEN;
 }
+
+void profile_print_results_impl() {
+	printf("Timing results:\n");
+	for (size_t i = 0; i < profile_used_data; ++i) {
+		profile_data_t data = profile_data[i];
+
+		long avg = 0;
+		for (size_t j = 0; j < data.delta_num_samples; ++j) {
+			avg += 1000000000*data.deltas[j].tv_sec + data.deltas[j].tv_nsec;
+		}
+		avg /= data.delta_num_samples;
+
+		printf("%10s -- %ld (ms)\n", data.name, avg/1000000);
+	}
+}

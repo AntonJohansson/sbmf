@@ -1,11 +1,11 @@
 using DelimitedFiles, Plots
 pyplot()
 
-N = 128;
+N = 64;
 
 function load_wf()
 	wf_data = readdlm("gss_item_wf");
-	global wf = reshape(wf_data, N,N);
+	global wf = reshape(wf_data, N,1);
 
 	#pt_data = readdlm("gss_item_pt");
 	#global pt = reshape(pt_data, N,N);

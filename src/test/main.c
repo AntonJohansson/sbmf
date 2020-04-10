@@ -26,16 +26,16 @@
 //}
 
 real_t potential(real_t* v, int_t n, complex_t u) {
-	real_t temp = 0.0f;
-	for (int_t i = 0; i < n; ++i)
-		temp += cos(v[i])*cos(v[i]);
-	return 3*temp + cabs(u)*cabs(u);
-
 	//real_t temp = 0.0f;
-	//for (int_t i = 0; i < n; ++i) {
-	//	temp += v[i]*v[i];
-	//}
-	//return 0.5*temp;
+	//for (int_t i = 0; i < n; ++i)
+	//	temp += cos(v[i])*cos(v[i]);
+	//return 3*temp + cabs(u)*cabs(u);
+
+	real_t temp = 0.0f;
+	for (int_t i = 0; i < n; ++i) {
+		temp += v[i]*v[i];
+	}
+	return 0.5*temp;
 }
 
 complex_t initial_guess(real_t* v, int_t n) {
@@ -45,62 +45,46 @@ complex_t initial_guess(real_t* v, int_t n) {
 
 
 void item_test() {
-	const int_t N = 128;
-	grid g = generate_grid(2, 
+	const int_t N = 64;
+
+	grid g = generate_grid(1, 
 			(real_t[]){-5*M_PI, -5*M_PI},
 			(real_t[]){ 5*M_PI,  5*M_PI},
-			 (int_t[]){ N,  	 	 N}
+			 (int_t[]){ N,  	 	 N     }
 			);
-
-	{
-		FILE* fd = fopen("debug_grid", "w");
-		for (int_t i = 0; i < g.total_pointcount; ++i) {
-			for (int_t j = 0; j < g.dimensions; ++j) {
-				fprintf(fd, "%lf", g.points[g.dimensions*i + j]);
-				if (j < g.dimensions-1)
-					fprintf(fd, "\t");
-				else
-					fprintf(fd, "\n");
-			}
-		}
-		fclose(fd);
-	}
 
 	gss_settings settings = {
 		.g = g,
-		//.resolution = N,
 		.max_iterations = 2000,
 		.error_tol = 1e-10,
 		.dt = 0.01,
-		//.length_x = 10.0*M_PI,
-		//.length_y = 10.0*M_PI,
 
 		.measure_every = 0,
 	};
 
 	printf("Finding groundstate\n");
-	PROFILE_BEGIN("item");
 
+	PROFILE_BEGIN("item");
 	gss_result res = item_execute(settings,
 																potential,
 																initial_guess);
 	PROFILE_END("item");
 
 	printf("Generating FD matrix\n");
-	//PROFILE_BEGIN("gen fd");
-	//bandmat fdm = generate_fd_matrix(settings.resolution, 4, 2, (real_t[]){
-	//		settings.length_x/settings.resolution,
-	//		settings.length_y/settings.resolution});
+	PROFILE_BEGIN("gen fd");
+	bandmat fdm = generate_fd_matrix(settings.resolution, 4, 2, (real_t[]){
+			settings.length_x/settings.resolution,
+			settings.length_y/settings.resolution});
 
-	//for (int_t i = 0; i < fdm.size*fdm.bandcount; ++i) {
-	//	fdm.bands[i] = -fdm.bands[i];
-	//}
+	for (int_t i = 0; i < fdm.size*fdm.bandcount; ++i) {
+		fdm.bands[i] = -fdm.bands[i];
+	}
 
-	//for (int_t i = 0; i < fdm.size; ++i) {
-	//	int_t idx = fdm.size*(fdm.bandcount-1) + i;
-	//	//fdm.bands[idx] += potential(res.X[i], res.Y[i], res.wavefunction[i]);
-	//}	
-	//PROFILE_END("gen fd");
+	for (int_t i = 0; i < fdm.size; ++i) {
+		int_t idx = fdm.size*(fdm.bandcount-1) + i;
+		//fdm.bands[idx] += potential(res.X[i], res.Y[i], res.wavefunction[i]);
+	}	
+	PROFILE_END("gen fd");
 
 	printf("Trying to solve the eigenvalue problem\n");
 	//PROFILE_BEGIN("EV prob");
@@ -183,36 +167,8 @@ void item_test() {
 	free_grid(g);
 }
 
-/*
-void niter_test() {
-	niter_settings settings = {
-		.resolution = 20,
-		.max_iterations = 500,
-		.error_tol = 1e-10,
-		.length_x = 10.0*M_PI,
-		.length_y = 10.0*M_PI,
-	};
-
-	niter_result res = niter_execute(settings, potential, initial_guess);
-	niter_free_result(res);
-}
-*/
 int main(int argc, char** argv) {
-	//aitem_test();
 	item_test();
-
-	printf("Timing results:\n");
-	for (size_t i = 0; i < profile_used_data; ++i) {
-		profile_data_t data = profile_data[i];
-
-		long avg = 0;
-		for (size_t j = 0; j < data.delta_num_samples; ++j) {
-			avg += 1000000000*data.deltas[j].tv_sec + data.deltas[j].tv_nsec;
-		}
-		avg /= data.delta_num_samples;
-
-		printf("%10s -- %ld (ms)\n", data.name, avg/1000000);
-	}
-
+	profile_print_results();
 	return 0;
 }

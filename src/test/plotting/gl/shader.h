@@ -1,14 +1,16 @@
 #pragma once
 
 #include <glad/glad.h>
-#include <commonstd.h>
 
-extern GLuint program_begin();
-extern void program_end();
-extern void program_link();
+#define MAX_SHADERCOUNT 8
 
-extern void program_attach_shader_from_file(const char* file, GLenum type);
-extern void program_attach_shader_from_buffer(const char* buffer, GLenum type);
+typedef struct {
+	GLuint handle;
+
+	GLuint current_shader_index;
+	GLuint shaders[MAX_SHADERCOUNT];
+
+} ShaderProgram;
 
 typedef struct {
 	GLuint location;
@@ -17,16 +19,20 @@ typedef struct {
 	GLboolean normalized;
 	GLsizei stride;
 	GLsizei offset;
-} vertex_attribute;
+} VertexAttribute;
 
-static vertex_attribute format_xy_uv[] = {
-	{0,2,GL_FLOAT,GL_FALSE,4*sizeof(GL_FLOAT),0}, // position
-	{1,2,GL_FLOAT,GL_FALSE,4*sizeof(GL_FLOAT),2*sizeof(GL_FLOAT)}, // texcoord
-};
+//static VertexAttribute format_xy_uv[] = {
+//	{0,2,GL_FLOAT,GL_FALSE,4*sizeof(GL_FLOAT),0}, // position
+//	{1,2,GL_FLOAT,GL_FALSE,4*sizeof(GL_FLOAT),2*sizeof(GL_FLOAT)}, // texcoord
+//};
+//
+//static VertexAttribute format_xy[] = {
+//	{0,2,GL_FLOAT,GL_FALSE,2*sizeof(GL_FLOAT),0}, // position
+//};
 
-static vertex_attribute format_xy[] = {
-	{0,2,GL_FLOAT,GL_FALSE,2*sizeof(GL_FLOAT),0}, // position
-};
-
-extern void bind_vertex_attribute(vertex_attribute attrib);
-extern void bind_vertex_format(vertex_attribute format[], uint8_t size);
+extern ShaderProgram program_make();
+extern void program_attach_shader_from_buffer(ShaderProgram* program, const char* buffer, GLenum type);
+extern void program_link(ShaderProgram* program);
+extern void program_bind_fragdata_location(ShaderProgram* program, const char* loc);
+extern void program_bind_vertex_attribute(VertexAttribute attrib);
+extern void program_bind_vertex_format(VertexAttribute format[], unsigned int size);

@@ -5,6 +5,7 @@
 
 #include <string.h>
 #include <stdlib.h>
+#include <assert.h>
 
 static real_t VK(real_t* v, int_t n, complex_t u) {
 	real_t value = 0.0;
@@ -76,6 +77,7 @@ gss_result item_execute(gss_settings settings, gss_potential_func* potential, gs
 
 	gss_debug dbg = {};
 	if (settings.measure_every > 0) {
+		printf("-- Allocating debug info\n");
 		dbg.count = settings.max_iterations/settings.measure_every;
 		dbg.current = 0;
 		dbg.error = malloc(dbg.count * sizeof(real_t));
@@ -293,6 +295,7 @@ gss_result item_execute(gss_settings settings, gss_potential_func* potential, gs
 	apply_step_op(1.0, dt/2.0, fft_in, potential, settings.g, result.wavefunction);
 
 	// Cleanup
+	free_grid(kgrid);
 	fftw_destroy_plan(fft_plan);
 	fftw_destroy_plan(ifft_plan);
 	fftw_free(fft_in);

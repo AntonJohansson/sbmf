@@ -1,13 +1,13 @@
 #pragma once
 
-#include <debug/log.h>
 #include <glad/glad.h>
+#include <stdio.h>
 
 #define GL_DUMP_ERRORS() 														\
 	do {  																						\
 		GLenum e; 																			\
 		while((e = glGetError()) != GL_NO_ERROR) {			\
-			log_error("GL: %s", glGetString(e)); 					\
+			fprintf(stderr, "GL: %s", glGetString(e)); 		\
 		}																								\
 	}while(0)
 

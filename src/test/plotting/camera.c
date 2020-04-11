@@ -1,5 +1,4 @@
-#include "camera.hpp"
-#include <glm/gtc/matrix_transform.hpp>
+#include "camera.h"
 #include <math.h>
 
 void camera_update_arcball(camera* cam){
@@ -17,8 +16,8 @@ void camera_update_arcball(camera* cam){
 	mat4 view = {0};
 	m4identity(&view);
 	m4translate(&view, view, cam->tar_x,cam->tar_y,cam->tar_z);
-	m4rotate(&view, cam->phi + M_PI_2, 0,0,1);
-	m4rotate(&view, cam->theta, 1,0,0);
+	m4rotate(&view, view, cam->phi + M_PI_2, 0,0,1);
+	m4rotate(&view, view, cam->theta, 1,0,0);
 	m4translate(&view, view, 0,0,cam->radius);
 
 	// get poisition from translation (last) column
@@ -35,5 +34,6 @@ void camera_update_arcball(camera* cam){
 
 void camera_update_projection(camera* cam){
 	//camera.projection = glm::perspective(glm::radians(camera.fov), camera.aspect_ratio, camera.near, camera.far);
-	m4perspective(&cam->projection, cam->fov, cam->aspect, cam->near, cam->far);
+	mat4* ptr = &cam->projection;
+	m4perspective(ptr, cam->fov, cam->aspect, cam->near, cam->far);
 }

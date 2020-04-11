@@ -8,22 +8,7 @@
 #include <stdio.h>
 #include <assert.h>
 
-//real_t potential(real_t x, real_t y, complex_t u) {
-//	real_t cosx = cos(x);
-//	real_t cosy = cos(y);
-//	//return x*x + y*y + cabs(u)*cabs(u);
-//	//return 3*(cosx*cosx + cosy*cosy)*u + u*u*u;
-//	return 3*(cosx*cosx + cosy*cosy) + cabs(u)*cabs(u);
-//	//return x*x + y*y;
-//	//return x*x + y*y;
-//	//return 3*(x*x)*u;
-//	//return (fabs(x) < 15 && fabs(y) < 15) ? 0 : 10*u;
-//}
-
-//complex_t initial_guess(real_t x, real_t y) {
-//	//return (1.0/(10.0*m_pi*10.0*m_pi + 10.0*m_pi*10.0*m_pi))*exp(-(x*x + y*y));
-//	return 1.0/(10.0*m_pi*10.0*m_pi);
-//}
+#include "plotting/plt.h"
 
 real_t potential(real_t* v, int_t n, complex_t u) {
 	//real_t temp = 0.0f;
@@ -43,9 +28,8 @@ complex_t initial_guess(real_t* v, int_t n) {
 	return 1.0/(10.0*M_PI*10.0*M_PI);
 }
 
-
-void item_test() {
-	const int_t N = 64;
+int main(int argc, char** argv) {
+	const int_t N = 128;
 
 	grid g = generate_grid(1, 
 			(real_t[]){-5*M_PI, -5*M_PI},
@@ -70,21 +54,37 @@ void item_test() {
 																initial_guess);
 	PROFILE_END("item");
 
-	printf("Generating FD matrix\n");
-	PROFILE_BEGIN("gen fd");
-	bandmat fdm = generate_fd_matrix(settings.resolution, 4, 2, (real_t[]){
-			settings.length_x/settings.resolution,
-			settings.length_y/settings.resolution});
+	PlotState* state = plt_init();
 
-	for (int_t i = 0; i < fdm.size*fdm.bandcount; ++i) {
-		fdm.bands[i] = -fdm.bands[i];
+	float x[N];
+	float y[N];
+	float v[N];
+	for (int_t i = 0; i < N; ++i) {
+		x[i] = (float)g.points[i];
+		y[i] = (float)cabs(res.wavefunction[i]);
+		v[i] = (float)potential(&g.points[i], 1, cabs(res.wavefunction[i]));
 	}
+	plt_1d(state, x, y, N);
+	plt_1d(state, x, v, N);
 
-	for (int_t i = 0; i < fdm.size; ++i) {
-		int_t idx = fdm.size*(fdm.bandcount-1) + i;
-		//fdm.bands[idx] += potential(res.X[i], res.Y[i], res.wavefunction[i]);
-	}	
-	PROFILE_END("gen fd");
+	plt_update_until_closed(state);
+	plt_shutdown(state);
+
+	//printf("Generating FD matrix\n");
+	//PROFILE_BEGIN("gen fd");
+	//bandmat fdm = generate_fd_matrix(settings.resolution, 4, 2, (real_t[]){
+	//		settings.length_x/settings.resolution,
+	//		settings.length_y/settings.resolution});
+
+	//for (int_t i = 0; i < fdm.size*fdm.bandcount; ++i) {
+	//	fdm.bands[i] = -fdm.bands[i];
+	//}
+
+	//for (int_t i = 0; i < fdm.size; ++i) {
+	//	int_t idx = fdm.size*(fdm.bandcount-1) + i;
+	//	//fdm.bands[idx] += potential(res.X[i], res.Y[i], res.wavefunction[i]);
+	//}	
+	//PROFILE_END("gen fd");
 
 	printf("Trying to solve the eigenvalue problem\n");
 	//PROFILE_BEGIN("EV prob");
@@ -130,31 +130,31 @@ void item_test() {
 		res.settings.error_tol
 	);
 
-	{
-		FILE* fdwf = fopen("gss_item_wf", "w");
-		FILE* fdpt = fopen("gss_item_pt", "w");
-		FILE* fdev = fopen("gss_item_ev", "w");
-		FILE* fdvv = fopen("gss_item_vv", "w");
-		for (int_t i = 0; i < settings.g.total_pointcount; ++i) {
-			fprintf(fdwf, "%lf\n", cabs(res.wavefunction[i]));
-			//fprintf(fdpt, "%lf\n", potential(res.X[i], res.Y[i], res.wavefunction[i]));
-			//fprintf(fdev, "%lf\n", outD[i]);
-			//for (int_t j = 0; j < fdm.size; ++j) {
-			//	fprintf(fdvv, "%lf", outQ[i*fdm.size + j]);
-			//	if (j < fdm.size-1)
-			//		fprintf(fdvv, "\t");
-			//	else
-			//		fprintf(fdvv, "\n");
-			//}
-		}
-		FOREACH_GRIDPOINT(settings.g, i) {
-			fprintf(fdpt, "%lf\n", potential(&settings.g.points[i], settings.g.dimensions, res.wavefunction[i]));
-		}
-		fclose(fdwf);
-		fclose(fdpt);
-		fclose(fdev);
-		fclose(fdvv);
-	}
+	//{
+	//	FILE* fdwf = fopen("gss_item_wf", "w");
+	//	FILE* fdpt = fopen("gss_item_pt", "w");
+	//	FILE* fdev = fopen("gss_item_ev", "w");
+	//	FILE* fdvv = fopen("gss_item_vv", "w");
+	//	for (int_t i = 0; i < settings.g.total_pointcount; ++i) {
+	//		fprintf(fdwf, "%lf\n", cabs(res.wavefunction[i]));
+	//		//fprintf(fdpt, "%lf\n", potential(res.X[i], res.Y[i], res.wavefunction[i]));
+	//		//fprintf(fdev, "%lf\n", outD[i]);
+	//		//for (int_t j = 0; j < fdm.size; ++j) {
+	//		//	fprintf(fdvv, "%lf", outQ[i*fdm.size + j]);
+	//		//	if (j < fdm.size-1)
+	//		//		fprintf(fdvv, "\t");
+	//		//	else
+	//		//		fprintf(fdvv, "\n");
+	//		//}
+	//	}
+	//	FOREACH_GRIDPOINT(settings.g, i) {
+	//		fprintf(fdpt, "%lf\n", potential(&settings.g.points[i], settings.g.dimensions, res.wavefunction[i]));
+	//	}
+	//	fclose(fdwf);
+	//	fclose(fdpt);
+	//	fclose(fdev);
+	//	fclose(fdvv);
+	//}
 	//{
 	//	FILE* fd = fopen("gss_item_error", "w");
 	//	for (int_t i = 0; i < res.debug.current; ++i) {
@@ -165,10 +165,7 @@ void item_test() {
 	
 	gss_free_result(res);
 	free_grid(g);
-}
 
-int main(int argc, char** argv) {
-	item_test();
 	profile_print_results();
 	return 0;
 }

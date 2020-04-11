@@ -1,23 +1,23 @@
 #pragma once
 
 #include <math.h>
+#include "mat4.h"
 
-typedef struct{
-	float radius = 0.0f;
-	float theta = 0.0f;
-	float phi = 0.0f;
+typedef struct {
+	float radius;
+	float theta;
+	float phi;
 
-	glm::vec3 position{0,0,0};
-	glm::vec3 direction{1,0,0};
-	glm::vec3 target{0,0,0};
+	float pos_x, pos_y, pos_z;
+	float dir_x, dir_y, dir_z;
+	float tar_x, tar_y, tar_z;
+	
+	float fov;
+	float aspect;
+	float near, far;
 
-	float fov = 45.0f;
-	float aspect_ratio = 16.0f/9.0f;
-	float near = 1.0f;
-	float far = 40.0f;
-
-	glm::mat4 projection{1};
-	glm::mat4 view{1};
+	mat4 projection;
+	mat4 view;
 } camera;
 
 static inline camera make_camera() {
@@ -38,7 +38,7 @@ static inline camera make_camera() {
 		.tar_y = 0,
 		.tar_z = 0,
 
-		.fov = M_PI_2,
+		.fov = M_PI_4,
 		.aspect = 16.0f/9.0f,
 		.near = 1,
 		.far = 10,

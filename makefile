@@ -9,10 +9,12 @@ PROJ_SRCS = \
 TEST_SRCS = $(shell find src/test -name "*.c")
 
 PROJ_LIBS = -lfftw3 -llapacke -lm
-TEST_LIBS = -l$(PROJECT) -llapacke -lm
+TEST_LIBS = -l$(PROJECT) -llapacke -lglfw -lm -ldl
 
-PROJ_FLAGS = -fsanitize=address -fsanitize=leak -g -fpic -Wall -Werror -Isrc
-TEST_FLAGS = -fsanitize=address -fsanitize=leak -g -Wall -Werror -Isrc
+#PROJ_FLAGS = -fsanitize=address -fsanitize=leak -g -fpic -Wall -Werror -Isrc
+#TEST_FLAGS = -fsanitize=address -fsanitize=leak -g -Wall -Werror -Isrc -Isrc/test/plotting/third_party
+PROJ_FLAGS = -g -fpic -Wall -Werror -Isrc
+TEST_FLAGS = -g -Wall -Werror -Isrc -Isrc/test/plotting/third_party
 
 default: $(BUILD_DIR)/$(PROJECT) $(BUILD_DIR)/test
 

@@ -11,6 +11,9 @@ TEST_SRCS = $(shell find src/test -name "*.c")
 PROJ_LIBS = -lfftw3 -llapacke -lm
 TEST_LIBS = -l$(PROJECT) -llapacke -lm
 
+PROJ_FLAGS = -fsanitize=address -fsanitize=leak -g -fpic -Wall -Werror -Isrc
+TEST_FLAGS = -fsanitize=address -fsanitize=leak -g -Wall -Werror -Isrc
+
 default: $(BUILD_DIR)/$(PROJECT) $(BUILD_DIR)/test
 
 $(BUILD_DIR):
@@ -19,7 +22,7 @@ $(BUILD_DIR):
 # -Ithird_party/include -Lthird_party/lib  required on school comp
 #  How do I check for that?
 $(BUILD_DIR)/$(PROJECT): $(BUILD_DIR) $(PROJ_SRCS)
-	$(CC) -Wall -Werror -o $(BUILD_DIR)/lib$(PROJECT).so -shared -fpic $(PROJ_SRCS) -Isrc -g $(PROJ_LIBS)
+	$(CC) -o $(BUILD_DIR)/lib$(PROJECT).so -shared $(PROJ_SRCS) $(PROJ_FLAGS) $(PROJ_LIBS)
 
 $(BUILD_DIR)/test: $(TEST_SRCS) $(BUILD_DIR)/$(PROJECT)
-	$(CC) $(TEST_SRCS) -o $(BUILD_DIR)/test -g -Wl,-rpath=$(BUILD_DIR) -Isrc -L$(BUILD_DIR) $(TEST_LIBS)
+	$(CC) $(TEST_SRCS) -o $(BUILD_DIR)/test -Wl,-rpath=$(BUILD_DIR) -L$(BUILD_DIR) $(TEST_FLAGS) $(TEST_LIBS)

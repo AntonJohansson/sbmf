@@ -1,7 +1,7 @@
 #include "camera.h"
 #include <math.h>
 
-void camera_update_arcball(camera* cam){
+void camera_update_arcball(camera* cam) {
 	//auto view = glm::mat4(1.0f);
 	//view = glm::translate(view, camera.target);
 	//view = glm::rotate(view, camera.phi + glm::half_pi<float>(), glm::vec3(0,0,1));
@@ -32,8 +32,24 @@ void camera_update_arcball(camera* cam){
 	m4inverse(&cam->view, view);
 }
 
-void camera_update_projection(camera* cam){
+void camera_update_pan(camera* cam) {
+	mat4 view = {0};
+	m4identity(&view);
+	m4translate(&view, view, cam->tar_x, cam->tar_y, cam->tar_z);
+
+	float scale = 1.0/cam->radius;
+	m4scale(&view, view, scale, scale, scale);
+	m4copy(&cam->view, view);
+}
+
+void camera_update_perspective_projection(camera* cam) {
 	//camera.projection = glm::perspective(glm::radians(camera.fov), camera.aspect_ratio, camera.near, camera.far);
 	mat4* ptr = &cam->projection;
 	m4perspective(ptr, cam->fov, cam->aspect, cam->near, cam->far);
 }
+
+void camera_update_orthographic_projection(camera* cam) {
+	mat4* ptr = &cam->projection;
+	m4orthographic(ptr, cam->fov, cam->aspect, cam->near, cam->far);
+}
+

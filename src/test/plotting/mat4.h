@@ -65,6 +65,15 @@ static inline void m4rotate(mat4* ans, mat4 m, float angle, float x, float y, fl
 	m4mul(ans, rotmat, m);
 }
 
+static inline void m4scale(mat4* ans, mat4 m, float sx, float sy, float sz) {
+	M4ASSIGN(*ans,
+			sx*m[0], m[1],    m[2], 	m[3],
+			m[4], sy*m[5],    m[6], 	m[7],
+			m[8], 	 m[9], sz*m[10], 	m[11],
+			m[12], 	 m[13],	  m[14], 	m[15]
+			);
+}
+
 // fov, aspect, near, far
 static inline void m4perspective(mat4* ans, float fov, float aspect, float near, float far) {
 	assert(far-near != 0 && aspect != 0);
@@ -77,6 +86,20 @@ static inline void m4perspective(mat4* ans, float fov, float aspect, float near,
 			0, 	uh, 0, 										 0,
 			0, 	0,	-far/(far-near), 			-1,
 			0, 	0,  -far*near/(far-near),  0
+			);
+}
+
+static inline void m4orthographic(mat4* ans, float fov, float aspect, float near, float far) {
+	assert(far-near != 0 && aspect != 0);
+
+	float right = tanf(fov/2);
+	float top = right/aspect;
+
+	M4ASSIGN(*ans,
+			1/right,		0,  0,										 	0,
+			0, 	1/top, 	0, 										 	0,
+			0, 	0,	-2/(far-near), 				 	-(far+near)/(far-near),
+			0, 	0,  0,  										1
 			);
 }
 

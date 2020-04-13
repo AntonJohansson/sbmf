@@ -46,4 +46,6 @@ static inline camera make_camera() {
 }
 
 extern void camera_update_arcball(camera* cam);
-extern void camera_update_projection(camera* cam);
+extern void camera_update_pan(camera* cam);
+extern void camera_update_perspective_projection(camera* cam);
+extern void camera_update_orthographic_projection(camera* cam);

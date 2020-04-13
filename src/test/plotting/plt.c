@@ -33,13 +33,25 @@ struct PlotState {
 	float mouse_y;
 
 	// 1d plotting
-	unsigned int index1d;
+	bool active1d[MAX_CURVES_1D];
 	unsigned int lengths1d[MAX_CURVES_1D];
 	GLuint vaos1d[MAX_CURVES_1D];
 	GLuint vboxs1d[MAX_CURVES_1D];
 	GLuint vboys1d[MAX_CURVES_1D];
 	GLuint program1d;
 };
+
+static float hsl_f(float h, float s, float l, int n) {
+	float k = fmod((n + h/30), 12);
+	float a = s*fmin(l, 1-l);
+	return l - a*fmax(fmin(fmin(k-3, 9-k), 1), -1);
+}
+
+static void hsl_to_rgb(float outcol[3], float h, float s, float l) {
+	outcol[0] = hsl_f(h,s,l, 0);
+	outcol[1] = hsl_f(h,s,l, 8);
+	outcol[2] = hsl_f(h,s,l, 4);
+}
 
 static void glfw_error_callback(int code, const char* desc) {
 	fprintf(stderr, "GLFW: %s (%d).\n", desc, code);
@@ -63,9 +75,15 @@ static void mouse_move_callback(GLFWwindow* window, double x, double y){
 	last_normalized_y = normalized_y;
 
 	if (state->is_lmb_down){
+		// If camera is in "arc balL" mode
 		state->cam.theta = fclamp(state->cam.theta - dy, 0.0f, M_PI);
 		state->cam.phi = fmod(state->cam.phi - dx, 2.0f*M_PI);
-		camera_update_arcball(&state->cam);
+
+		// If camera is in "panning mode"
+		state->cam.tar_x+=dx;
+		state->cam.tar_y+=dy;
+		//camera_update_arcball(&state->cam);
+		camera_update_pan(&state->cam);
 	}
 }
 
@@ -95,7 +113,8 @@ static void mouse_button_callback(GLFWwindow* window, int button, int action, in
 static void scroll_callback(GLFWwindow* window, double xoffset, double yoffset){
 	PlotState* state = (PlotState*) glfwGetWindowUserPointer(window);
 	state->cam.radius = fmax(state->cam.radius + -0.5f*yoffset, 0.0f);
-	camera_update_arcball(&state->cam);
+	//camera_update_arcball(&state->cam);
+	camera_update_pan(&state->cam);
 }
 
 
@@ -244,15 +263,19 @@ PlotState* plt_init() {
 			"#version 430\n"
 			"layout(location = 0) in float x;\n"
 			"layout(location = 1) in float y;\n"
+			"uniform mat4 M;\n"
+			"uniform mat4 V;\n"
+			"uniform mat4 P;\n"
 			"void main() {\n"
-			"	gl_Position = vec4(x, y, 0, 1);\n"
+			"	gl_Position = V*vec4(x, y, 0, 1);\n"
 			"}";
 
 		static const char* frag1d =
 			"#version 430\n"
 			"out vec4 out_color;\n"
+			"uniform vec3 color;\n"
 			"void main() {\n"
-			"	out_color = vec4(1,0,0,1);\n"
+			"	out_color = vec4(color,1);\n"
 			"}";
 
 		ShaderProgram prog = program_make();
@@ -262,7 +285,7 @@ PlotState* plt_init() {
 		program_bind_fragdata_location(&prog, "out_color");
 		state->program1d = prog.handle;
 
-			}
+	}
 
 	glfwSetWindowUserPointer(state->window, (void*)state);
 
@@ -271,10 +294,15 @@ PlotState* plt_init() {
   glfwSetMouseButtonCallback(state->window, mouse_button_callback);
 
 	state->cam = make_camera();
-	state->cam.radius = 2.0f;
+	state->cam.radius = 1.0f;
 	state->cam.aspect = WINDOW_WIDTH/(float)WINDOW_HEIGHT;
-	camera_update_projection(&state->cam);
-	camera_update_arcball(&state->cam);
+	state->cam.tar_x = 0;
+	state->cam.tar_y = 0;
+	state->cam.tar_z = 0;
+	camera_update_perspective_projection(&state->cam);
+	camera_update_orthographic_projection(&state->cam);
+	//camera_update_arcball(&state->cam);
+	camera_update_pan(&state->cam);
 
 	return state;
 }
@@ -296,6 +324,53 @@ void plt_shutdown(PlotState* state) {
 	free(state);
 }
 
+void plt_update(PlotState* state) {
+	glfwPollEvents();
+
+	{
+		glClearColor(0,0,0,1);
+		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+		//glm::vec4 plane_color = {0.25,0.25,0.25,1};
+		//glm::mat4 model(1);
+		//model = glm::scale(model, {plane_scale, plane_scale, plane_scale});
+		//glm::mat4 mvp = camera.projection * camera.view * model;
+
+		//glUseProgram(screen_program);
+		//bind_texture(grid_texture, 1);
+
+		glUseProgram(state->program1d);
+
+		GLuint uniform;
+		//uniform = glGetUniformLocation(screen_program, "M");
+		//glUniformMatrix4fv(uniform, 1, GL_FALSE, glm::value_ptr(mvp));
+		uniform = glGetUniformLocation(state->program1d, "V");
+		glUniformMatrix4fv(uniform, 1, GL_TRUE, state->cam.view);
+		uniform = glGetUniformLocation(state->program1d, "P");
+		glUniformMatrix4fv(uniform, 1, GL_TRUE, state->cam.projection);
+
+		//glEnable(GL_PRIMITIVE_RESTART);
+		//glPrimitiveRestartIndex(65535);
+		//glDrawElements(GL_TRIANGLE_STRIP, nelements, GL_UNSIGNED_INT, NULL);
+		//glDisable(GL_PRIMITIVE_RESTART);
+
+		uniform = glGetUniformLocation(state->program1d, "color");
+		for (unsigned int i = 0; i < MAX_CURVES_1D; ++i) {
+			if (!state->active1d[i])
+				continue;
+
+			float col[3] = {0};
+			hsl_to_rgb(col, i*(360.0f/MAX_CURVES_1D),0.85f,0.5f);
+			glUniform3fv(uniform, 1, col);
+
+			glBindVertexArray(state->vaos1d[i]);
+			glDrawArrays(GL_LINE_STRIP, 0, state->lengths1d[i]);
+		}
+	}
+
+	glfwSwapBuffers(state->window);
+}
+
 void plt_update_until_closed(PlotState* state) {
 	double timestep = 1.0/60.0;
 
@@ -313,59 +388,60 @@ void plt_update_until_closed(PlotState* state) {
 		while (accumulator >= timestep) {
 			accumulator -= timestep;
 			// update simulation
-			glfwPollEvents();
-
-			{
-				glClearColor(0,0,0,1);
-				glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-				//glm::vec4 plane_color = {0.25,0.25,0.25,1};
-				//glm::mat4 model(1);
-				//model = glm::scale(model, {plane_scale, plane_scale, plane_scale});
-				//glm::mat4 mvp = camera.projection * camera.view * model;
-
-				//glUseProgram(screen_program);
-				//bind_texture(grid_texture, 1);
-
-				//GLuint uniform;
-				//uniform = glGetUniformLocation(screen_program, "mvp");
-				//glUniformMatrix4fv(uniform, 1, GL_FALSE, glm::value_ptr(mvp));
-				//uniform = glGetUniformLocation(screen_program, "color");
-				//glUniform4fv(uniform, 1, glm::value_ptr(plane_color));
-
-				//glEnable(GL_PRIMITIVE_RESTART);
-				//glPrimitiveRestartIndex(65535);
-				//glDrawElements(GL_TRIANGLE_STRIP, nelements, GL_UNSIGNED_INT, NULL);
-				//glDisable(GL_PRIMITIVE_RESTART);
-
-				glUseProgram(state->program1d);
-				for (unsigned int i = 0; i < state->index1d; ++i) {
-					glBindVertexArray(state->vaos1d[i]);
-					glDrawArrays(GL_LINE_STRIP, 0, state->lengths1d[i]);
-				}
-			}
-
-			glfwSwapBuffers(state->window);
+			plt_update(state);
 		}
 	}
 }
 
-void plt_1d(PlotState* state, float* x, float* y, unsigned int len) {
-	assert(state->index1d + 1 < MAX_CURVES_1D);
 
-	unsigned int i = state->index1d;
-	glBindVertexArray(state->vaos1d[i]);
 
-	glBindBuffer(GL_ARRAY_BUFFER, state->vboxs1d[i]);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+void plt_1d(PlotState* state, unsigned int id, float* x, float* y, unsigned int len) {
+	assert(id < MAX_CURVES_1D);
+
+	glBindVertexArray(state->vaos1d[id]);
+
+	glBindBuffer(GL_ARRAY_BUFFER, state->vboxs1d[id]);
 	glBufferData(GL_ARRAY_BUFFER, sizeof(float)*len, x, GL_STATIC_DRAW);
 	program_bind_vertex_attribute((VertexAttribute){0,1,GL_FLOAT,GL_FALSE,sizeof(GL_FLOAT),0});
-	glBindBuffer(GL_ARRAY_BUFFER, state->vboys1d[i]);
+	glBindBuffer(GL_ARRAY_BUFFER, state->vboys1d[id]);
 	glBufferData(GL_ARRAY_BUFFER, sizeof(float)*len, y, GL_STATIC_DRAW);
 	program_bind_vertex_attribute((VertexAttribute){1,1,GL_FLOAT,GL_FALSE,sizeof(GL_FLOAT),0});
 
-	state->lengths1d[i] = len;
-	state->index1d++;
+	state->lengths1d[id] = len;
+	state->active1d[id] = true;
 }
 
-void plt_2d(PlotState* state, float* points, unsigned int len);
-void plt_3d(PlotState* state, float* points, unsigned int len);
+void plt_2d(PlotState* state, unsigned int id, float* points, unsigned int len);
+void plt_3d(PlotState* state, unsigned int id, float* points, unsigned int len);

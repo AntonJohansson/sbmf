@@ -7,8 +7,11 @@
 
 #include <stdio.h>
 #include <assert.h>
+#include <unistd.h>
 
 #include "plotting/plt.h"
+
+static PlotState* state;
 
 real_t potential(real_t* v, int_t n, complex_t u) {
 	//real_t temp = 0.0f;
@@ -28,6 +31,22 @@ complex_t initial_guess(real_t* v, int_t n) {
 	return 1.0/(10.0*M_PI*10.0*M_PI);
 }
 
+void dbgcallback(grid g, complex_t* wf) {
+	float x[g.total_pointcount];
+	float y[g.total_pointcount];
+	float v[g.total_pointcount];
+	for (int_t i = 0; i < g.total_pointcount; ++i) {
+		x[i] = (float)g.points[i];
+		y[i] = (float)cabs(wf[i]);
+		v[i] = (float)potential(&g.points[i], 1, y[i]);
+	}
+
+	plt_1d(state, 0, x, v, g.total_pointcount);
+	plt_1d(state, 1, x, y, g.total_pointcount);
+
+	plt_update(state);
+}
+
 int main(int argc, char** argv) {
 	const int_t N = 128;
 
@@ -43,30 +62,19 @@ int main(int argc, char** argv) {
 		.error_tol = 1e-10,
 		.dt = 0.01,
 
-		.measure_every = 0,
+		.measure_every = 1,
+		.dbgcallback = dbgcallback,
 	};
 
 	printf("Finding groundstate\n");
 
+	state = plt_init();
 	PROFILE_BEGIN("item");
+
 	gss_result res = item_execute(settings,
 																potential,
 																initial_guess);
 	PROFILE_END("item");
-
-	PlotState* state = plt_init();
-
-	float x[N];
-	float y[N];
-	float v[N];
-	for (int_t i = 0; i < N; ++i) {
-		x[i] = (float)g.points[i];
-		y[i] = (float)cabs(res.wavefunction[i]);
-		v[i] = (float)potential(&g.points[i], 1, cabs(res.wavefunction[i]));
-	}
-	plt_1d(state, x, y, N);
-	plt_1d(state, x, v, N);
-
 	plt_update_until_closed(state);
 	plt_shutdown(state);
 

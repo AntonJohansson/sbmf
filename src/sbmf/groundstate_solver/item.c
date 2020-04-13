@@ -14,15 +14,6 @@ static real_t VK(real_t* v, int_t n, complex_t u) {
 	return 0.5*value;
 }
 
-//static inline void apply_step_op(real_t ds, real_t dt, complex_t* out, gss_potential_func* potential, int_t rows, int_t cols, real_t* xmat, real_t* ymat, complex_t* wfmat) {
-//	FOREACH_ROW(rows,cols, i,j) {
-//		int_t idx = mat_idx(rows,i,j);
-//		real_t potval = potential(xmat[idx], ymat[idx], wfmat[idx]);
-//		real_t opval  = exp(-potval*dt);
-//		out[idx] = wfmat[idx] * opval * ds;
-//	}
-//}
-
 static inline void apply_step_op(real_t ds, real_t dt, complex_t* out, gss_potential_func* potential, grid g, complex_t* wavefunction) {
 	for (int_t i = 0; i < g.total_pointcount; ++i) {
 		real_t potval = potential(&g.points[g.dimensions*i], g.dimensions, wavefunction[i]);
@@ -75,19 +66,8 @@ gss_result item_execute(gss_settings settings, gss_potential_func* potential, gs
 		density *= 1.0/(settings.g.maxs[i] - settings.g.mins[i]);
 	}
 
-	gss_debug dbg = {};
-	if (settings.measure_every > 0) {
-		printf("-- Allocating debug info\n");
-		dbg.count = settings.max_iterations/settings.measure_every;
-		dbg.current = 0;
-		dbg.error = malloc(dbg.count * sizeof(real_t));
-		dbg.iteration_time = malloc(dbg.count * sizeof(real_t));
-		dbg.wavefunction = malloc((settings.g.total_pointcount) * dbg.count * sizeof(complex_t));
-	}
-
 	gss_result result = {
 		.settings = settings,
-		.debug = dbg,
 		.wavefunction = malloc(settings.g.total_pointcount*sizeof(complex_t)),
 		.error = 0.0,
 		.iterations = 0,
@@ -147,20 +127,6 @@ gss_result item_execute(gss_settings settings, gss_potential_func* potential, gs
 				}
 			}
 		}
-	}
-
-	{
-		FILE* fd = fopen("debug_kgrid", "w");
-		for (int_t i = 0; i < kgrid.total_pointcount; ++i) {
-			for (int_t j = 0; j < kgrid.dimensions; ++j) {
-				fprintf(fd, "%lf", kgrid.points[kgrid.dimensions*i + j]);
-				if (j < kgrid.dimensions-1)
-					fprintf(fd, "\t");
-				else
-					fprintf(fd, "\n");
-			}
-		}
-		fclose(fd);
 	}
 
 	// Variables used in computation
@@ -282,9 +248,12 @@ gss_result item_execute(gss_settings settings, gss_potential_func* potential, gs
 		}
 
 		if (settings.measure_every > 0 && result.iterations % settings.measure_every == 0) {
-			result.debug.error[result.debug.current] = result.error;
-			memcpy(&result.debug.wavefunction[result.debug.current*(settings.g.total_pointcount)], result.wavefunction, settings.g.total_pointcount*sizeof(complex_t));
-			result.debug.current++;
+			if (settings.dbgcallback) {
+				// Note: old_wavefunction has already been used at this point, we can
+				// thus use it as a temporary buffer.
+				apply_step_op(1.0, dt/2.0, old_wavefunction, potential, settings.g, result.wavefunction);
+				settings.dbgcallback(settings.g, old_wavefunction);
+			}
 		}
 
 		if (result.error < settings.error_tol) {
@@ -292,7 +261,7 @@ gss_result item_execute(gss_settings settings, gss_potential_func* potential, gs
 		}
 	}
 
-	apply_step_op(1.0, dt/2.0, fft_in, potential, settings.g, result.wavefunction);
+	apply_step_op(1.0, dt/2.0, result.wavefunction, potential, settings.g, result.wavefunction);
 
 	// Cleanup
 	free_grid(kgrid);

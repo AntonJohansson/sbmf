@@ -3,6 +3,9 @@
 #include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdint.h>
+#include <assert.h>
+#include <pthread.h>
 
 #include <GLFW/glfw3.h>
 #include <glad/glad.h>
@@ -21,6 +24,81 @@
 #define fclamp(val,min,max) \
 	fmax(fmin(val, max),min)
 
+///////////////////////////////////////////////////////////////////////////////////////
+// Why does this abstraction need to exist?
+//
+//	I'm glad you asked, thank you! I want the drawing of the
+//	plots to happen in a separate thread, so we can be in the
+//	background, and to do this we can either have all gl* calls
+//	in that thread, or switch contexts via glfwMakeContextCurrent(...),
+//	however the latter results in a PLATFORM_ERROR, which I don't feel
+//	like resolving, mostly cause I don't know how :/. So the former
+//	wins by default. Yay!
+//
+//	Drawing operations are batched into entries, stored in a group
+//	and the rendering thread will then convert these entries into
+//	the equivalent vbos/vaos, and clear the group.
+
+typedef enum {
+	ENTRY_TYPE_render_entry_line_plot,
+} render_entry_type;
+
+typedef struct {
+	render_entry_type type;
+	uint32_t entry_byte_size;
+} render_entry_header;
+
+typedef struct {
+	render_entry_header header;
+
+	float* x;
+	float* y;
+	uint32_t len;
+	//uint32_t vertex_count;
+	//GLuint vao;
+	//GLuint vbox;
+	//GLuint vboy;
+} render_entry_line_plot;
+
+
+
+
+typedef struct {
+	uint32_t top, block_size;
+	uint8_t* memory;
+} render_group;
+
+static inline render_group make_render_group(uint32_t size) {
+	return (render_group) {
+		.top = 0,
+		.block_size = size,
+		.memory = malloc(size),
+	};
+}
+
+static inline void free_render_group(render_group group) {
+	free(group.memory);
+}
+
+#define render_group_push(group, type) \
+	(type*) render_group_push_impl(group, sizeof(type), ENTRY_TYPE_##type)
+
+#define render_group_push_extra_size(group, type, extra_size) \
+	(type*) render_group_push_impl(group, sizeof(type) + extra_size, ENTRY_TYPE_##type)
+
+static inline void* render_group_push_impl(render_group* group, uint32_t entry_byte_size, render_entry_type type) {
+	assert(group->top + entry_byte_size <= group->block_size);
+
+	render_entry_header* header = (render_entry_header*) (group->memory + group->top);
+	group->top += entry_byte_size;
+
+	header->type = type;
+	header->entry_byte_size = entry_byte_size;
+
+	return header;
+}
+///////////////////////////////////////////////////////////////////////////////////////
+
 struct PlotState {
 	GLFWwindow* window;
 
@@ -35,10 +113,17 @@ struct PlotState {
 	// 1d plotting
 	bool active1d[MAX_CURVES_1D];
 	unsigned int lengths1d[MAX_CURVES_1D];
-	GLuint vaos1d[MAX_CURVES_1D];
-	GLuint vboxs1d[MAX_CURVES_1D];
-	GLuint vboys1d[MAX_CURVES_1D];
+	//GLuint vaos1d[MAX_CURVES_1D];
+	//GLuint vboxs1d[MAX_CURVES_1D];
+	//GLuint vboys1d[MAX_CURVES_1D];
 	GLuint program1d;
+
+	render_group group;
+
+	// Threading data
+	pthread_t thread;
+	pthread_mutex_t mutex;
+	bool should_join;
 };
 
 static float hsl_f(float h, float s, float l, int n) {
@@ -219,6 +304,134 @@ static GLFWwindow* setup_window() {
 	return window;
 }
 
+static void* plt_update_func(void* data) {
+	PlotState* state = (PlotState*) data;
+
+	{
+		pthread_mutex_lock(&state->mutex);
+		state->window = setup_window();
+		setup_gl_error_callback();
+
+		{
+			//glGenVertexArrays(MAX_CURVES_1D, state->vaos1d);
+
+			//glGenBuffers(MAX_CURVES_1D, state->vboxs1d);
+			//glGenBuffers(MAX_CURVES_1D, state->vboys1d);
+
+			static const char* vert1d = 
+				"#version 430\n"
+				"layout(location = 0) in float x;\n"
+				"layout(location = 1) in float y;\n"
+				"uniform mat4 M;\n"
+				"uniform mat4 V;\n"
+				"uniform mat4 P;\n"
+				"void main() {\n"
+				"	gl_Position = V*vec4(x, y, 0, 1);\n"
+				"}";
+
+			static const char* frag1d =
+				"#version 430\n"
+				"out vec4 out_color;\n"
+				"uniform vec3 color;\n"
+				"void main() {\n"
+				"	out_color = vec4(color,1);\n"
+				"}";
+
+			ShaderProgram prog = program_make();
+			program_attach_shader_from_buffer(&prog, vert1d, GL_VERTEX_SHADER);
+			program_attach_shader_from_buffer(&prog, frag1d, GL_FRAGMENT_SHADER);
+			program_link(&prog);
+			program_bind_fragdata_location(&prog, "out_color");
+			state->program1d = prog.handle;
+
+		}
+
+		glfwSetWindowUserPointer(state->window, (void*)state);
+
+		glfwSetScrollCallback(state->window, scroll_callback);
+		glfwSetCursorPosCallback(state->window, mouse_move_callback);
+		glfwSetMouseButtonCallback(state->window, mouse_button_callback);
+
+		pthread_mutex_unlock(&state->mutex);
+	}
+
+	double timestep = 1.0/60.0;
+
+	double frame_start = glfwGetTime(), 
+				 frame_time = 0.0,
+				 frame_end = 0.0,
+				 accumulator = 0.0;
+
+	while (true) {
+		frame_end = glfwGetTime();
+		frame_time = frame_end - frame_start;
+		frame_start = frame_end;
+
+		accumulator += frame_time;
+
+		pthread_mutex_lock(&state->mutex);
+		{
+			if (glfwWindowShouldClose(state->window) || state->should_join) {
+				pthread_mutex_unlock(&state->mutex);
+				break;
+			}
+
+			// Push queued render entries to GL-representation
+			if (state->group.top > 0) {
+
+				uint8_t* ptr = state->group.memory;
+				uint32_t iteration = 0;
+				while (ptr < state->group.memory + state->group.top && iteration < 100) {
+					iteration++;
+
+					render_entry_header* header = (render_entry_header*) ptr;
+					switch (header->type) {
+						case ENTRY_TYPE_render_entry_line_plot: {
+							//glBindVertexArray(state->vaos1d[id]);
+
+							//glBindBuffer(GL_ARRAY_BUFFER, state->vboxs1d[id]);
+							//glBufferData(GL_ARRAY_BUFFER, sizeof(float)*len, x, GL_STATIC_DRAW);
+							//program_bind_vertex_attribute((VertexAttribute){0,1,GL_FLOAT,GL_FALSE,sizeof(GL_FLOAT),0});
+							//glBindBuffer(GL_ARRAY_BUFFER, state->vboys1d[id]);
+							//glBufferData(GL_ARRAY_BUFFER, sizeof(float)*len, y, GL_STATIC_DRAW);
+							//program_bind_vertex_attribute((VertexAttribute){1,1,GL_FLOAT,GL_FALSE,sizeof(GL_FLOAT),0});
+
+							//state->lengths1d[id] = len;
+							//state->active1d[id] = true;
+						} break;
+						default:
+							assert(0);
+					};
+				}
+
+				state->group.top = 0;
+			}
+
+			while (accumulator >= timestep) {
+				accumulator -= timestep;
+				plt_update(state);
+			}
+
+		}
+		pthread_mutex_unlock(&state->mutex);
+	}
+
+	{
+		//glDeleteBuffers(MAX_CURVES_1D, state->vboxs1d),
+		//glDeleteBuffers(MAX_CURVES_1D, state->vboys1d),
+		//glDeleteVertexArrays(MAX_CURVES_1D, state->vaos1d);
+	}
+
+	//glfwDestroyWindow(state->window);
+	glfwTerminate();
+
+
+	return NULL;
+}
+
+
+
+
 
 
 
@@ -250,48 +463,45 @@ PlotState* plt_init() {
 	PlotState* state = (PlotState*) mem;
 	memset(state, 0, sizeof(PlotState));
 
-	state->window = setup_window();
-	setup_gl_error_callback();
+	//state->window = setup_window();
+	//setup_gl_error_callback();
 
-	{
-		glGenVertexArrays(MAX_CURVES_1D, state->vaos1d);
+	//{
+	//	glGenVertexArrays(MAX_CURVES_1D, state->vaos1d);
 
-		glGenBuffers(MAX_CURVES_1D, state->vboxs1d);
-		glGenBuffers(MAX_CURVES_1D, state->vboys1d);
+	//	glGenBuffers(MAX_CURVES_1D, state->vboxs1d);
+	//	glGenBuffers(MAX_CURVES_1D, state->vboys1d);
 
-		static const char* vert1d = 
-			"#version 430\n"
-			"layout(location = 0) in float x;\n"
-			"layout(location = 1) in float y;\n"
-			"uniform mat4 M;\n"
-			"uniform mat4 V;\n"
-			"uniform mat4 P;\n"
-			"void main() {\n"
-			"	gl_Position = V*vec4(x, y, 0, 1);\n"
-			"}";
+	//	static const char* vert1d = 
+	//		"#version 430\n"
+	//		"layout(location = 0) in float x;\n"
+	//		"layout(location = 1) in float y;\n"
+	//		"uniform mat4 M;\n"
+	//		"uniform mat4 V;\n"
+	//		"uniform mat4 P;\n"
+	//		"void main() {\n"
+	//		"	gl_Position = V*vec4(x, y, 0, 1);\n"
+	//		"}";
 
-		static const char* frag1d =
-			"#version 430\n"
-			"out vec4 out_color;\n"
-			"uniform vec3 color;\n"
-			"void main() {\n"
-			"	out_color = vec4(color,1);\n"
-			"}";
+	//	static const char* frag1d =
+	//		"#version 430\n"
+	//		"out vec4 out_color;\n"
+	//		"uniform vec3 color;\n"
+	//		"void main() {\n"
+	//		"	out_color = vec4(color,1);\n"
+	//		"}";
 
-		ShaderProgram prog = program_make();
-		program_attach_shader_from_buffer(&prog, vert1d, GL_VERTEX_SHADER);
-		program_attach_shader_from_buffer(&prog, frag1d, GL_FRAGMENT_SHADER);
-		program_link(&prog);
-		program_bind_fragdata_location(&prog, "out_color");
-		state->program1d = prog.handle;
+	//	ShaderProgram prog = program_make();
+	//	program_attach_shader_from_buffer(&prog, vert1d, GL_VERTEX_SHADER);
+	//	program_attach_shader_from_buffer(&prog, frag1d, GL_FRAGMENT_SHADER);
+	//	program_link(&prog);
+	//	program_bind_fragdata_location(&prog, "out_color");
+	//	state->program1d = prog.handle;
 
-	}
+	//}
 
-	glfwSetWindowUserPointer(state->window, (void*)state);
 
-  glfwSetScrollCallback(state->window, scroll_callback);
-  glfwSetCursorPosCallback(state->window, mouse_move_callback);
-  glfwSetMouseButtonCallback(state->window, mouse_button_callback);
+
 
 	state->cam = make_camera();
 	state->cam.radius = 1.0f;
@@ -304,23 +514,30 @@ PlotState* plt_init() {
 	//camera_update_arcball(&state->cam);
 	camera_update_pan(&state->cam);
 
+
+	state->group = make_render_group(8*1024);
+
+
+	state->should_join = false;
+	pthread_mutex_init(&state->mutex, 0);
+	pthread_create(&state->thread, NULL, plt_update_func, state);
+
 	return state;
 }
 
 void plt_shutdown(PlotState* state) {
+	pthread_mutex_lock(&state->mutex);
+	state->should_join = true;
+	pthread_mutex_unlock(&state->mutex);
+
+	pthread_join(state->thread, NULL);
+	pthread_mutex_destroy(&state->mutex);
+
 	//glDeleteTextures(1, &grid_texture);
 	//free_plane_memory();
 
 	//glDeleteProgram(state->program);
 
-	{
-		glDeleteBuffers(MAX_CURVES_1D, state->vboxs1d),
-		glDeleteBuffers(MAX_CURVES_1D, state->vboys1d),
-		glDeleteVertexArrays(MAX_CURVES_1D, state->vaos1d);
-	}
-
-	//glfwDestroyWindow(state->window);
-	glfwTerminate();
 	free(state);
 }
 
@@ -356,91 +573,63 @@ void plt_update(PlotState* state) {
 
 		uniform = glGetUniformLocation(state->program1d, "color");
 		for (unsigned int i = 0; i < MAX_CURVES_1D; ++i) {
-			if (!state->active1d[i])
-				continue;
+			//if (!state->active1d[i])
+			//	continue;
 
 			float col[3] = {0};
 			hsl_to_rgb(col, i*(360.0f/MAX_CURVES_1D),0.85f,0.5f);
 			glUniform3fv(uniform, 1, col);
 
-			glBindVertexArray(state->vaos1d[i]);
-			glDrawArrays(GL_LINE_STRIP, 0, state->lengths1d[i]);
+			//glBindVertexArray(state->vaos1d[i]);
+			//glDrawArrays(GL_LINE_STRIP, 0, state->lengths1d[i]);
 		}
 	}
 
 	glfwSwapBuffers(state->window);
 }
 
-void plt_update_until_closed(PlotState* state) {
-	double timestep = 1.0/60.0;
-
-	double frame_start = glfwGetTime(), 
-				 frame_time = 0.0,
-				 frame_end = 0.0,
-				 accumulator = 0.0;
-
-	while (!glfwWindowShouldClose(state->window)) {
-		frame_end = glfwGetTime();
-		frame_time = frame_end - frame_start;
-		frame_start = frame_end;
-
-		accumulator += frame_time;
-		while (accumulator >= timestep) {
-			accumulator -= timestep;
-			// update simulation
-			plt_update(state);
-		}
-	}
+void plt_wait_on_join(PlotState* state) {
+	pthread_join(state->thread, NULL);
 }
 
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+void plt_clear(PlotState* state) {
+	pthread_mutex_lock(&state->mutex);
+	state->group.top = 0;
+	pthread_mutex_unlock(&state->mutex);
+}
 
 void plt_1d(PlotState* state, unsigned int id, float* x, float* y, unsigned int len) {
 	assert(id < MAX_CURVES_1D);
 
-	glBindVertexArray(state->vaos1d[id]);
+	pthread_mutex_lock(&state->mutex);
 
-	glBindBuffer(GL_ARRAY_BUFFER, state->vboxs1d[id]);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(float)*len, x, GL_STATIC_DRAW);
-	program_bind_vertex_attribute((VertexAttribute){0,1,GL_FLOAT,GL_FALSE,sizeof(GL_FLOAT),0});
-	glBindBuffer(GL_ARRAY_BUFFER, state->vboys1d[id]);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(float)*len, y, GL_STATIC_DRAW);
-	program_bind_vertex_attribute((VertexAttribute){1,1,GL_FLOAT,GL_FALSE,sizeof(GL_FLOAT),0});
+	render_entry_line_plot* entry;
+	entry = render_group_push_extra_size(&state->group, render_entry_line_plot, 2*len*sizeof(float));
+	entry->x = (float*)(entry + 1);
+	entry->y = (float*)((uint8_t*)(entry + 1) + len*sizeof(float));
+	entry->len = len;
 
-	state->lengths1d[id] = len;
-	state->active1d[id] = true;
+	memcpy(entry->x, x, len*sizeof(float));
+	memcpy(entry->y, y, len*sizeof(float));
+
+	//glfwMakeContextCurrent(state->window);
+
+	//glBindVertexArray(state->vaos1d[id]);
+
+	//glBindBuffer(GL_ARRAY_BUFFER, state->vboxs1d[id]);
+	//glBufferData(GL_ARRAY_BUFFER, sizeof(float)*len, x, GL_STATIC_DRAW);
+	//program_bind_vertex_attribute((VertexAttribute){0,1,GL_FLOAT,GL_FALSE,sizeof(GL_FLOAT),0});
+	//glBindBuffer(GL_ARRAY_BUFFER, state->vboys1d[id]);
+	//glBufferData(GL_ARRAY_BUFFER, sizeof(float)*len, y, GL_STATIC_DRAW);
+	//program_bind_vertex_attribute((VertexAttribute){1,1,GL_FLOAT,GL_FALSE,sizeof(GL_FLOAT),0});
+
+	//state->lengths1d[id] = len;
+	//state->active1d[id] = true;
+
+	pthread_mutex_unlock(&state->mutex);
 }
 
 void plt_2d(PlotState* state, unsigned int id, float* points, unsigned int len);

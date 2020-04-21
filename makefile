@@ -9,7 +9,7 @@ PROJ_SRCS = \
 TEST_SRCS = $(shell find src/test -name "*.c")
 
 PROJ_LIBS = -lfftw3 -llapacke -lm
-TEST_LIBS = -l$(PROJECT) -llapacke -lglfw -lm -ldl
+TEST_LIBS = -l$(PROJECT) -llapacke -lglfw -lm -ldl -lpthread
 
 #PROJ_FLAGS = -fsanitize=address -fsanitize=leak -g -fpic -Wall -Werror -Isrc
 #TEST_FLAGS = -fsanitize=address -fsanitize=leak -g -Wall -Werror -Isrc -Isrc/test/plotting/third_party

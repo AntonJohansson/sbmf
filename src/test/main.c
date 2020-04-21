@@ -41,10 +41,15 @@ void dbgcallback(grid g, complex_t* wf) {
 		v[i] = (float)potential(&g.points[i], 1, y[i]);
 	}
 
-	plt_1d(state, 0, x, v, g.total_pointcount);
-	plt_1d(state, 1, x, y, g.total_pointcount);
+	(void)v;
+	(void)x;
+	(void)y;
 
-	plt_update(state);
+	plt_clear(state);
+	plt_1d(state, 0, x, v, g.total_pointcount);
+	//plt_1d(state, 1, x, y, g.total_pointcount);
+
+	//plt_update(state);
 }
 
 int main(int argc, char** argv) {
@@ -75,57 +80,56 @@ int main(int argc, char** argv) {
 																potential,
 																initial_guess);
 	PROFILE_END("item");
-	plt_update_until_closed(state);
+	plt_wait_on_join(state);
 	plt_shutdown(state);
 
-	//printf("Generating FD matrix\n");
-	//PROFILE_BEGIN("gen fd");
-	//bandmat fdm = generate_fd_matrix(settings.resolution, 4, 2, (real_t[]){
-	//		settings.length_x/settings.resolution,
-	//		settings.length_y/settings.resolution});
+	printf("Generating FD matrix\n");
+	PROFILE_BEGIN("gen fd");
+	bandmat fdm = generate_fd_matrix(g.pointcounts[0], 4, g.dimensions, g.deltas);
 
-	//for (int_t i = 0; i < fdm.size*fdm.bandcount; ++i) {
-	//	fdm.bands[i] = -fdm.bands[i];
-	//}
+	for (int_t i = 0; i < fdm.size*fdm.bandcount; ++i) {
+		fdm.bands[i] = -fdm.bands[i];
+	}
 
-	//for (int_t i = 0; i < fdm.size; ++i) {
-	//	int_t idx = fdm.size*(fdm.bandcount-1) + i;
-	//	//fdm.bands[idx] += potential(res.X[i], res.Y[i], res.wavefunction[i]);
-	//}	
-	//PROFILE_END("gen fd");
+	for (int_t i = 0; i < fdm.size; ++i) {
+		int_t idx = fdm.size*(fdm.bandcount-1) + i;
+		(void)idx;
+		//fdm.bands[idx] += potential(res.X[i], res.Y[i], res.wavefunction[i]);
+	}	
+	PROFILE_END("gen fd");
 
 	printf("Trying to solve the eigenvalue problem\n");
-	//PROFILE_BEGIN("EV prob");
-	//{
-	//	real_t* outD = malloc(fdm.size*sizeof(real_t));
-	//	real_t* outE = malloc((fdm.size-1) * sizeof(real_t));
-	//	complex_t* outQ = malloc(fdm.order*sizeof(complex_t));
+	PROFILE_BEGIN("EV prob");
+	{
+		real_t* outD = malloc(fdm.size*sizeof(real_t));
+		real_t* outE = malloc((fdm.size-1) * sizeof(real_t));
+		complex_t* outQ = malloc(fdm.order*sizeof(complex_t));
 
-	//	{
-	//		int res = 0;
+		{
+			int res = 0;
 
-	//		// Reduce to tridiag-form
-	//		res = LAPACKE_zhbtrd(LAPACK_ROW_MAJOR, 'V', 'U', 
-	//				fdm.size,
-	//				fdm.bandcount-1, 
-	//				fdm.bands, 
-	//				fdm.size, 
-	//				outD, outE, outQ, 
-	//				fdm.size);
+			// Reduce to tridiag-form
+			res = LAPACKE_zhbtrd(LAPACK_ROW_MAJOR, 'V', 'U', 
+					fdm.size,
+					fdm.bandcount-1, 
+					fdm.bands, 
+					fdm.size, 
+					outD, outE, outQ, 
+					fdm.size);
 
-	//		assert(res == 0);
+			assert(res == 0);
 
-	//		// Solve eigenvalue problem
-	//		res = LAPACKE_zsteqr(LAPACK_ROW_MAJOR, 'V', 
-	//				fdm.size, 
-	//				outD, outE, outQ, 
-	//				fdm.size);
+			// Solve eigenvalue problem
+			res = LAPACKE_zsteqr(LAPACK_ROW_MAJOR, 'V', 
+					fdm.size, 
+					outD, outE, outQ, 
+					fdm.size);
 
-	//		assert(res == 0);
-	//	}
+			assert(res == 0);
+		}
 
-	//}
-	//PROFILE_END("EV prob");
+	}
+	PROFILE_END("EV prob");
 
 	printf(
 			"item results:\n"

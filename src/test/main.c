@@ -47,7 +47,7 @@ void dbgcallback(grid g, complex_t* wf) {
 
 	plt_clear(state);
 	plt_1d(state, 0, x, v, g.total_pointcount);
-	//plt_1d(state, 1, x, y, g.total_pointcount);
+	plt_1d(state, 1, x, y, g.total_pointcount);
 
 	//plt_update(state);
 }

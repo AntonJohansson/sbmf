@@ -21,6 +21,8 @@
 #define WINDOW_HEIGHT 600
 #define MAX_CURVES_1D 16
 
+#define MAX_GLDRAWDATA_LEN 16
+
 #define fclamp(val,min,max) \
 	fmax(fmin(val, max),min)
 
@@ -53,11 +55,7 @@ typedef struct {
 
 	float* x;
 	float* y;
-	uint32_t len;
-	//uint32_t vertex_count;
-	//GLuint vao;
-	//GLuint vbox;
-	//GLuint vboy;
+	uint32_t point_count;
 } render_entry_line_plot;
 
 
@@ -99,6 +97,15 @@ static inline void* render_group_push_impl(render_group* group, uint32_t entry_b
 }
 ///////////////////////////////////////////////////////////////////////////////////////
 
+typedef struct {
+	uint32_t vertex_count;
+	GLuint vao;
+	GLuint vbo;
+	GLenum drawmode;
+} gldrawdata;
+
+///////////////////////////////////////////////////////////////////////////////////////
+
 struct PlotState {
 	GLFWwindow* window;
 
@@ -119,6 +126,9 @@ struct PlotState {
 	GLuint program1d;
 
 	render_group group;
+
+	uint32_t gldata_index;
+	gldrawdata gldata[MAX_GLDRAWDATA_LEN];
 
 	// Threading data
 	pthread_t thread;
@@ -398,10 +408,31 @@ static void* plt_update_func(void* data) {
 
 							//state->lengths1d[id] = len;
 							//state->active1d[id] = true;
+
+							render_entry_line_plot* entry = (render_entry_line_plot*) header;
+
+							assert(state->gldata_index + 1 < MAX_GLDRAWDATA_LEN);
+							gldrawdata* gldata = &state->gldata[state->gldata_index++];
+							glGenVertexArrays(1, &gldata->vao);
+							glBindVertexArray(gldata->vao);
+
+							glGenBuffers(1, &gldata->vbo);
+							glBindBuffer(GL_ARRAY_BUFFER, gldata->vbo);
+							// The data in the entry is stored as xxxx....yyyy... where thera are entry->point_count
+							// x's and entry->point_count y's.
+							glBufferData(GL_ARRAY_BUFFER, sizeof(GL_FLOAT)*2*entry->point_count, entry->x, GL_STATIC_DRAW);
+							glUseProgram(state->program1d);
+							program_bind_vertex_attribute((VertexAttribute){0,1, GL_FLOAT, GL_FALSE, sizeof(GL_FLOAT), 0});
+							program_bind_vertex_attribute((VertexAttribute){1,1, GL_FLOAT, GL_FALSE, sizeof(GL_FLOAT), entry->point_count*sizeof(GL_FLOAT)});
+
+							gldata->vertex_count = entry->point_count;
+							gldata->drawmode = GL_LINE_STRIP;
 						} break;
 						default:
 							assert(0);
 					};
+
+					ptr += header->entry_byte_size;
 				}
 
 				state->group.top = 0;
@@ -517,6 +548,7 @@ PlotState* plt_init() {
 
 	state->group = make_render_group(8*1024);
 
+	state->gldata_index = 0;
 
 	state->should_join = false;
 	pthread_mutex_init(&state->mutex, 0);
@@ -572,16 +604,26 @@ void plt_update(PlotState* state) {
 		//glDisable(GL_PRIMITIVE_RESTART);
 
 		uniform = glGetUniformLocation(state->program1d, "color");
-		for (unsigned int i = 0; i < MAX_CURVES_1D; ++i) {
-			//if (!state->active1d[i])
-			//	continue;
+		//for (unsigned int i = 0; i < MAX_CURVES_1D; ++i) {
+		//	//if (!state->active1d[i])
+		//	//	continue;
 
+		//	float col[3] = {0};
+		//	hsl_to_rgb(col, i*(360.0f/MAX_CURVES_1D),0.85f,0.5f);
+		//	glUniform3fv(uniform, 1, col);
+
+		//	//glBindVertexArray(state->vaos1d[i]);
+		//	//glDrawArrays(GL_LINE_STRIP, 0, state->lengths1d[i]);
+		//}
+
+		for (uint32_t i = 0; i < state->gldata_index; ++i) {
 			float col[3] = {0};
-			hsl_to_rgb(col, i*(360.0f/MAX_CURVES_1D),0.85f,0.5f);
+			hsl_to_rgb(col, i*(360.0f/state->gldata_index),0.85f,0.5f);
 			glUniform3fv(uniform, 1, col);
 
-			//glBindVertexArray(state->vaos1d[i]);
-			//glDrawArrays(GL_LINE_STRIP, 0, state->lengths1d[i]);
+			gldrawdata* data = &state->gldata[i];
+			glBindVertexArray(data->vao);
+			glDrawArrays(data->drawmode, 0, data->vertex_count);
 		}
 	}
 
@@ -598,6 +640,7 @@ void plt_wait_on_join(PlotState* state) {
 void plt_clear(PlotState* state) {
 	pthread_mutex_lock(&state->mutex);
 	state->group.top = 0;
+	state->gldata_index = 0;
 	pthread_mutex_unlock(&state->mutex);
 }
 
@@ -610,7 +653,7 @@ void plt_1d(PlotState* state, unsigned int id, float* x, float* y, unsigned int 
 	entry = render_group_push_extra_size(&state->group, render_entry_line_plot, 2*len*sizeof(float));
 	entry->x = (float*)(entry + 1);
 	entry->y = (float*)((uint8_t*)(entry + 1) + len*sizeof(float));
-	entry->len = len;
+	entry->point_count = len;
 
 	memcpy(entry->x, x, len*sizeof(float));
 	memcpy(entry->y, y, len*sizeof(float));

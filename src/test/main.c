@@ -4,31 +4,11 @@
 #include <sbmf/common/grid.h>
 #include <sbmf/common/eigenproblem.h>
 
-#include <lapacke.h>
-
 #include <stdio.h>
 #include <assert.h>
 #include <unistd.h>
 
 #include "plotting/plt.h"
-
-real_t potential(real_t* v, int_t n, complex_t u) {
-	//real_t temp = 0.0f;
-	//for (int_t i = 0; i < n; ++i)
-	//	temp += cos(v[i])*cos(v[i]);
-	//return 5*temp + cabs(u)*cabs(u);
-
-	real_t temp = 0.0f;
-	for (int_t i = 0; i < n; ++i) {
-		temp += v[i]*v[i];
-	}
-	return 0.5*temp;
-}
-
-complex_t initial_guess(real_t* v, int_t n) {
-	//return (1.0/(10.0*m_pi*10.0*m_pi + 10.0*m_pi*10.0*m_pi))*exp(-(x*x + y*y));
-	return 1.0/(10.0*M_PI*10.0*M_PI);
-}
 
 static inline void test_eigenvalue_solving() {
 	printf("Testing eigenvalue solving for band matrices\n");
@@ -80,7 +60,7 @@ static inline void test_eigenvalue_solving() {
 	// check answer
 	for (int i = 0; i < bm.size; ++i) {
 		if (fabs(eigvals[i] - eigvals_answer[i]) > 0.01) {
-			fprintf(stderr, "Eigenvalue calculation %d failed: got %lf; expected %lf\n", i, eigvals[i], eigvals_answer[i]);
+			fprintf(stderr, "\t- Eigenvalue calculation %d failed: got %lf; expected %lf\n", i, eigvals[i], eigvals_answer[i]);
 		}
 	}
 
@@ -91,14 +71,35 @@ static inline void test_eigenvalue_solving() {
 			complex_t got = eigvecs[j*bm.size + i]; // NOTE: output of lapacke is apparently COLUMN MAJOR
 			complex_t expected = eigvecs_answer[j*bm.size + i];
 			if (cabs(got)-cabs(expected) > 0.01) {
-				fprintf(stderr, "Eigenvector calculation failed: got %lf + %lf i; expected: %lf + %lf i\n", creal(got), cimag(got), creal(expected), cimag(expected));
+				fprintf(stderr, "\t- Eigenvector calculation failed: got %lf + %lf i; expected: %lf + %lf i\n", creal(got), cimag(got), creal(expected), cimag(expected));
 			}
 		}
 	}
 }
 
+real_t potential(real_t* v, int_t n, complex_t u) {
+	//real_t temp = 0.0f;
+	//for (int_t i = 0; i < n; ++i)
+	//	temp += cos(v[i])*cos(v[i]);
+	//return 3*temp + cabs(u)*cabs(u);
+
+	real_t temp = 0.0f;
+	for (int_t i = 0; i < n; ++i) {
+		temp += v[i]*v[i];
+	}
+	return 0.5*temp;
+}
+
+complex_t initial_guess(real_t* v, int_t n) {
+	//return (1.0/(10.0*m_pi*10.0*m_pi + 10.0*m_pi*10.0*m_pi))*exp(-(x*x + y*y));
+	return 1.0/10*10;
+}
+
 int main(int argc, char** argv) {
 	test_eigenvalue_solving();
+
+
+
 
 	PlotState* state = plt_init();
 
@@ -117,17 +118,24 @@ int main(int argc, char** argv) {
 		.dt = 0.01,
 
 		.measure_every = 0,
-		//.dbgcallback = dbgcallback,
 	};
 
-	printf("Finding groundstate\n");
-
 	PROFILE_BEGIN("item");
-
 	gss_result res = item_execute(settings,
 																potential,
 																initial_guess);
 	PROFILE_END("item");
+	printf(
+			"ITEM results:\n"
+			"\titerations: %d/%d\n"
+			"\terror: %e\n"
+			"\terror tol: %e\n",
+		res.iterations,
+		res.settings.max_iterations,
+		res.error,
+		res.settings.error_tol
+	);
+
 
 	float x[g.total_pointcount];
 	float y[g.total_pointcount];
@@ -142,31 +150,24 @@ int main(int argc, char** argv) {
 	plt_1d(state, x, y, g.total_pointcount); 
 
 
-
-
-
-
-
-
-	printf("Generating FD matrix\n");
 	PROFILE_BEGIN("gen. fdm");
-	// NOTE: g.pointcounts[0] forces it to be square!
-	bandmat fdm = generate_fd_matrix(g.pointcounts[0], pow(2,g.dimensions), g.dimensions, g.deltas);
+	bandmat fdm;
+	{
+		// NOTE: g.pointcounts[0] forces it to be square!
+		fdm = generate_fd_matrix(g.pointcounts[0], pow(2,g.dimensions), g.dimensions, g.deltas);
 
-	for (int_t i = 0; i < fdm.size*fdm.bandcount; ++i) {
-		fdm.bands[i] = -0.5*fdm.bands[i];
+		for (int_t i = 0; i < fdm.size*fdm.bandcount; ++i) {
+			fdm.bands[i] = -0.5*fdm.bands[i];
+		}
+
+		for (int_t i = 0; i < fdm.size; ++i) {
+			int_t idx = fdm.size*(fdm.bandcount-1) + i;
+			fdm.bands[idx] += (complex_t) potential(&g.points[i], 1, res.wavefunction[i]);
+		}	
 	}
-
-	for (int_t i = 0; i < fdm.size; ++i) {
-		int_t idx = fdm.size*(fdm.bandcount-1) + i;
-		fdm.bands[idx] += (complex_t) potential(&g.points[i], 1, res.wavefunction[i]);
-	}	
 	PROFILE_END("gen. fdm");
 
 
-
-
-	printf("Trying to solve the eigenvalue problem\n");
 	PROFILE_BEGIN("e.v. prob.");
 	{
 		real_t* eigenvalues = malloc(fdm.size * sizeof(real_t));
@@ -189,29 +190,6 @@ int main(int argc, char** argv) {
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-	printf(
-			"item results:\n"
-			"\titerations: %d/%d\n"
-			"\terror: %e\n"
-			"\terror tol: %e\n",
-		res.iterations,
-		res.settings.max_iterations,
-		res.error,
-		res.settings.error_tol
-	);
-	
 	gss_free_result(res);
 	free_grid(g);
 

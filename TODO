@@ -1,0 +1,27 @@
+SBMF:
+	[x] numerical weirdness in results after a certain point?
+			[x] whats going on?
+				"	the output from lacpake isnt automatically converted to row major in the same way that
+					the input is, changed interpretation of eigenvector output to column major. "
+			[x] absolute values are still accurate.
+				" turns out they weren't accurate, just sneaky, errors in this where especially visible at
+					lower grid resolutions. "
+	[x] the operator that we're diagonalizing should maybe be real?
+		" it should not, we need the output eigenvectors to be complex. "
+	[ ] Unify memory allocation
+
+
+Testing:
+	[x] Separate out and test eigenvalue/-vector solving.
+
+
+Plotting:
+	[ ] not freeing vaos/vbos in drawdata
+	[ ] Plot 2d planes
+	[ ] Handle switching between camera modes
+	[ ] Text rendering
+			[ ] stb font loading
+			[ ] generate fonts
+			[ ] draw fonts
+			[ ] draw fonts in different colors
+	[ ] Togglable plots

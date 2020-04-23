@@ -34,11 +34,14 @@ void camera_update_arcball(camera* cam) {
 
 void camera_update_pan(camera* cam) {
 	mat4 view = {0};
+
 	m4identity(&view);
-	m4translate(&view, view, cam->tar_x, cam->tar_y, cam->tar_z);
 
 	float scale = 1.0/cam->radius;
 	m4scale(&view, view, scale, scale, scale);
+
+	m4translate(&view, view, cam->tar_x, cam->tar_y, cam->tar_z);
+
 	m4copy(&cam->view, view);
 }
 

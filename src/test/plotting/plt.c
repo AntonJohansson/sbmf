@@ -23,6 +23,8 @@
 
 #define MAX_GLDRAWDATA_LEN 16
 
+#define MEM_RENDERGROUP_PREALLOC 32*1024
+
 #define fclamp(val,min,max) \
 	fmax(fmin(val, max),min)
 
@@ -175,8 +177,9 @@ static void mouse_move_callback(GLFWwindow* window, double x, double y){
 		state->cam.phi = fmod(state->cam.phi - dx, 2.0f*M_PI);
 
 		// If camera is in "panning mode"
-		state->cam.tar_x+=dx;
-		state->cam.tar_y+=dy;
+		state->cam.tar_x+=state->cam.radius*dx;
+		state->cam.tar_y+=state->cam.radius*dy;
+
 		//camera_update_arcball(&state->cam);
 		camera_update_pan(&state->cam);
 	}
@@ -211,7 +214,6 @@ static void scroll_callback(GLFWwindow* window, double xoffset, double yoffset){
 	//camera_update_arcball(&state->cam);
 	camera_update_pan(&state->cam);
 }
-
 
 //static float* plane_vbo_memory;
 //static GLuint* plane_ebo_memory;
@@ -284,6 +286,8 @@ static GLFWwindow* setup_window() {
   glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
   glfwWindowHint(GLFW_RESIZABLE, GL_FALSE);
 
+	glfwWindowHint(GLFW_SAMPLES, 4);
+
 	GLFWwindow* window = glfwCreateWindow(WINDOW_WIDTH, WINDOW_HEIGHT, "intract", 0, 0);
 	if (!window) {
 		fprintf(stderr, "GLFW: Failed to create window!\n");
@@ -308,8 +312,10 @@ static GLFWwindow* setup_window() {
   glEnable(GL_DEPTH_TEST);
   glDepthMask(GL_TRUE);
 
-	printf("Running GLFW %s\n", glfwGetVersionString());
-	printf("Using OpenGL %d.%d\n", GLVersion.major, GLVersion.minor);
+	glEnable(GL_MULTISAMPLE);
+
+	//printf("Running GLFW %s\n", glfwGetVersionString());
+	//printf("Using OpenGL %d.%d\n", GLVersion.major, GLVersion.minor);
 
 	return window;
 }
@@ -494,46 +500,6 @@ PlotState* plt_init() {
 	PlotState* state = (PlotState*) mem;
 	memset(state, 0, sizeof(PlotState));
 
-	//state->window = setup_window();
-	//setup_gl_error_callback();
-
-	//{
-	//	glGenVertexArrays(MAX_CURVES_1D, state->vaos1d);
-
-	//	glGenBuffers(MAX_CURVES_1D, state->vboxs1d);
-	//	glGenBuffers(MAX_CURVES_1D, state->vboys1d);
-
-	//	static const char* vert1d = 
-	//		"#version 430\n"
-	//		"layout(location = 0) in float x;\n"
-	//		"layout(location = 1) in float y;\n"
-	//		"uniform mat4 M;\n"
-	//		"uniform mat4 V;\n"
-	//		"uniform mat4 P;\n"
-	//		"void main() {\n"
-	//		"	gl_Position = V*vec4(x, y, 0, 1);\n"
-	//		"}";
-
-	//	static const char* frag1d =
-	//		"#version 430\n"
-	//		"out vec4 out_color;\n"
-	//		"uniform vec3 color;\n"
-	//		"void main() {\n"
-	//		"	out_color = vec4(color,1);\n"
-	//		"}";
-
-	//	ShaderProgram prog = program_make();
-	//	program_attach_shader_from_buffer(&prog, vert1d, GL_VERTEX_SHADER);
-	//	program_attach_shader_from_buffer(&prog, frag1d, GL_FRAGMENT_SHADER);
-	//	program_link(&prog);
-	//	program_bind_fragdata_location(&prog, "out_color");
-	//	state->program1d = prog.handle;
-
-	//}
-
-
-
-
 	state->cam = make_camera();
 	state->cam.radius = 1.0f;
 	state->cam.aspect = WINDOW_WIDTH/(float)WINDOW_HEIGHT;
@@ -546,7 +512,7 @@ PlotState* plt_init() {
 	camera_update_pan(&state->cam);
 
 
-	state->group = make_render_group(8*1024);
+	state->group = make_render_group(MEM_RENDERGROUP_PREALLOC);
 
 	state->gldata_index = 0;
 
@@ -644,9 +610,7 @@ void plt_clear(PlotState* state) {
 	pthread_mutex_unlock(&state->mutex);
 }
 
-void plt_1d(PlotState* state, unsigned int id, float* x, float* y, unsigned int len) {
-	assert(id < MAX_CURVES_1D);
-
+void plt_1d(PlotState* state, float* x, float* y, unsigned int len) {
 	pthread_mutex_lock(&state->mutex);
 
 	render_entry_line_plot* entry;
@@ -675,5 +639,5 @@ void plt_1d(PlotState* state, unsigned int id, float* x, float* y, unsigned int 
 	pthread_mutex_unlock(&state->mutex);
 }
 
-void plt_2d(PlotState* state, unsigned int id, float* points, unsigned int len);
-void plt_3d(PlotState* state, unsigned int id, float* points, unsigned int len);
+void plt_2d(PlotState* state, float* points, unsigned int len);
+void plt_3d(PlotState* state, float* points, unsigned int len);

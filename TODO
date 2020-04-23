@@ -17,9 +17,12 @@ SBMF (Slightly Beyond Mean Field):
 			[ ] Do I need numerical integration?
 	[ ] Potential speedup for ITEM, adaptive timestep
 			[ ] See papers/item.pdf
+	[ ] cos^2 x gives asymmetric solution
+	[ ] particle in a box, maybe rounded corners
+	[ ] interest is high in radial and toroidal
 
 Testing:
-	[x] Separate out and test eigenvalue/-vector solving.
+[x] Separate out and test eigenvalue/-vector solving.
 
 
 Plotting:

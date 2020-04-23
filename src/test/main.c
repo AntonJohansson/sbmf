@@ -78,16 +78,16 @@ static inline void test_eigenvalue_solving() {
 }
 
 real_t potential(real_t* v, int_t n, complex_t u) {
-	//real_t temp = 0.0f;
-	//for (int_t i = 0; i < n; ++i)
-	//	temp += cos(v[i])*cos(v[i]);
-	//return 3*temp + cabs(u)*cabs(u);
-
 	real_t temp = 0.0f;
-	for (int_t i = 0; i < n; ++i) {
-		temp += v[i]*v[i];
-	}
-	return 0.5*temp;
+	for (int_t i = 0; i < n; ++i)
+		temp += cos(v[i])*cos(v[i]);
+	return 3*temp;
+
+	//real_t temp = 0.0f;
+	//for (int_t i = 0; i < n; ++i) {
+	//	temp += v[i]*v[i];
+	//}
+	//return 0.5*temp;
 }
 
 complex_t initial_guess(real_t* v, int_t n) {
@@ -180,7 +180,7 @@ int main(int argc, char** argv) {
 		for (int i = 1; i < 6; ++i) {
 			for (int j = 0; j < fdm.size; ++j) {
 				x[j] = (float)g.points[j];
-				u[j] = (float)eigenvalues[i] +  5*(float)creal(eigenvectors[j*fdm.size + i]);
+				u[j] = (float)eigenvalues[i] +  3*(float)creal(eigenvectors[j*fdm.size + i]);
 			}
 			plt_1d(state, x,u, fdm.size);
 		}

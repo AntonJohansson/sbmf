@@ -1,4 +1,4 @@
-SBMF:
+SBMF (Slightly Beyond Mean Field):
 	[x] numerical weirdness in results after a certain point?
 			[x] whats going on?
 				"	the output from lacpake isnt automatically converted to row major in the same way that
@@ -8,20 +8,25 @@ SBMF:
 					lower grid resolutions. "
 	[x] the operator that we're diagonalizing should maybe be real?
 		" it should not, we need the output eigenvectors to be complex. "
-	[ ] Unify memory allocation
-
+	[ ] Try projecting full numerical hamiltonian onto known ground states (e.g. harmonic) to avoid having to
+			diagonalize massive matrices. This is especially needed for higher dimensionality.
+	[ ] Unify memory allocation.
+	[ ] Convert column to row major in eigenvalue solver
+	[ ] Many-body pertrubation theory
+			[ ] How is this different from regular P.T.?
+			[ ] Do I need numerical integration?
 
 Testing:
 	[x] Separate out and test eigenvalue/-vector solving.
 
 
 Plotting:
-	[ ] not freeing vaos/vbos in drawdata
-	[ ] Plot 2d planes
-	[ ] Handle switching between camera modes
-	[ ] Text rendering
-			[ ] stb font loading
-			[ ] generate fonts
-			[ ] draw fonts
-			[ ] draw fonts in different colors
-	[ ] Togglable plots
+	[ ] Not freeing vaos/vbos in drawdata.
+	[ ] Plot 2d planes.
+	[ ] Handle switching between camera modes.
+	[ ] Text rendering,
+			[ ] stb font loading,
+			[ ] generate fonts,
+			[ ] draw fonts,
+			[ ] draw fonts in different colors.
+	[ ] Togglable plots.

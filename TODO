@@ -24,12 +24,13 @@ SBMF (Slightly Beyond Mean Field):
 Testing:
 	[x] Separate out and test eigenvalue/-vector solving.
 	[ ] Eigenvalue solver test-cases
-			[ ] 1d Harmonic oscillator
+			[x] 1d Harmonic oscillator
 			[ ] 2d Harmonic oscillator
 			[ ] 3d Harmonic oscillator
 			[ ] 1d Particle in a box
 			[ ] 2d Particle in a box
 			[ ] 3d Particle in a box
+			[ ] cleanup HO 1d
 
 
 Plotting:

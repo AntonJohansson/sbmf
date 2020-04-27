@@ -6,9 +6,11 @@
 #include <stdlib.h>
 
 static inline void eigvp_bandmat(real_t* out_eigval, complex_t* out_eigvec, bandmat bm) {
-	real_t* offdiag_elements = malloc((bm.size - 1)*sizeof(real_t));
+	real_t* offdiag_elements 	= malloc((bm.size - 1)*sizeof(real_t));
+	complex_t* colmaj_eigvecs = malloc(bm.order*sizeof(complex_t));
 
 	int res = 0;
+
 
 	// Start by reducing (complex hermitian) bandmatrix to tri-diagonal mat.
 	{
@@ -17,7 +19,7 @@ static inline void eigvp_bandmat(real_t* out_eigval, complex_t* out_eigvec, band
 				bm.bandcount-1, 
 				bm.bands, 
 				bm.size, 
-				out_eigval, offdiag_elements, out_eigvec, 
+				out_eigval, offdiag_elements, colmaj_eigvecs, 
 				bm.size);
 		
 		assert(res == 0);
@@ -27,13 +29,21 @@ static inline void eigvp_bandmat(real_t* out_eigval, complex_t* out_eigvec, band
 	{
 		res = LAPACKE_zsteqr(LAPACK_ROW_MAJOR, 'V', 
 				bm.size, 
-				out_eigval, offdiag_elements, out_eigvec, 
+				out_eigval, offdiag_elements, colmaj_eigvecs, 
 				bm.size);
 
 		assert(res == 0);
 	}
 
+	// Convert eigenvectors to row-major, as we expected them to be.
+	for (int i = 0; i < bm.size; ++i) {
+		for (int j = 0; j < bm.size; ++j) {
+			out_eigvec[i*bm.size + j] = colmaj_eigvecs[j*bm.size + i];
+		}
+	}
+	
 	free(offdiag_elements);
+	free(colmaj_eigvecs);
 }
 
 /*

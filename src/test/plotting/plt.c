@@ -21,9 +21,9 @@
 #define WINDOW_HEIGHT 600
 #define MAX_CURVES_1D 16
 
-#define MAX_GLDRAWDATA_LEN 16
+#define MAX_GLDRAWDATA_LEN 32
 
-#define MEM_RENDERGROUP_PREALLOC 32*1024
+#define MEM_RENDERGROUP_PREALLOC 64*1024
 
 #define fclamp(val,min,max) \
 	fmax(fmin(val, max),min)
@@ -273,12 +273,12 @@ static void scroll_callback(GLFWwindow* window, double xoffset, double yoffset){
 //
 
 static GLFWwindow* setup_window() {
+	glfwSetErrorCallback(glfw_error_callback);
+
 	if (!glfwInit()) {
 		fprintf(stderr, "GLFW: Failed to initialize!\n");
 		return 0;
 	}
-
-	glfwSetErrorCallback(glfw_error_callback);
 
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 1);
@@ -286,9 +286,9 @@ static GLFWwindow* setup_window() {
   glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
   glfwWindowHint(GLFW_RESIZABLE, GL_FALSE);
 
-	glfwWindowHint(GLFW_SAMPLES, 4);
+	//glfwWindowHint(GLFW_SAMPLES, 4);
 
-	GLFWwindow* window = glfwCreateWindow(WINDOW_WIDTH, WINDOW_HEIGHT, "intract", 0, 0);
+	GLFWwindow* window = glfwCreateWindow(WINDOW_WIDTH, WINDOW_HEIGHT, "plot", 0, 0);
 	if (!window) {
 		fprintf(stderr, "GLFW: Failed to create window!\n");
 		glfwTerminate();
@@ -335,7 +335,7 @@ static void* plt_update_func(void* data) {
 			//glGenBuffers(MAX_CURVES_1D, state->vboys1d);
 
 			static const char* vert1d = 
-				"#version 430\n"
+				"#version 410\n"
 				"layout(location = 0) in float x;\n"
 				"layout(location = 1) in float y;\n"
 				"uniform mat4 M;\n"
@@ -346,7 +346,7 @@ static void* plt_update_func(void* data) {
 				"}";
 
 			static const char* frag1d =
-				"#version 430\n"
+				"#version 410\n"
 				"out vec4 out_color;\n"
 				"uniform vec3 color;\n"
 				"void main() {\n"

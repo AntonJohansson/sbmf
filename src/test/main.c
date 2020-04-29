@@ -204,6 +204,27 @@ static inline void test_eigenvalue_solving_harmonic_osc_2d() {
 			 (i32[]){ N,   N}
 			);
 
+
+	f32 x[g.total_pointcount];
+	f32 y[g.total_pointcount];
+	f32 z[g.total_pointcount];
+	for (i32 i = 0; i < g.total_pointcount; ++i) {
+		x[i] = g.points[2*i];
+		y[i] = g.points[2*i+1];
+		z[i] = harmonic_osc_potential(&g.points[2*i], g.dimensions, 0.0);
+	}
+
+	PlotState* state = plt_init();
+	plt_2d(state, x, y, z, g.total_pointcount);
+	plt_wait_on_join(state);
+	plt_shutdown(state);
+
+
+
+
+
+
+
 	PROFILE_BEGIN("gen. fdm ho 2d");
 	bandmat fdm;
 	{
@@ -227,6 +248,20 @@ static inline void test_eigenvalue_solving_harmonic_osc_2d() {
 	c64* eigenvectors = malloc(fdm.order * sizeof(c64));
 	eigvp_bandmat(eigenvalues, eigenvectors, fdm);
 	PROFILE_END("e.v. prob. ho 2d");
+
+	
+	
+	
+	
+	
+	
+	
+	
+
+	
+	
+	
+	
 
 	free(eigenvalues);
 	free(eigenvectors);

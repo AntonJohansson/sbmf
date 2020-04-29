@@ -1,5 +1,7 @@
 #pragma once
 
+#include <sbmf/common/common.h>
+
 struct PlotState;
 typedef struct PlotState PlotState;
 
@@ -10,6 +12,5 @@ extern void plt_wait_on_join(PlotState* state);
 //extern void plt_update_until_closed(PlotState* state);
 
 extern void plt_clear(PlotState* state);
-extern void plt_1d(PlotState* state, float* x, float* y, unsigned int len);
-extern void plt_2d(PlotState* state, float* points, unsigned int len);
-extern void plt_3d(PlotState* state, float* points, unsigned int len);
+extern void plt_1d(PlotState* state, f32* x, f32* y, u32 len);
+extern void plt_2d(PlotState* state, f32* x, f32* y, f32* z, u32 len);

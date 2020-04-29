@@ -40,7 +40,7 @@ static inline camera make_camera() {
 
 		.fov = M_PI_4,
 		.aspect = 16.0f/9.0f,
-		.near = 1,
+		.near = 0.1,
 		.far = 10,
 	};
 }

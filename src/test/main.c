@@ -60,6 +60,14 @@ f64 harmonic_osc_potential(f64* v, i32 n, c64 u) {
 	return temp*0.5;
 }
 
+f64 periodic_pot(f64* v, i32 n, c64 u) {
+	f64 temp = 0.0;
+	for (i32 i = 0; i < n; ++i) {
+		temp += cos(v[i])*cos(v[i]);
+	}
+	return temp;
+}
+
 c64 initial_guess(f64* v, i32 n) {
 	return 1.0/10*10;
 }
@@ -122,7 +130,7 @@ static inline void test_eigenvalue_solving_harmonic_osc_1d() {
 	bandmat fdm;
 	{
 		// NOTE: g.pointcounts[0] forces it to be square!
-		fdm = generate_fd_matrix(g.pointcounts[0], pow(2,g.dimensions), g.dimensions, g.deltas);
+		fdm = generate_fd_matrix(g.pointcounts[0], g.dimensions, g.deltas);
 
 		for (i32 i = 0; i < fdm.size*fdm.bandcount; ++i) {
 			fdm.bands[i] = -0.5*fdm.bands[i];
@@ -199,25 +207,11 @@ static inline void test_eigenvalue_solving_harmonic_osc_2d() {
 	const i32 N = 32;
 
 	grid g = generate_grid(2, 
-			(f64[]){-5, -5},
-			(f64[]){ 5,  5},
+			(f64[]){-2, -2},
+			(f64[]){ 2,  2},
 			 (i32[]){ N,   N}
 			);
 
-
-	f32 x[g.total_pointcount];
-	f32 y[g.total_pointcount];
-	f32 z[g.total_pointcount];
-	for (i32 i = 0; i < g.total_pointcount; ++i) {
-		x[i] = g.points[2*i];
-		y[i] = g.points[2*i+1];
-		z[i] = harmonic_osc_potential(&g.points[2*i], g.dimensions, 0.0);
-	}
-
-	PlotState* state = plt_init();
-	plt_2d(state, x, y, z, g.total_pointcount);
-	plt_wait_on_join(state);
-	plt_shutdown(state);
 
 
 
@@ -229,7 +223,7 @@ static inline void test_eigenvalue_solving_harmonic_osc_2d() {
 	bandmat fdm;
 	{
 		// NOTE: g.pointcounts[0] forces it to be square!
-		fdm = generate_fd_matrix(g.pointcounts[0], pow(2,g.dimensions), g.dimensions, g.deltas);
+		fdm = generate_fd_matrix(g.pointcounts[0], g.dimensions, g.deltas);
 
 		for (i32 i = 0; i < fdm.size*fdm.bandcount; ++i) {
 			fdm.bands[i] = -0.5*fdm.bands[i];
@@ -237,7 +231,7 @@ static inline void test_eigenvalue_solving_harmonic_osc_2d() {
 
 		for (i32 i = 0; i < fdm.size; ++i) {
 			i32 idx = fdm.size*(fdm.bandcount-1) + i;
-			fdm.bands[idx] += (c64) harmonic_osc_potential(&g.points[i], g.dimensions, 0.0);
+			fdm.bands[idx] += (c64) harmonic_osc_potential(&g.points[2*i], g.dimensions, 0.0);
 		}	
 	}
 	PROFILE_END("gen. fdm ho 2d");
@@ -249,9 +243,38 @@ static inline void test_eigenvalue_solving_harmonic_osc_2d() {
 	eigvp_bandmat(eigenvalues, eigenvectors, fdm);
 	PROFILE_END("e.v. prob. ho 2d");
 
-	
-	
-	
+	normalize_function_c64(&eigenvectors[0], g.total_pointcount);
+
+	f32 x[g.total_pointcount];
+	f32 y[g.total_pointcount];
+	f32 v[g.total_pointcount];
+	f32 u[g.total_pointcount];
+	f32 e[g.total_pointcount];
+	for (i32 i = 0; i < g.total_pointcount; ++i) {
+		x[i] = g.points[2*i];
+		y[i] = g.points[2*i+1];
+		v[i] = harmonic_osc_potential(&g.points[2*i], g.dimensions, 0.0);
+		u[i] = -10*creal(eigenvectors[1*g.total_pointcount + i]);
+		e[i] = psi_ho((i32[]){1,0}, &g.points[2*i], g.dimensions);
+	}
+
+	for (i32 i = 0; i < g.total_pointcount; ++i) {
+		if (fabs(e[i] - u[i]) > 0.01) {
+			fprintf(stderr, "\t- Eigenvector calculation %d failed: got %lf; expected %lf\n", i, e[i], u[i]);
+		}
+	}
+
+	normalize_function_f32(&e[0], g.total_pointcount);
+	for (i32 i = 0; i < g.total_pointcount; ++i) {
+		e[i] = 10*e[i];
+	}
+
+	PlotState* state = plt_init();
+	plt_2d(state, x, y, v, g.total_pointcount);
+	plt_2d(state, x, y, u, g.total_pointcount);
+	plt_2d(state, x, y, e, g.total_pointcount);
+	plt_wait_on_join(state);
+	plt_shutdown(state);
 	
 	
 	
@@ -272,6 +295,71 @@ static inline void test_eigenvalue_solving_harmonic_osc_3d() { }
 static inline void test_eigenvalue_solving_particle_in_a_box_1d() { }
 static inline void test_eigenvalue_solving_particle_in_a_box_2d() { }
 static inline void test_eigenvalue_solving_particle_in_a_box_3d() { }
+
+static inline void test_eigenvalue_solving_periodic_pot_1d() {
+	printf("-- Running 1D periodic test\n");
+
+	const i32 N = 256;
+
+	grid g = generate_grid(1, 
+			(f64[]){-5},
+			(f64[]){ 5},
+			 (i32[]){ N}
+			);
+
+	PROFILE_BEGIN("gen. fdm ho 1d");
+	bandmat fdm;
+	{
+		// NOTE: g.pointcounts[0] forces it to be square!
+		fdm = generate_fd_matrix(g.pointcounts[0], g.dimensions, g.deltas);
+
+		for (i32 i = 0; i < fdm.size*fdm.bandcount; ++i) {
+			fdm.bands[i] = -0.5*fdm.bands[i];
+		}
+
+		for (i32 i = 0; i < fdm.size; ++i) {
+			i32 idx = fdm.size*(fdm.bandcount-1) + i;
+			fdm.bands[idx] += (c64) periodic_pot(&g.points[i], g.dimensions, 0.0);
+		}	
+	}
+	PROFILE_END("gen. fdm  ho 1d");
+
+
+	PROFILE_BEGIN("e.v. prob. ho 1d");
+	f64* eigenvalues = malloc(fdm.size * sizeof(f64));
+	c64* eigenvectors = malloc(fdm.order * sizeof(c64));
+	eigvp_bandmat(eigenvalues, eigenvectors, fdm);
+	PROFILE_END("e.v. prob. ho 1d");
+
+
+	PlotState* state = plt_init();
+
+	f32 x[g.total_pointcount];
+	f32 v[g.total_pointcount];
+	f32 u[g.total_pointcount];
+	for (i32 i = 0; i < g.total_pointcount; ++i) {
+		x[i] = g.points[i];
+		v[i] = periodic_pot(&g.points[i], g.dimensions, 0.0);
+	}
+
+	plt_1d(state, x, v, g.total_pointcount);
+
+	for (i32 i = 0; i < 5; ++i) {
+		normalize_function_c64(&eigenvectors[i*g.total_pointcount], g.total_pointcount);
+		for (i32 j = 0; j < g.total_pointcount; ++j) {
+			u[j] = 10*creal(eigenvectors[i*g.total_pointcount + j]);
+		}
+
+		plt_1d(state, x, u, g.total_pointcount);
+	}
+
+
+	plt_wait_on_join(state);
+	plt_shutdown(state);
+
+	(void)normalize_function_f32;
+	free_grid(g);
+}
 
 static inline void test_eigenvalue_solving() {
 	printf("-- General band matrix\n");
@@ -352,8 +440,9 @@ int main(int argc, char** argv) {
 
 	printf("Testing eigenvalue solving\n"),
 	//test_eigenvalue_solving();
-	//test_eigenvalue_solving_harmonic_osc_1d();
-	test_eigenvalue_solving_harmonic_osc_2d();
+	test_eigenvalue_solving_harmonic_osc_1d();
+	test_eigenvalue_solving_periodic_pot_1d();
+	//test_eigenvalue_solving_harmonic_osc_2d();
 
 	//PlotState* state = plt_init();
 

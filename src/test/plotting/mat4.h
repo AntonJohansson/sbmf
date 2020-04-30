@@ -54,15 +54,20 @@ static inline void m4rotate(mat4* ans, mat4 m, float angle, float x, float y, fl
 	y /= vec_len;
 	z /= vec_len;
 
+	float ca = cosf(angle);
+	float sa = sinf(angle);
+
 	mat4 rotmat;
 	M4ASSIGN(rotmat,
-				cosf(angle)+x*x*(1-cosf(angle)), 			x*y*(1-cosf(angle))-z*sinf(angle), 			x*z*(1-cosf(angle))+y*sinf(angle), 		0,
-				y*x*(1-cosf(angle))+z*sinf(angle),		cosf(angle)+y*y*(1-cosf(angle)), 				y*z*(1-cosf(angle))-x*sinf(angle),		0,
-				z*x*(1-cosf(angle))-y*sinf(angle), 		z*y*(1-cosf(angle))+x*sinf(angle), 			cosf(angle)+z*z*(1-cosf(angle)), 			0,
-				0,																		0,																			0,																		1
+				ca + x*x*(1-ca), 			x*y*(1-ca) - z*sa, 			x*z*(1-ca) + y*sa, 		0,
+				y*x*(1-ca) + z*sa,		ca + y*y*(1-ca), 				y*z*(1-ca) - x*sa,		0,
+				z*x*(1-ca) - y*sa, 		z*y*(1-ca) + x*sa, 			ca + z*z*(1-ca), 			0,
+				0,										0,											0,										1
 			);
 
-	m4mul(ans, rotmat, m);
+	mat4 tmp;
+	m4mul(&tmp, rotmat, m);
+	m4copy(ans, tmp);
 }
 
 static inline void m4scale(mat4* ans, mat4 m, float sx, float sy, float sz) {
@@ -78,15 +83,36 @@ static inline void m4scale(mat4* ans, mat4 m, float sx, float sy, float sz) {
 static inline void m4perspective(mat4* ans, float fov, float aspect, float near, float far) {
 	assert(far-near != 0 && aspect != 0);
 
-	float uh = 1/tanf(fov/2);
-	float uw = uh/aspect;
+	//float uh = 1/tanf(fov/2);
+	//float uw = uh/aspect;
+
+	//M4ASSIGN(*ans,
+	//		uw,	0,  0,										 0,
+	//		0, 	uh, 0, 										 0,
+	//		0, 	0,	-far/(far-near), 			-far*near/(far-near),
+	//		0, 	0,  -1,  0
+	//		);
+
+	float right = tanf(fov/2);
+	float top = right/aspect;
 
 	M4ASSIGN(*ans,
-			uw,	0,  0,										 0,
-			0, 	uh, 0, 										 0,
-			0, 	0,	-far/(far-near), 			-1,
-			0, 	0,  -far*near/(far-near),  0
+			near/right,	0,  0,										 0,
+			0, 	near/top, 	0, 										 0,
+			0, 	0,	-(far+near)/(far-near), 			-2*far*near/(far-near),
+			0, 	0,  -1,  0
 			);
+
+
+	//float top = tanf(fov/2);
+	//float right = top*aspect;
+
+	//M4ASSIGN(*ans,
+	//		near/right,	0,  0,										 0,
+	//		0, 	near/top, 	0, 										 0,
+	//		0, 	0,	-(far+near)/(far-near), 			-2*far*near/(far-near),
+	//		0, 	0,  -1,  0
+	//		);
 }
 
 static inline void m4orthographic(mat4* ans, float fov, float aspect, float near, float far) {

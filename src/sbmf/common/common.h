@@ -5,6 +5,7 @@
 #include <float.h>
 #include <stdint.h>
 #include <math.h>
+#include <stdbool.h>
 
 #define ARRLEN(arr) \
 	(sizeof(arr)/sizeof(arr[0]))

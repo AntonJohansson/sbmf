@@ -55,10 +55,10 @@ void profile_print_results_impl() {
 		profile_data_t data = profile_data[i];
 
 		long avg = 0;
-		for (size_t j = 0; j < data.delta_num_samples; ++j) {
+		for (size_t j = 0; j < PROFILE_DATA_SAMPLE_LEN; ++j) {
 			avg += 1000000000*data.deltas[j].tv_sec + data.deltas[j].tv_nsec;
 		}
-		avg /= data.delta_num_samples;
+		avg /= PROFILE_DATA_SAMPLE_LEN;
 
 		printf("%10s -- %ld (ms)\n", data.name, avg/1000000);
 	}

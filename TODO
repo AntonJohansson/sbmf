@@ -1,4 +1,21 @@
 SBMF (Slightly Beyond Mean Field):
+	[ ] Unify memory allocation.
+	[ ] Convert column to row major in eigenvalue solver
+	[ ] Many-body pertrubation theory
+			[ ] How is this different from regular P.T.?
+			[ ] Do I need numerical integration?
+	[ ] Potential speedup for ITEM, adaptive timestep
+			[ ] See papers/item.pdf
+		[ ] particle in a box, maybe rounded corners?
+	[ ] interest is high in radial and toroidal geometry
+	[ ] Is there a more efficient LAPACKE routine for complex band matrices?
+	[ ] Which ARPACK routines should we use for complex band matrices?
+	[ ] Basis functions instead of fdm
+			[ ] Quadgk for numerical integration
+					[ ] implement own quadrature?
+							[ ] is it possible to find a table of eval points online?
+					[ ] Use QUADPACK?
+
 	[x] numerical weirdness in results after a certain point?
 			[x] whats going on?
 				"	the output from lacpake isnt automatically converted to row major in the same way that
@@ -8,38 +25,39 @@ SBMF (Slightly Beyond Mean Field):
 					lower grid resolutions. "
 	[x] the operator that we're diagonalizing should maybe be real?
 		" it should not, we need the output eigenvectors to be complex. "
-	[ ] Try projecting full numerical hamiltonian onto known ground states (e.g. harmonic) to avoid having to
+	[x] Try projecting full numerical hamiltonian onto known ground states (e.g. harmonic) to avoid having to
 			diagonalize massive matrices. This is especially needed for higher dimensionality.
-	[ ] Unify memory allocation.
-	[ ] Convert column to row major in eigenvalue solver
-	[ ] Many-body pertrubation theory
-			[ ] How is this different from regular P.T.?
-			[ ] Do I need numerical integration?
-	[ ] Potential speedup for ITEM, adaptive timestep
-			[ ] See papers/item.pdf
-	[ ] cos^2 x gives asymmetric solution
-	[ ] particle in a box, maybe rounded corners
-	[ ] interest is high in radial and toroidal
+		" this is the way moving forward. "
+	[x] cos^2 x gives asymmetric solution
+		" solved but not sure how. "
 
 Testing:
-	[x] Separate out and test eigenvalue/-vector solving.
-	[ ] Eigenvalue solver test-cases
+	[ ] FDM Eigenvalue solver test-cases
 			[x] 1d Harmonic oscillator
 			[ ] 2d Harmonic oscillator
 			[ ] 3d Harmonic oscillator
 			[ ] 1d Particle in a box
 			[ ] 2d Particle in a box
 			[ ] 3d Particle in a box
-			[ ] cleanup HO 1d
+	[ ] HO basis functions Eigenvalue solver test-cases
+			[ ] 1d Harmonic oscillator
+			[ ] 2d Harmonic oscillator
+			[ ] 3d Harmonic oscillator
+			[ ] 1d Particle in a box
+			[ ] 2d Particle in a box
+			[ ] 3d Particle in a box
 
+	[x] Separate out and test eigenvalue/-vector solving.
 
 Plotting:
 	[ ] Not freeing vaos/vbos in drawdata.
 	[ ] Plot 2d planes.
-	[ ] Handle switching between camera modes.
+	[ ] Plot 3d surfaces.
 	[ ] Text rendering,
 			[ ] stb font loading,
 			[ ] generate fonts,
 			[ ] draw fonts,
 			[ ] draw fonts in different colors.
-	[ ] Togglable plots.
+
+	[x] Handle switching between camera modes.
+	[x] Togglable plots.

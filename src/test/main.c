@@ -10,6 +10,47 @@
 
 #include "plotting/plt.h"
 
+////////////////////////////////////////////////////////////////////////////////////////////////////
+#include <sbmf/prioqueue.h>
+
+static bool cmpint(void* a, void* b) {
+	return (*(i32*)a > *(i32*)b);
+}
+
+static void test_prioqueue() {
+	prioqueue* pq = prioqueue_new(10, sizeof(i32), cmpint);
+	
+	i32 i;
+	i	= 0; prioqueue_push(pq, &i);
+	i	= 1; prioqueue_push(pq, &i);
+	i	= 2; prioqueue_push(pq, &i);
+	i	= 3; prioqueue_push(pq, &i);
+	i	= 4; prioqueue_push(pq, &i);
+	i	= 5; prioqueue_push(pq, &i);
+	i	= 6; prioqueue_push(pq, &i);
+	i	= 7; prioqueue_push(pq, &i);
+	i	= 8; prioqueue_push(pq, &i);
+	i	= 9; prioqueue_push(pq, &i);
+
+	prioqueue_pop(pq);
+	prioqueue_pop(pq);
+	prioqueue_pop(pq);
+
+	i	= 10; prioqueue_push(pq, &i);
+	i	= 12; prioqueue_push(pq, &i);
+	i	= 11; prioqueue_push(pq, &i);
+
+	do {
+		u8* ptr = prioqueue_top(pq);
+		printf("%d\n", *(i32*)ptr);
+	} while (prioqueue_pop(pq));
+
+	prioqueue_free(pq);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+
 static void normalize_function_c64(c64* func, i32 size) {
 	f64 sum = 0.0;
 	for (i32 i = 0; i < size; ++i) {
@@ -170,15 +211,15 @@ static inline void test_eigenvalue_solving_harmonic_osc_1d() {
 		normalize_function_f64(expected_answer, g.total_pointcount);
 
 		for (i32 j = 0; j < g.total_pointcount; ++j) {
-			f64 expected = expected_answer[j];
-			f64 got = creal(eigenvectors[i*g.total_pointcount + j]);
-			if (fabs(expected-got) > 0.01) {
+			f64 expected = fabs(expected_answer[j]);
+			f64 got = fabs(creal(eigenvectors[i*g.total_pointcount + j]));
+			if (expected-got > 0.05) {
 				fprintf(stderr, "\t- Eigenvector calculation failed: got %lf; expected: %lf\n", got, expected);
 			}
 		}
 
 		f64 expected_energy = energy_ho(&i, g.dimensions);
-		if (fabs(eigenvalues[i] - expected_energy) > 0.01) {
+		if (fabs(eigenvalues[i] - expected_energy) > 0.05) {
 			fprintf(stderr, "\t - Eigenvalue calculation failed: got %lf, expected %lf\n", eigenvalues[i], expected_energy);
 		}
 
@@ -437,6 +478,10 @@ int main(int argc, char** argv) {
 	assert(factorial(5) == 120);
 	assert(factorial(10) == 3628800);
 	assert(factorial(20) == 2432902008176640000);
+
+	test_prioqueue();
+
+	return 0;
 
 	printf("Testing eigenvalue solving\n"),
 	//test_eigenvalue_solving();

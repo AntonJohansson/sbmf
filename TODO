@@ -46,6 +46,7 @@ Testing:
 			[ ] 1d Particle in a box
 			[ ] 2d Particle in a box
 			[ ] 3d Particle in a box
+	[ ] Timing is not accurate, averaging is wrong
 
 	[x] Separate out and test eigenvalue/-vector solving.
 

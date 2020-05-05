@@ -1,28 +1,33 @@
 #pragma once
 
-#include <math.h>
 #include "mat4.h"
+#include <sbmf/common/common.h>
 
 typedef struct {
-	float radius;
-	float theta;
-	float phi;
+	f32 radius;
+	f32 theta;
+	f32 phi;
 
-	float pos_x, pos_y, pos_z;
-	float dir_x, dir_y, dir_z;
-	float tar_x, tar_y, tar_z;
+	f32 pos_x, pos_y, pos_z;
+	f32 dir_x, dir_y, dir_z;
+	f32 tar_x, tar_y, tar_z;
 	
-	float fov;
-	float aspect;
-	float near, far;
+	f32 fov;
+	f32 aspect;
+	f32 near, far;
 
 	mat4 projection;
 	mat4 view;
+
+	enum {
+		CAM_PAN = 0,
+		CAM_ARCBALL = 1,
+	} mode;
 } camera;
 
 static inline camera make_camera() {
 	return (camera){
-		.radius = 0,
+		.radius = 1,
 		.theta = 0,
 		.phi = 0,
 
@@ -38,10 +43,12 @@ static inline camera make_camera() {
 		.tar_y = 0,
 		.tar_z = 0,
 
-		.fov = M_PI_4,
-		.aspect = 16.0f/9.0f,
-		.near = 0.1,
-		.far = 10,
+		.fov = 0.25*M_PI_4,
+		.aspect = 4.0/3.0,
+		.near = 0.01,
+		.far = 20,
+
+		.mode = CAM_PAN,
 	};
 }
 
@@ -49,3 +56,4 @@ extern void camera_update_arcball(camera* cam);
 extern void camera_update_pan(camera* cam);
 extern void camera_update_perspective_projection(camera* cam);
 extern void camera_update_orthographic_projection(camera* cam);
+extern void camera_set_mode(camera* cam,i32 mode);

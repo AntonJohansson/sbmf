@@ -52,17 +52,17 @@
 //  	points = {...} (128 x 64 x 32 array)
 
 typedef struct {
-	int_t dimensions;
-	int_t total_pointcount;
+	i32 dimensions;
+	i32 total_pointcount;
 
 	void* memory;
-	real_t* lens;
-	real_t* mins;
-	real_t* maxs;
-	real_t* deltas;
-	int_t* pointcounts;
+	f64* lens;
+	f64* mins;
+	f64* maxs;
+	f64* deltas;
+	i32* pointcounts;
 
-	real_t* points;
+	f64* points;
 } grid;
 
 static inline grid generate_grid(int_t dimensions, real_t mins[], real_t maxs[], int_t pointcounts[]) {

@@ -19,7 +19,6 @@
 
 #define WINDOW_WIDTH 800
 #define WINDOW_HEIGHT 600
-#define MAX_CURVES_1D 16
 
 #define MAX_GLDRAWDATA_LEN 32
 
@@ -110,7 +109,9 @@ typedef struct {
 	uint32_t vertex_count;
 	GLuint vao;
 	GLuint vbo;
+	GLuint program;
 	GLenum drawmode;
+	bool active;
 } gldrawdata;
 
 ///////////////////////////////////////////////////////////////////////////////////////
@@ -118,10 +119,6 @@ typedef struct {
 struct PlotState {
 	GLFWwindow* window;
 
-	enum {
-		CAM_PAN = 0,
-		CAM_ARCBALL = 1,
-	} cam_mode;
 	camera cam;
 
 	bool is_lmb_down;
@@ -129,16 +126,6 @@ struct PlotState {
 
 	float mouse_x;
 	float mouse_y;
-
-	// 1d plotting
-	bool active1d[MAX_CURVES_1D];
-	unsigned int lengths1d[MAX_CURVES_1D];
-	//GLuint vaos1d[MAX_CURVES_1D];
-	//GLuint vboxs1d[MAX_CURVES_1D];
-	//GLuint vboys1d[MAX_CURVES_1D];
-	GLuint program1d;
-	GLuint program3d;
-	GLuint active_program;
 
 	render_group group;
 
@@ -185,10 +172,10 @@ static void mouse_move_callback(GLFWwindow* window, double x, double y){
 	last_normalized_y = normalized_y;
 
 	if (state->is_lmb_down){
-		switch (state->cam_mode) {
+		switch (state->cam.mode) {
 			case CAM_PAN: {
-				state->cam.tar_x+=state->cam.radius*dx;
-				state->cam.tar_y+=state->cam.radius*dy;
+				state->cam.tar_x += 20*state->cam.radius*dx;
+				state->cam.tar_y += 20*state->cam.radius*dy;
 				camera_update_pan(&state->cam);
 			} break;
 			case CAM_ARCBALL: {
@@ -223,6 +210,11 @@ static void mouse_button_callback(GLFWwindow* window, int button, int action, in
 				break;
 			}
 		}
+	} else if (button == GLFW_MOUSE_BUTTON_RIGHT && action == GLFW_PRESS) {
+		if (state->cam.mode == CAM_PAN)
+			camera_set_mode(&state->cam, CAM_ARCBALL);
+		else if (state->cam.mode == CAM_ARCBALL)
+			camera_set_mode(&state->cam, CAM_PAN);
 	}
 }
 
@@ -230,7 +222,7 @@ static void scroll_callback(GLFWwindow* window, double xoffset, double yoffset){
 	PlotState* state = (PlotState*) glfwGetWindowUserPointer(window);
 	state->cam.radius = fmax(state->cam.radius + -0.5f*yoffset, 0.1f);
 
-	switch (state->cam_mode) {
+	switch (state->cam.mode) {
 		case CAM_PAN: {
 			camera_update_pan(&state->cam);
 		} break;
@@ -240,6 +232,13 @@ static void scroll_callback(GLFWwindow* window, double xoffset, double yoffset){
 		default:
 			assert(0);
 	};
+}
+
+static void  key_callback(GLFWwindow* window, i32 key, i32 scancode, i32 action, i32 mods) {
+	PlotState* state = (PlotState*) glfwGetWindowUserPointer(window);
+	if (action == GLFW_PRESS && key >= GLFW_KEY_0 && key <= GLFW_KEY_9) {
+		plt_toggle_active(state, key - GLFW_KEY_0);
+	}
 }
 
 //static float* plane_vbo_memory;
@@ -350,6 +349,9 @@ static GLFWwindow* setup_window() {
 static void* plt_update_func(void* data) {
 	PlotState* state = (PlotState*) data;
 
+	static GLuint program2d;
+	static GLuint program3d;
+
 	{
 		pthread_mutex_lock(&state->mutex);
 		state->window = setup_window();
@@ -361,7 +363,7 @@ static void* plt_update_func(void* data) {
 			//glGenBuffers(MAX_CURVES_1D, state->vboxs1d);
 			//glGenBuffers(MAX_CURVES_1D, state->vboys1d);
 
-			static const char* vert1d = 
+			static const char* vert2d = 
 				"#version 410\n"
 				"layout(location = 0) in float x;\n"
 				"layout(location = 1) in float y;\n"
@@ -369,10 +371,10 @@ static void* plt_update_func(void* data) {
 				"uniform mat4 V;\n"
 				"uniform mat4 P;\n"
 				"void main() {\n"
-				"	gl_Position = V*vec4(x, y, 0, 1);\n"
+				"	gl_Position = P*V*vec4(x, y, 0, 1);\n"
 				"}";
 
-			static const char* frag1d =
+			static const char* frag2d =
 				"#version 410\n"
 				"out vec4 out_color;\n"
 				"uniform vec3 color;\n"
@@ -382,11 +384,11 @@ static void* plt_update_func(void* data) {
 
 			ShaderProgram prog;
 			prog = program_make();
-			program_attach_shader_from_buffer(&prog, vert1d, GL_VERTEX_SHADER);
-			program_attach_shader_from_buffer(&prog, frag1d, GL_FRAGMENT_SHADER);
+			program_attach_shader_from_buffer(&prog, vert2d, GL_VERTEX_SHADER);
+			program_attach_shader_from_buffer(&prog, frag2d, GL_FRAGMENT_SHADER);
 			program_link(&prog);
 			program_bind_fragdata_location(&prog, "out_color");
-			state->program1d = prog.handle;
+			program2d = prog.handle;
 
 			static const char* vert3d = 
 				"#version 410\n"
@@ -413,9 +415,7 @@ static void* plt_update_func(void* data) {
 			program_attach_shader_from_buffer(&prog, frag3d, GL_FRAGMENT_SHADER);
 			program_link(&prog);
 			program_bind_fragdata_location(&prog, "out_color");
-			state->program3d = prog.handle;
-
-			state->active_program = state->program1d;
+			program3d = prog.handle;
 		}
 
 		glfwSetWindowUserPointer(state->window, (void*)state);
@@ -423,6 +423,7 @@ static void* plt_update_func(void* data) {
 		glfwSetScrollCallback(state->window, scroll_callback);
 		glfwSetCursorPosCallback(state->window, mouse_move_callback);
 		glfwSetMouseButtonCallback(state->window, mouse_button_callback);
+		glfwSetKeyCallback(state->window, key_callback);
 
 		pthread_mutex_unlock(&state->mutex);
 	}
@@ -475,6 +476,7 @@ static void* plt_update_func(void* data) {
 
 							assert(state->gldata_index + 1 < MAX_GLDRAWDATA_LEN);
 							gldrawdata* gldata = &state->gldata[state->gldata_index++];
+							gldata->active = true;
 							glGenVertexArrays(1, &gldata->vao);
 							glBindVertexArray(gldata->vao);
 
@@ -483,19 +485,20 @@ static void* plt_update_func(void* data) {
 							// The data in the entry is stored as xxxx....yyyy... where thera are entry->point_count
 							// x's and entry->point_count y's.
 							glBufferData(GL_ARRAY_BUFFER, sizeof(GL_FLOAT)*2*entry->point_count, entry->x, GL_STATIC_DRAW);
-							glUseProgram(state->program1d);
+							glUseProgram(program2d);
 							program_bind_vertex_attribute((VertexAttribute){0,1, GL_FLOAT, GL_FALSE, sizeof(GL_FLOAT), 0});
 							program_bind_vertex_attribute((VertexAttribute){1,1, GL_FLOAT, GL_FALSE, sizeof(GL_FLOAT), entry->point_count*sizeof(GL_FLOAT)});
 
 							gldata->vertex_count = entry->point_count;
 							gldata->drawmode = GL_LINE_STRIP;
-							state->active_program = state->program1d;
+							gldata->program = program2d;
 						} break;
 						case ENTRY_TYPE_render_entry_surface_plot: {
 							render_entry_surface_plot* entry = (render_entry_surface_plot*) header;
 
 							assert(state->gldata_index + 1 < MAX_GLDRAWDATA_LEN);
 							gldrawdata* gldata = &state->gldata[state->gldata_index++];
+							gldata->active = true;
 
 							glGenVertexArrays(1, &gldata->vao);
 							glBindVertexArray(gldata->vao);
@@ -505,14 +508,14 @@ static void* plt_update_func(void* data) {
 							// The data in the entry is stored as xxxx....yyyy...zzzzzz.... where thera are entry->point_count
 							// x's and entry->point_count y's.
 							glBufferData(GL_ARRAY_BUFFER, sizeof(GL_FLOAT)*3*entry->point_count, entry->x, GL_STATIC_DRAW);
-							glUseProgram(state->program3d);
+							glUseProgram(program3d);
 							program_bind_vertex_attribute((VertexAttribute){0,1, GL_FLOAT, GL_FALSE, sizeof(GL_FLOAT), 0});
 							program_bind_vertex_attribute((VertexAttribute){1,1, GL_FLOAT, GL_FALSE, sizeof(GL_FLOAT), entry->point_count*sizeof(GL_FLOAT)});
 							program_bind_vertex_attribute((VertexAttribute){2,1, GL_FLOAT, GL_FALSE, sizeof(GL_FLOAT), 2*entry->point_count*sizeof(GL_FLOAT)});
 
 							gldata->vertex_count = entry->point_count;
-							gldata->drawmode = GL_LINE_STRIP;
-							state->active_program = state->program3d;
+							gldata->drawmode = GL_POINTS;
+							gldata->program = program3d;
 						} break;
 						default:
 							assert(0);
@@ -584,19 +587,8 @@ PlotState* plt_init() {
 	state->cam.tar_x = 0;
 	state->cam.tar_y = 0;
 	state->cam.tar_z = 0;
-	//camera_update_orthographic_projection(&state->cam);
 
-	switch (state->cam_mode) {
-		case CAM_PAN: {
-			camera_update_pan(&state->cam);
-		} break;
-		case CAM_ARCBALL: {
-			camera_update_perspective_projection(&state->cam);
-			camera_update_arcball(&state->cam);
-		} break;
-		default:
-			assert(0);
-	};
+	camera_set_mode(&state->cam, CAM_PAN);
 
 	state->group = make_render_group(MEM_RENDERGROUP_PREALLOC);
 
@@ -632,48 +624,27 @@ void plt_update(PlotState* state) {
 		glClearColor(0,0,0,1);
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-		//glm::vec4 plane_color = {0.25,0.25,0.25,1};
-		//glm::mat4 model(1);
-		//model = glm::scale(model, {plane_scale, plane_scale, plane_scale});
-		//glm::mat4 mvp = camera.projection * camera.view * model;
-
-		//glUseProgram(screen_program);
-		//bind_texture(grid_texture, 1);
-
-		glUseProgram(state->active_program);
-
-		GLuint uniform;
-		//uniform = glGetUniformLocation(screen_program, "M");
-		//glUniformMatrix4fv(uniform, 1, GL_FALSE, glm::value_ptr(mvp));
-		uniform = glGetUniformLocation(state->active_program, "V");
-		glUniformMatrix4fv(uniform, 1, GL_TRUE, state->cam.view);
-		uniform = glGetUniformLocation(state->active_program, "P");
-		glUniformMatrix4fv(uniform, 1, GL_TRUE, state->cam.projection);
-
-		//glEnable(GL_PRIMITIVE_RESTART);
-		//glPrimitiveRestartIndex(65535);
-		//glDrawElements(GL_TRIANGLE_STRIP, nelements, GL_UNSIGNED_INT, NULL);
-		//glDisable(GL_PRIMITIVE_RESTART);
-
-		uniform = glGetUniformLocation(state->active_program, "color");
-		//for (unsigned int i = 0; i < MAX_CURVES_1D; ++i) {
-		//	//if (!state->active1d[i])
-		//	//	continue;
-
-		//	float col[3] = {0};
-		//	hsl_to_rgb(col, i*(360.0f/MAX_CURVES_1D),0.85f,0.5f);
-		//	glUniform3fv(uniform, 1, col);
-
-		//	//glBindVertexArray(state->vaos1d[i]);
-		//	//glDrawArrays(GL_LINE_STRIP, 0, state->lengths1d[i]);
-		//}
-
 		for (uint32_t i = 0; i < state->gldata_index; ++i) {
+			gldrawdata* data = &state->gldata[i];
+
+			if (!data->active)
+				continue;
+
+			glUseProgram(data->program);
+
+			GLuint uniform;
+			//uniform = glGetUniformLocation(screen_program, "M");
+			//glUniformMatrix4fv(uniform, 1, GL_FALSE, glm::value_ptr(mvp));
+			uniform = glGetUniformLocation(data->program, "V");
+			glUniformMatrix4fv(uniform, 1, GL_TRUE, state->cam.view);
+			uniform = glGetUniformLocation(data->program, "P");
+			glUniformMatrix4fv(uniform, 1, GL_TRUE, state->cam.projection);
+
+			uniform = glGetUniformLocation(data->program, "color");
 			float col[3] = {0};
 			hsl_to_rgb(col, i*(360.0f/state->gldata_index),0.85f,0.5f);
 			glUniform3fv(uniform, 1, col);
 
-			gldrawdata* data = &state->gldata[i];
 			glBindVertexArray(data->vao);
 			glDrawArrays(data->drawmode, 0, data->vertex_count);
 		}
@@ -686,6 +657,11 @@ void plt_wait_on_join(PlotState* state) {
 	pthread_join(state->thread, NULL);
 }
 
+void plt_toggle_active(PlotState* state, i32 idx) {
+	if (idx >= 0 && idx < state->gldata_index) {
+		state->gldata[idx].active = !state->gldata[idx].active;
+	}
+}
 
 
 
@@ -693,7 +669,6 @@ void plt_clear(PlotState* state) {
 	pthread_mutex_lock(&state->mutex);
 	state->group.top = 0;
 	state->gldata_index = 0;
-	state->cam_mode = CAM_PAN;
 	pthread_mutex_unlock(&state->mutex);
 }
 
@@ -728,12 +703,6 @@ void plt_1d(PlotState* state, f32* x, f32* y, u32 len) {
 
 void plt_2d(PlotState* state, f32* x, f32* y, f32* z, u32 len) {
 	pthread_mutex_lock(&state->mutex);
-
-	state->cam_mode = CAM_ARCBALL;
-	state->cam.tar_x = 0;
-	state->cam.tar_y = 0;
-	state->cam.tar_z = 0;
-	camera_update_perspective_projection(&state->cam);
 
 	render_entry_surface_plot* entry;
 	entry = render_group_push_extra_size(&state->group, render_entry_surface_plot, 3*len*sizeof(f32));

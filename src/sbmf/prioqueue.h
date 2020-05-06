@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <assert.h>
 #include <stdbool.h>
+#include <string.h> // memcpy
 
 // Returns true if a comes before b
 typedef bool cmpfunc(void* a, void* b);

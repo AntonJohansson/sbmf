@@ -11,6 +11,25 @@
 #include "plotting/plt.h"
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#include <sbmf/quadgk.h>
+
+static void test_quadgk() {
+	integrationinfo info = {
+		.order = 7,
+		.abs_tol = 0,
+		.rel_tol = 1e-4,
+		.max_evals = 1e7,
+		.num_evals = 0,
+		.integral_estimate = 0,
+		.error_estimate = 0,
+	};
+	quadgk(cos, 0,1, info);
+	quadgk(exp, 0,1, info);
+	quadgk(sin, 0,2*M_PI, info);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
 #include <sbmf/prioqueue.h>
 
 static bool cmpint(void* a, void* b) {
@@ -480,6 +499,7 @@ int main(int argc, char** argv) {
 	assert(factorial(20) == 2432902008176640000);
 
 	test_prioqueue();
+	test_quadgk();
 
 	return 0;
 

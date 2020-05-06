@@ -5,7 +5,8 @@ BUILD_DIR = build
 PROJ_SRCS = \
 	src/sbmf/groundstate_solver/groundstate_solver.c  \
 	src/sbmf/groundstate_solver/item.c \
-	src/sbmf/common/profile.c
+	src/sbmf/common/profile.c \
+	src/sbmf/quadgk.c
 TEST_SRCS = $(shell find src/test -name "*.c")
 
 PROJ_LIBS = -lfftw3 -llapacke -larpack -lm

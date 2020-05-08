@@ -2,23 +2,24 @@
 
 typedef f64 integrand(f64);
 
-struct segment;
-typedef struct segment segment;
-
-struct integrationinfo;
-typedef struct integrationinfo integrationinfo;
-
-struct integrationinfo {
+typedef struct {
+	// Order of the Gauss-Kronod method used.
+	// This setting is currently ignored.
 	i32 order;
 
-	f64 abs_tol;
-	f64 rel_tol;
+	// Aboslute and relative error tolarences.
+	f64 abs_error_tol;
+	f64 rel_error_tol;
 
+	// The maximum allowed function evaluations of
+	// the supplied integrand.
 	i32 max_evals;
-	i32 num_evals;
+} integration_settings;
 
-	f64 integral_estimate;
-	f64 error_estimate;
-};
+typedef struct {
+	f64 integral;
+	f64 error;
+	i32 performed_evals;
+} integration_result;
 
-extern void quadgk(integrand* f, f64 start, f64 end, integrationinfo info);
+extern integration_result quadgk(integrand* f, f64 start, f64 end, integration_settings settings);

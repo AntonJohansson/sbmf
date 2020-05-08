@@ -8,38 +8,32 @@ typedef struct gss_settings gss_settings;
 struct gss_result;
 typedef struct gss_result gss_result;
 
-typedef real_t gss_potential_func(real_t* v, int_t n, complex_t u);
-typedef complex_t  gss_guess_func(real_t* v, int_t n);
-typedef void gss_debug_callback(grid g, complex_t* wf);
+typedef f64 gss_potential_func(f64* v, i32 n, c64 u);
+typedef c64  gss_guess_func(f64* v, i32 n);
+typedef void gss_debug_callback(grid g, c64* wf);
 
 struct gss_settings {
 	grid g;
 
-	int_t max_iterations;
-	real_t error_tol;
+	i32 max_iterations;
+	f64 error_tol;
 
-	int_t measure_every;
+	i32 measure_every;
 	gss_debug_callback* dbgcallback;
 
-	// Specific for aitem
-	real_t c;
-	real_t A;
-	real_t dt;
+	f64 dt;
 };
 
 struct gss_result {
 	gss_settings settings;
 
-	complex_t* wavefunction;
+	c64* wavefunction;
 
-	real_t error;
-	int_t iterations;
+	f64 error;
+	i32 iterations;
 };
 
 extern void gss_free_result(gss_result res);
-
-extern gss_result aitem_execute(gss_settings settings,
-																gss_potential_func* potential, gss_guess_func* guess);
 
 extern gss_result niter_execute(gss_settings settings,
 																gss_potential_func* potential, gss_guess_func* guess);

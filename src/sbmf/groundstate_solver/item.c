@@ -1,23 +1,22 @@
 #include "groundstate_solver.h"
-#include <sbmf/common/math_utils.h>
 
 #include <fftw3.h>
 
-#include <string.h>
-#include <stdlib.h>
+#include <string.h> // memcpy
+#include <stdlib.h> // malloc
 #include <assert.h>
 
-static real_t VK(real_t* v, int_t n, complex_t u) {
-	real_t value = 0.0;
-	for (int_t i = 0; i < n; ++i)
+static f64 VK(f64* v, i32 n, c64 u) {
+	f64 value = 0.0;
+	for (i32 i = 0; i < n; ++i)
 		value += v[i]*v[i];
 	return 0.5*value;
 }
 
-static inline void apply_step_op(real_t ds, real_t dt, complex_t* out, gss_potential_func* potential, grid g, complex_t* wavefunction) {
-	for (int_t i = 0; i < g.total_pointcount; ++i) {
-		real_t potval = potential(&g.points[g.dimensions*i], g.dimensions, wavefunction[i]);
-		real_t opval  = exp(-potval*dt);
+static inline void apply_step_op(f64 ds, f64 dt, c64* out, gss_potential_func* potential, grid g, c64* wavefunction) {
+	for (i32 i = 0; i < g.total_pointcount; ++i) {
+		f64 potval = potential(&g.points[g.dimensions*i], g.dimensions, wavefunction[i]);
+		f64 opval  = exp(-potval*dt);
 		out[i] = wavefunction[i] * opval * ds;
 	}
 }
@@ -48,37 +47,37 @@ static inline void apply_step_op(real_t ds, real_t dt, complex_t* out, gss_poten
 
 
 gss_result item_execute(gss_settings settings, gss_potential_func* potential, gss_guess_func* guess) {
-	//const real_t Lx = settings.length_x;
-	//const real_t Ly = settings.length_y;
-	//const real_t dx = settings.length_x / settings.resolution;
-	//const real_t dy = settings.length_y / settings.resolution;
-	//const real_t ds = (dx*dy);
-	//const int_t N = settings.resolution;
+	//const f64 Lx = settings.length_x;
+	//const f64 Ly = settings.length_y;
+	//const f64 dx = settings.length_x / settings.resolution;
+	//const f64 dy = settings.length_y / settings.resolution;
+	//const f64 ds = (dx*dy);
+	//const i32 N = settings.resolution;
 
 	// applying fft -> ifft in fftw scales input by N = n0*n1*...*nk.
 	// this is needed to cancel that scaling.
-	const real_t ifft_factor = 1.0/(settings.g.total_pointcount);
-	const real_t dt = settings.dt;
-	real_t ds = 1.0;
-	real_t density = 1.0;
-	for (int_t i = 0; i < settings.g.dimensions; ++i) {
+	const f64 ifft_factor = 1.0/(settings.g.total_pointcount);
+	const f64 dt = settings.dt;
+	f64 ds = 1.0;
+	f64 density = 1.0;
+	for (i32 i = 0; i < settings.g.dimensions; ++i) {
 		ds *= settings.g.deltas[i];
 		density *= 1.0/(settings.g.maxs[i] - settings.g.mins[i]);
 	}
 
 	gss_result result = {
 		.settings = settings,
-		.wavefunction = malloc(settings.g.total_pointcount*sizeof(complex_t)),
+		.wavefunction = malloc(settings.g.total_pointcount*sizeof(c64)),
 		.error = 0.0,
 		.iterations = 0,
 	};
 
-	//real_t* X = result.X;
-	//real_t* Y = result.Y;
-	//real_t KX[settings.grid.total_pointcount];
-	//real_t KY[settings.grid.total_pointcount];
+	//f64* X = result.X;
+	//f64* Y = result.Y;
+	//f64 KX[settings.grid.total_pointcount];
+	//f64 KY[settings.grid.total_pointcount];
 	//FOREACH_ROW(N,N, i,j) {
-	//	int_t idx = mat_idx(N,i,j);
+	//	i32 idx = mat_idx(N,i,j);
 	//	X[idx] = -settings.length_x/2 + j*dx;
 	//	Y[idx] = -settings.length_y/2 + i*dy;
 	//	KX[idx] = (j<N/2) ? 2*M_PI/settings.length_x*j : 2*M_PI/settings.length_x*(-N+j);
@@ -88,10 +87,10 @@ gss_result item_execute(gss_settings settings, gss_potential_func* potential, gs
 	grid kgrid = mimic_grid(settings.g);
 
 	//{
-	//	int_t indices[settings.g.dimensions];
-	//	memset(indices, 0, settings.g.dimensions*sizeof(int_t));
-	//	for (int_t i = 0; i < kgrid.total_pointcount; ++i) {
-	//		for (int_t j = 0; j < kgrid.dimensions; ++j) {
+	//	i32 indices[settings.g.dimensions];
+	//	memset(indices, 0, settings.g.dimensions*sizeof(i32));
+	//	for (i32 i = 0; i < kgrid.total_pointcount; ++i) {
+	//		for (i32 j = 0; j < kgrid.dimensions; ++j) {
 	//			kgrid.points[kgrid.dimensions*i + j] = 
 	//				(indices[j] < kgrid.pointcounts[j]/2) ? 
 	//					2*M_PI/(kgrid.maxs[j] - kgrid.mins[j]) * indices[j]
@@ -99,9 +98,9 @@ gss_result item_execute(gss_settings settings, gss_potential_func* potential, gs
 	//					2*M_PI/(kgrid.maxs[j] - kgrid.mins[j]) * (-kgrid.pointcounts[j] + indices[j]);
 	//		}
 
-	//		int_t baseidx = kgrid.dimensions-1;
+	//		i32 baseidx = kgrid.dimensions-1;
 	//		indices[baseidx] = (indices[baseidx]+1) % kgrid.pointcounts[baseidx];
-	//		for (int_t j = baseidx; j > 0; --j)
+	//		for (i32 j = baseidx; j > 0; --j)
 	//			if (indices[j] % kgrid.pointcounts[j] == 0)
 	//				indices[j-1] = (indices[j-1]+1) % kgrid.pointcounts[j-1];
 	//			else
@@ -110,16 +109,16 @@ gss_result item_execute(gss_settings settings, gss_potential_func* potential, gs
 	//}
 
 	{
-		int_t indices[kgrid.dimensions];
-		memset(indices, 0, kgrid.dimensions*sizeof(int_t));
-		for (int_t index = 0; index < kgrid.total_pointcount; ++index) {
-			int_t prodlen = 1;
-			for (int_t n = kgrid.dimensions-1; n >= 0; --n) {
+		i32 indices[kgrid.dimensions];
+		memset(indices, 0, kgrid.dimensions*sizeof(i32));
+		for (i32 index = 0; index < kgrid.total_pointcount; ++index) {
+			i32 prodlen = 1;
+			for (i32 n = kgrid.dimensions-1; n >= 0; --n) {
 				indices[n] = fmod((index / prodlen), kgrid.pointcounts[n]);
 				prodlen *= kgrid.pointcounts[n];
 			}
 
-			for (int_t n = 0; n < kgrid.dimensions; ++n) {
+			for (i32 n = 0; n < kgrid.dimensions; ++n) {
 				if (indices[n] < kgrid.pointcounts[n]/2) {
 					kgrid.points[kgrid.dimensions*index + n] = 2*M_PI / kgrid.lens[n] * indices[n];
 				} else {
@@ -134,10 +133,10 @@ gss_result item_execute(gss_settings settings, gss_potential_func* potential, gs
 	fftw_complex old_wavefunction[settings.g.total_pointcount];
 
 	// FFT def.
-	complex_t* fft_in   = fftw_malloc(sizeof(complex_t) * settings.g.total_pointcount);
-	complex_t* fft_out  = fftw_malloc(sizeof(complex_t) * settings.g.total_pointcount);
-	complex_t* ifft_in  = fftw_malloc(sizeof(complex_t) * settings.g.total_pointcount);
-	complex_t* ifft_out = fftw_malloc(sizeof(complex_t) * settings.g.total_pointcount);
+	c64* fft_in   = fftw_malloc(sizeof(c64) * settings.g.total_pointcount);
+	c64* fft_out  = fftw_malloc(sizeof(c64) * settings.g.total_pointcount);
+	c64* ifft_in  = fftw_malloc(sizeof(c64) * settings.g.total_pointcount);
+	c64* ifft_out = fftw_malloc(sizeof(c64) * settings.g.total_pointcount);
 
 	fftw_plan fft_plan  = fftw_plan_dft(settings.g.dimensions, settings.g.pointcounts,  fft_in,  fft_out, FFTW_FORWARD,  FFTW_MEASURE);
 	fftw_plan ifft_plan = fftw_plan_dft(settings.g.dimensions, settings.g.pointcounts, ifft_in, ifft_out, FFTW_BACKWARD, FFTW_MEASURE);
@@ -145,32 +144,32 @@ gss_result item_execute(gss_settings settings, gss_potential_func* potential, gs
 	// W.f. def.
 	{
 		//FOREACH_ROW(N,N, i,j) {
-		//	int_t idx = mat_idx(N,i,j);
-		//	real_t x = X[idx];
-		//	real_t y = Y[idx];
+		//	i32 idx = mat_idx(N,i,j);
+		//	f64 x = X[idx];
+		//	f64 y = Y[idx];
 		//	result.wavefunction[idx] = guess(x,y);
 		//}
-		for (int_t i = 0; i < settings.g.total_pointcount; ++i) {
+		for (i32 i = 0; i < settings.g.total_pointcount; ++i) {
 			result.wavefunction[i] = guess(&settings.g.points[settings.g.dimensions*i], settings.g.dimensions);
 		}
 
-		real_t sum = 0.0;
+		f64 sum = 0.0;
 		//FOREACH_ROW(N,N, i,j) {
-		//	int_t idx = mat_idx(N,i,j);
-		//	real_t tmp = cabs(result.wavefunction[idx]);
+		//	i32 idx = mat_idx(N,i,j);
+		//	f64 tmp = cabs(result.wavefunction[idx]);
 		//	sum += tmp*tmp;
 		//}
-		for (int_t i = 0; i < settings.g.total_pointcount; ++i) {
-			real_t tmp = cabs(result.wavefunction[i]);
+		for (i32 i = 0; i < settings.g.total_pointcount; ++i) {
+			f64 tmp = cabs(result.wavefunction[i]);
 			sum  += tmp*tmp;
 		}
 
-		real_t scaling = 1.0/sqrt(sum*ds);
+		f64 scaling = 1.0/sqrt(sum*ds);
 		//FOREACH_ROW(N,N, i,j) {
-		//	int_t idx = mat_idx(N,i,j);
+		//	i32 idx = mat_idx(N,i,j);
 		//	result.wavefunction[idx] *= scaling;
 		//}
-		for (int_t i = 0; i < settings.g.total_pointcount; ++i) {
+		for (i32 i = 0; i < settings.g.total_pointcount; ++i) {
 			result.wavefunction[i] *= scaling;
 		}
 	}
@@ -182,10 +181,10 @@ gss_result item_execute(gss_settings settings, gss_potential_func* potential, gs
 	fftw_execute(ifft_plan);
 
 	//FOREACH_ROW(N,N, i,j) {
-	//	int_t idx = mat_idx(N,i,j);
+	//	i32 idx = mat_idx(N,i,j);
 	//	result.wavefunction[idx] = ifft_factor*ifft_out[idx]/(Lx*Ly);
 	//}
-	for (int_t i = 0; i < settings.g.total_pointcount; ++i) {
+	for (i32 i = 0; i < settings.g.total_pointcount; ++i) {
 		result.wavefunction[i] = ifft_factor * ifft_out[i] * density;
 	}
 
@@ -201,47 +200,47 @@ gss_result item_execute(gss_settings settings, gss_potential_func* potential, gs
 			fftw_execute(ifft_plan);
 
 			//FOREACH_ROW(N,N, i,j) {
-			//	int_t idx = mat_idx(N,i,j);
+			//	i32 idx = mat_idx(N,i,j);
 			//	result.wavefunction[idx] = ifft_factor*ifft_out[idx]/(Lx*Ly);
 			//}
-			for (int_t i = 0; i < settings.g.total_pointcount; ++i) {
+			for (i32 i = 0; i < settings.g.total_pointcount; ++i) {
 				result.wavefunction[i] = ifft_factor * ifft_out[i] * density;
 			}
 		}
 		
 		// Normalize wavefunction
 		{
-			real_t sum = 0.0;
+			f64 sum = 0.0;
 			//FOREACH_ROW(N,N, i,j) {
-			//	int_t idx = mat_idx(N,i,j);
-			//	real_t tmp = cabs(result.wavefunction[idx]);
+			//	i32 idx = mat_idx(N,i,j);
+			//	f64 tmp = cabs(result.wavefunction[idx]);
 			//	sum += tmp*tmp;
 			//}
-			for (int_t i = 0; i < settings.g.total_pointcount; ++i) {
-				real_t tmp = cabs(result.wavefunction[i]);
+			for (i32 i = 0; i < settings.g.total_pointcount; ++i) {
+				f64 tmp = cabs(result.wavefunction[i]);
 				sum += tmp*tmp;
 			}
 
-			real_t scaling = 1.0/sqrt(sum*ds);
+			f64 scaling = 1.0/sqrt(sum*ds);
 			//FOREACH_ROW(N,N, i,j) {
-			//	int_t idx = mat_idx(N,i,j);
+			//	i32 idx = mat_idx(N,i,j);
 			//	result.wavefunction[idx] *= scaling;
 			//}
-			for (int_t i = 0; i < settings.g.total_pointcount; ++i) {
+			for (i32 i = 0; i < settings.g.total_pointcount; ++i) {
 				result.wavefunction[i] *= scaling;
 			}
 		}
 
 		// Calculate error
 		{
-			real_t sum = 0.0;
+			f64 sum = 0.0;
 			//FOREACH_ROW(N,N, i,j) {
-			//	int_t idx = mat_idx(N,i,j);
-			//	real_t diff = cabs(result.wavefunction[idx]-old_wavefunction[idx]);
+			//	i32 idx = mat_idx(N,i,j);
+			//	f64 diff = cabs(result.wavefunction[idx]-old_wavefunction[idx]);
 			//	sum += diff*diff;
 			//}
-			for (int_t i = 0; i < settings.g.total_pointcount; ++i) {
-				real_t diff = cabs(result.wavefunction[i] - old_wavefunction[i]);
+			for (i32 i = 0; i < settings.g.total_pointcount; ++i) {
+				f64 diff = cabs(result.wavefunction[i] - old_wavefunction[i]);
 				sum += diff*diff;
 			}
 			result.error = sqrt(sum*ds);

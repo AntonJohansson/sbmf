@@ -1,7 +1,7 @@
 #pragma once
 
 #include "mat4.h"
-#include <sbmf/common/common.h>
+#include "common.h"
 
 typedef struct {
 	f32 radius;

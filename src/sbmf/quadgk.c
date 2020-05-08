@@ -32,16 +32,15 @@ const f64 gwd7[4] = {
 	4.1795918367346938775510204081658e-01
 };
 
-
-struct segment {
-	f64 integral_estimate;
-	f64 error_estimate;
+typedef struct {
+	f64 integral;
+	f64 error;
 
 	f64 start;
 	f64 end;
-};
+} segment;
 
-f64 norm(f64 r) {
+static inline f64 norm(f64 r) {
 	return r*r;
 }
 
@@ -92,57 +91,58 @@ segment evaluate_rule(integrand* f, f64 start, f64 end) {
 	return (segment){Ik_s, error, start, end};
 }
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-static bool cmpsegments(void* a, void* b) {
-	return (((segment*)a)->error_estimate > ((segment*)b)->error_estimate);
+// Sort segments by error in descending order.
+static bool compare_segments(void* a, void* b) {
+	return (((segment*)a)->error > ((segment*)b)->error);
 }
 
-void hadapt(integrand* f, f64 start, f64 end, integrationinfo info, segment s) {
-	prioqueue* pq = prioqueue_new(32, sizeof(segment), cmpsegments);
+static inline bool should_exit(integration_result result, integration_settings settings) {
+	return (result.error <= settings.abs_error_tol ||
+					result.error <= settings.rel_error_tol*norm(result.integral) ||
+					result.performed_evals >= settings.max_evals);
+}
+
+integration_result quadgk(integrand* f, f64 start, f64 end, integration_settings settings) {
+	integration_result result = {
+		.integral = 0,
+		.error = 0,
+		.performed_evals = 0,
+	};
+
+	// Perform one evaluation of the rule and see if we can
+	// exit early without having to initalize extra memory and
+	// so on.
+	segment s = evaluate_rule(f, start, end);
+	result.performed_evals += 4*settings.order + 2;
+	result.integral = s.integral;
+	result.error = s.error;
+
+	if (should_exit(result, settings)) {
+		return result;
+	}
+
+	// If we get to this point we were not able to exit early and have do to more subdivisions
+	// to get desired error tolerance. yay.
+	prioqueue* pq = prioqueue_new(32, sizeof(segment), compare_segments);
 	prioqueue_push(pq, &s);
 
-	segment* seg = 0;
-	while (	info.error_estimate > info.abs_tol && 
-					info.error_estimate > info.rel_tol*norm(info.integral_estimate) && 
-					info.num_evals < info.max_evals) {
-		seg = (segment*)prioqueue_top(pq);
+	while (!should_exit(result, settings)) {
+		segment* largest_error_seg = (segment*)prioqueue_top(pq);
 		prioqueue_pop(pq);
 
-		f64 midpoint = 0.5 * (seg->start + seg->end);
-		segment s1 = evaluate_rule(f, seg->start, midpoint);
-		segment s2 = evaluate_rule(f, midpoint, seg->end);
+		f64 midpoint = 0.5 * (largest_error_seg->start + largest_error_seg->end);
+		segment left_seg  = evaluate_rule(f, largest_error_seg->start, midpoint);
+		segment right_seg = evaluate_rule(f, midpoint, largest_error_seg->end);
 
-		info.integral_estimate = (info.integral_estimate - seg->integral_estimate) + s1.integral_estimate + s2.integral_estimate;
-		info.error_estimate = (info.error_estimate - seg->error_estimate) + s1.error_estimate + s2.error_estimate;
+		result.performed_evals += 4*settings.order+2;
+		result.integral = (result.integral - largest_error_seg->integral) + left_seg.integral + right_seg.integral;
+		result.error = (result.error - largest_error_seg->error) + left_seg.error + right_seg.error;
 
-		info.num_evals += 4*info.order+2;
-
-		prioqueue_push(pq, &s1);
-		prioqueue_push(pq, &s2);
-
-		printf("I: %e E: %e -- (%d/%d)\n", info.integral_estimate, info.error_estimate, info.num_evals, info.max_evals);
+		prioqueue_push(pq, &left_seg);
+		prioqueue_push(pq, &right_seg);
 	}
 
-	printf("I: %e E: %e\n", info.integral_estimate, info.error_estimate);
 	prioqueue_free(pq);
+
+	return result;
 }
-
-void quadgk(integrand* f, f64 start, f64 end, integrationinfo info) {
-	segment s = evaluate_rule(f, start, end);
-	info.num_evals = 4*info.order + 2;
-
-	info.integral_estimate = s.integral_estimate;
-	info.error_estimate = s.error_estimate;
-
-	if (s.error_estimate <= info.abs_tol || 
-			s.error_estimate <= info.rel_tol*norm(s.integral_estimate) || 
-			info.num_evals >= info.max_evals) {
-		printf("I: %e E: %e -- (%d/%d)\n", s.integral_estimate, s.error_estimate, info.num_evals, info.max_evals);
-		return;
-	}
-
-	hadapt(f, start,end, info, s);
-}
-
-/////////////////////////////////////////////////////////////////////////////

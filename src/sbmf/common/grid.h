@@ -65,27 +65,27 @@ typedef struct {
 	f64* points;
 } grid;
 
-static inline grid generate_grid(int_t dimensions, real_t mins[], real_t maxs[], int_t pointcounts[]) {
-	int_t total_pointcount = 1;
-	for (int_t i = 0; i < dimensions; ++i)
+static inline grid generate_grid(i32 dimensions, f64 mins[], f64 maxs[], i32 pointcounts[]) {
+	i32 total_pointcount = 1;
+	for (i32 i = 0; i < dimensions; ++i)
 		total_pointcount *= pointcounts[i];
 
-	int_t size_points  = dimensions*total_pointcount*sizeof(real_t);
+	i32 size_points  = dimensions*total_pointcount*sizeof(f64);
 
-	void* mem = malloc(dimensions*(4*sizeof(real_t) + sizeof(int_t)) + size_points);
+	void* mem = malloc(dimensions*(4*sizeof(f64) + sizeof(i32)) + size_points);
 	grid g = {
 		.total_pointcount = total_pointcount,
 		.dimensions = dimensions,
 		.memory = mem,
-		.lens					= (real_t*)(mem),
-		.mins 				= (real_t*)((char*)mem + 		dimensions*sizeof(real_t)),
-		.maxs 				= (real_t*)((char*)mem +  2*dimensions*sizeof(real_t)),
-		.deltas 			= (real_t*)((char*)mem +  3*dimensions*sizeof(real_t)),
-		.pointcounts 	=  (int_t*)((char*)mem + 	4*dimensions*sizeof(real_t)),
-		.points 			= (real_t*)((char*)mem +  4*dimensions*sizeof(real_t) + dimensions*sizeof(int_t))
+		.lens					= (f64*)(mem),
+		.mins 				= (f64*)((char*)mem + 		dimensions*sizeof(f64)),
+		.maxs 				= (f64*)((char*)mem +  2*dimensions*sizeof(f64)),
+		.deltas 			= (f64*)((char*)mem +  3*dimensions*sizeof(f64)),
+		.pointcounts 	=  (i32*)((char*)mem + 	4*dimensions*sizeof(f64)),
+		.points 			= (f64*)((char*)mem +  4*dimensions*sizeof(f64) + dimensions*sizeof(i32))
 	};
 
-	for (int_t i = 0; i < dimensions; ++i) {
+	for (i32 i = 0; i < dimensions; ++i) {
 		g.lens[i] = maxs[i] - mins[i];
 		g.mins[i] = mins[i];
 		g.maxs[i] = maxs[i];
@@ -93,16 +93,16 @@ static inline grid generate_grid(int_t dimensions, real_t mins[], real_t maxs[],
 		g.deltas[i] = g.lens[i]/pointcounts[i];
 	}
 
-	int_t indices[dimensions];
-	memset(indices, 0, dimensions*sizeof(int_t));
+	i32 indices[dimensions];
+	memset(indices, 0, dimensions*sizeof(i32));
 
-	//for (int_t i = 0; i < total_pointcount; ++i) {
-	//	for (int_t j = 0; j < dimensions; ++j) {
+	//for (i32 i = 0; i < total_pointcount; ++i) {
+	//	for (i32 j = 0; j < dimensions; ++j) {
 	//		g.points[dimensions*i + j] = mins[j] + indices[j]*g.deltas[j];
 	//	}
 
 	//	indices[dimensions-1] = (indices[dimensions-1]+1) % pointcounts[dimensions-1];
-	//	for (int_t j = dimensions-1; j > 0; --j) {
+	//	for (i32 j = dimensions-1; j > 0; --j) {
 	//		if (indices[j] % pointcounts[j] == 0)
 	//			indices[j-1] = (indices[j-1]+1) % pointcounts[j-1];
 	//		else
@@ -111,21 +111,21 @@ static inline grid generate_grid(int_t dimensions, real_t mins[], real_t maxs[],
 	//}
 
 	{
-		int_t indices[g.dimensions];
-		memset(indices, 0, g.dimensions*sizeof(int_t));
-		for (int_t index = 0; index < total_pointcount; ++index) {
+		i32 indices[g.dimensions];
+		memset(indices, 0, g.dimensions*sizeof(i32));
+		for (i32 index = 0; index < total_pointcount; ++index) {
 			// k = (index / (1))   		% l1
 			// j = (index / (l1))  		% l2
 			// i = (index / (l1*l2))  % l3
 			// ...
 
-			int_t prodlen = 1;
-			for (int_t n = g.dimensions-1; n >= 0; --n) {
+			i32 prodlen = 1;
+			for (i32 n = g.dimensions-1; n >= 0; --n) {
 				indices[n] = fmod((index / prodlen), g.pointcounts[n]);
 				prodlen *= g.pointcounts[n];
 			}
 
-			for (int_t n = 0; n < g.dimensions; ++n) {
+			for (i32 n = 0; n < g.dimensions; ++n) {
 				g.points[dimensions*index + n] = g.mins[n] + indices[n]*g.deltas[n];
 				//printf("%d\t", indices[n]);
 			}
@@ -137,20 +137,20 @@ static inline grid generate_grid(int_t dimensions, real_t mins[], real_t maxs[],
 }
 
 static inline grid mimic_grid(grid base) {
-	int_t size_points  = base.dimensions*base.total_pointcount*sizeof(real_t);
-	int_t total_size = base.dimensions*(4*sizeof(real_t) + sizeof(int_t)) + size_points;
+	i32 size_points  = base.dimensions*base.total_pointcount*sizeof(f64);
+	i32 total_size = base.dimensions*(4*sizeof(f64) + sizeof(i32)) + size_points;
 
 	void* mem = malloc(total_size);
 	grid g = {
 		.dimensions = base.dimensions,
 		.total_pointcount = base.total_pointcount,
 		.memory = mem,
-		.lens					= (real_t*)(mem),
-		.mins 				= (real_t*)((char*)mem +   base.dimensions*sizeof(real_t)),
-		.maxs 				= (real_t*)((char*)mem + 2*base.dimensions*sizeof(real_t)),
-		.deltas 			= (real_t*)((char*)mem + 3*base.dimensions*2*sizeof(real_t)),
-		.pointcounts 	=  (int_t*)((char*)mem + 4*base.dimensions*sizeof(real_t)),
-		.points 			= (real_t*)((char*)mem + 4*base.dimensions*sizeof(real_t) + base.dimensions*sizeof(int_t)),
+		.lens					= (f64*)(mem),
+		.mins 				= (f64*)((char*)mem +   base.dimensions*sizeof(f64)),
+		.maxs 				= (f64*)((char*)mem + 2*base.dimensions*sizeof(f64)),
+		.deltas 			= (f64*)((char*)mem + 3*base.dimensions*2*sizeof(f64)),
+		.pointcounts 	=  (i32*)((char*)mem + 4*base.dimensions*sizeof(f64)),
+		.points 			= (f64*)((char*)mem + 4*base.dimensions*sizeof(f64) + base.dimensions*sizeof(i32)),
 	};
 
 	memcpy(g.memory, base.memory, total_size);
@@ -163,4 +163,4 @@ static inline void free_grid(grid g) {
 }
 
 #define FOREACH_GRIDPOINT(grid, i) \
-		for (int_t i = 0; i < grid.total_pointcount; i += grid.dimensions)
+		for (i32 i = 0; i < grid.total_pointcount; i += grid.dimensions)

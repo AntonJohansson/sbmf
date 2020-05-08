@@ -10,7 +10,7 @@
 #include <GLFW/glfw3.h>
 #include <glad/glad.h>
 
-#include "plt.h"
+#include "plot.h"
 #include "camera.h"
 #include "mat4.h"
 #include "gl/gl_error_checking.h"
@@ -116,7 +116,7 @@ typedef struct {
 
 ///////////////////////////////////////////////////////////////////////////////////////
 
-struct PlotState {
+struct plotstate {
 	GLFWwindow* window;
 
 	camera cam;
@@ -155,7 +155,7 @@ static void glfw_error_callback(int code, const char* desc) {
 }
 
 static void mouse_move_callback(GLFWwindow* window, double x, double y){
-	PlotState* state = (PlotState*) glfwGetWindowUserPointer(window);
+	plotstate* state = (plotstate*) glfwGetWindowUserPointer(window);
 
 	static double last_normalized_x = 0.0, last_normalized_y = 0.0;
 
@@ -191,7 +191,7 @@ static void mouse_move_callback(GLFWwindow* window, double x, double y){
 }
 
 static void mouse_button_callback(GLFWwindow* window, int button, int action, int mods){
-	PlotState* state = (PlotState*) glfwGetWindowUserPointer(window);
+	plotstate* state = (plotstate*) glfwGetWindowUserPointer(window);
 
 	if (button == GLFW_MOUSE_BUTTON_LEFT) {
 		switch(action){
@@ -219,7 +219,7 @@ static void mouse_button_callback(GLFWwindow* window, int button, int action, in
 }
 
 static void scroll_callback(GLFWwindow* window, double xoffset, double yoffset){
-	PlotState* state = (PlotState*) glfwGetWindowUserPointer(window);
+	plotstate* state = (plotstate*) glfwGetWindowUserPointer(window);
 	state->cam.radius = fmax(state->cam.radius + -0.5f*yoffset, 0.1f);
 
 	switch (state->cam.mode) {
@@ -235,9 +235,9 @@ static void scroll_callback(GLFWwindow* window, double xoffset, double yoffset){
 }
 
 static void  key_callback(GLFWwindow* window, i32 key, i32 scancode, i32 action, i32 mods) {
-	PlotState* state = (PlotState*) glfwGetWindowUserPointer(window);
+	plotstate* state = (plotstate*) glfwGetWindowUserPointer(window);
 	if (action == GLFW_PRESS && key >= GLFW_KEY_0 && key <= GLFW_KEY_9) {
-		plt_toggle_active(state, key - GLFW_KEY_0);
+		plot_toggle_active(state, key - GLFW_KEY_0);
 	}
 }
 
@@ -346,8 +346,8 @@ static GLFWwindow* setup_window() {
 	return window;
 }
 
-static void* plt_update_func(void* data) {
-	PlotState* state = (PlotState*) data;
+static void* plot_update_func(void* data) {
+	plotstate* state = (plotstate*) data;
 
 	static GLuint program2d;
 	static GLuint program3d;
@@ -529,7 +529,7 @@ static void* plt_update_func(void* data) {
 
 			while (accumulator >= timestep) {
 				accumulator -= timestep;
-				plt_update(state);
+				plot_update(state);
 			}
 
 		}
@@ -575,11 +575,11 @@ static void* plt_update_func(void* data) {
 
 
 
-PlotState* plt_init() {
-	void* mem = malloc(sizeof(PlotState));
+plotstate* plot_init() {
+	void* mem = malloc(sizeof(plotstate));
 	assert(mem);
-	PlotState* state = (PlotState*) mem;
-	memset(state, 0, sizeof(PlotState));
+	plotstate* state = (plotstate*) mem;
+	memset(state, 0, sizeof(plotstate));
 
 	state->cam = make_camera();
 	state->cam.radius = 1.0f;
@@ -596,12 +596,12 @@ PlotState* plt_init() {
 
 	state->should_join = false;
 	pthread_mutex_init(&state->mutex, 0);
-	pthread_create(&state->thread, NULL, plt_update_func, state);
+	pthread_create(&state->thread, NULL, plot_update_func, state);
 
 	return state;
 }
 
-void plt_shutdown(PlotState* state) {
+void plot_shutdown(plotstate* state) {
 	pthread_mutex_lock(&state->mutex);
 	state->should_join = true;
 	pthread_mutex_unlock(&state->mutex);
@@ -617,7 +617,7 @@ void plt_shutdown(PlotState* state) {
 	free(state);
 }
 
-void plt_update(PlotState* state) {
+void plot_update(plotstate* state) {
 	glfwPollEvents();
 
 	{
@@ -653,11 +653,11 @@ void plt_update(PlotState* state) {
 	glfwSwapBuffers(state->window);
 }
 
-void plt_wait_on_join(PlotState* state) {
+void plot_wait_on_join(plotstate* state) {
 	pthread_join(state->thread, NULL);
 }
 
-void plt_toggle_active(PlotState* state, i32 idx) {
+void plot_toggle_active(plotstate* state, i32 idx) {
 	if (idx >= 0 && idx < state->gldata_index) {
 		state->gldata[idx].active = !state->gldata[idx].active;
 	}
@@ -665,14 +665,14 @@ void plt_toggle_active(PlotState* state, i32 idx) {
 
 
 
-void plt_clear(PlotState* state) {
+void plot_clear(plotstate* state) {
 	pthread_mutex_lock(&state->mutex);
 	state->group.top = 0;
 	state->gldata_index = 0;
 	pthread_mutex_unlock(&state->mutex);
 }
 
-void plt_1d(PlotState* state, f32* x, f32* y, u32 len) {
+void plot_1d(plotstate* state, f32* x, f32* y, u32 len) {
 	pthread_mutex_lock(&state->mutex);
 
 	render_entry_line_plot* entry;
@@ -701,7 +701,7 @@ void plt_1d(PlotState* state, f32* x, f32* y, u32 len) {
 	pthread_mutex_unlock(&state->mutex);
 }
 
-void plt_2d(PlotState* state, f32* x, f32* y, f32* z, u32 len) {
+void plot_2d(plotstate* state, f32* x, f32* y, f32* z, u32 len) {
 	pthread_mutex_lock(&state->mutex);
 
 	render_entry_surface_plot* entry;
@@ -717,4 +717,4 @@ void plt_2d(PlotState* state, f32* x, f32* y, f32* z, u32 len) {
 
 	pthread_mutex_unlock(&state->mutex);
 }
-void plt_3d(PlotState* state, float* points, unsigned int len) {}
+void plot_3d(plotstate* state, f64* points, u32 len) {}

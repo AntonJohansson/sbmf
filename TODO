@@ -1,6 +1,5 @@
 SBMF (Slightly Beyond Mean Field):
 	[ ] Unify memory allocation.
-	[ ] Convert column to row major in eigenvalue solver
 	[ ] Many-body pertrubation theory
 			[ ] How is this different from regular P.T.?
 			[ ] Do I need numerical integration?
@@ -11,11 +10,12 @@ SBMF (Slightly Beyond Mean Field):
 	[ ] Is there a more efficient LAPACKE routine for complex band matrices?
 	[ ] Which ARPACK routines should we use for complex band matrices?
 	[ ] Basis functions instead of fdm
-			[ ] Quadgk for numerical integration
-					[ ] implement own quadrature?
+			[x] Quadgk for numerical integration
+					[x] implement own quadrature?
 							[ ] is it possible to find a table of eval points online?
 					[ ] Use QUADPACK?
 
+	[x] Convert column to row major in eigenvalue solver
 	[x] numerical weirdness in results after a certain point?
 			[x] whats going on?
 				"	the output from lacpake isnt automatically converted to row major in the same way that

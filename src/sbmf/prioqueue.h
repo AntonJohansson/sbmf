@@ -4,7 +4,7 @@
 #include <stdlib.h>
 #include <assert.h>
 #include <stdbool.h>
-#include <string.h> // memcpy
+#include <string.h> // memcpy, memmove
 
 // Returns true if a comes before b
 typedef bool cmpfunc(void* a, void* b);
@@ -59,7 +59,7 @@ static inline void prioqueue_push(prioqueue* pq, void* data) {
 
 	i32 wrapped_index = (pq->top + insert_index) % pq->max_size;
 
-	if (insert_index + 1 < pq->size)  {
+	if (insert_index < pq->size)  {
 				// 0 1 2 3 4 5 6 7 8 9
 		// 	   b   t     i
 		// shift 012 -> 123
@@ -74,14 +74,14 @@ static inline void prioqueue_push(prioqueue* pq, void* data) {
 			// shift 456 -> 567
 
 			i32 next_index = (wrapped_index + 1) % pq->max_size;
-			memcpy(&pq->mem[next_index*pq->item_size], &pq->mem[wrapped_index*pq->item_size], (pq->size - insert_index-1)*pq->item_size);
+			memmove(&pq->mem[next_index*pq->item_size], &pq->mem[wrapped_index*pq->item_size], (pq->size - insert_index)*pq->item_size);
 		} else {
-			memcpy(&pq->mem[pq->item_size], &pq->mem[0], (end_index)*pq->item_size);
+			memmove(&pq->mem[pq->item_size], &pq->mem[0], (end_index)*pq->item_size);
 
-			memcpy(&pq->mem[0], &pq->mem[(pq->max_size-1)*pq->item_size], pq->item_size);
+			memmove(&pq->mem[0], &pq->mem[(pq->max_size-1)*pq->item_size], pq->item_size);
 
 			i32 next_index = (wrapped_index + 1) % pq->max_size;
-			memcpy(&pq->mem[next_index*pq->item_size], &pq->mem[wrapped_index*pq->item_size], (pq->size - insert_index-1-end_index)*pq->item_size);
+			memmove(&pq->mem[next_index*pq->item_size], &pq->mem[wrapped_index*pq->item_size], (pq->size - insert_index-1-end_index)*pq->item_size);
 		}
 	}
 
@@ -90,7 +90,7 @@ static inline void prioqueue_push(prioqueue* pq, void* data) {
 }
 
 static inline u8* prioqueue_top(prioqueue* pq) {
-	return &pq->mem[pq->top*pq->item_size];
+	return &pq->mem[pq->top * pq->item_size];
 }
 
 static inline bool prioqueue_pop(prioqueue* pq) {

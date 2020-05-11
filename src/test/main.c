@@ -55,7 +55,36 @@ static bool cmpint(void* a, void* b) {
 }
 
 describe(priority_queue) {
-	it ("push/pop") {
+	it ("push items") {
+		prioqueue* pq = prioqueue_new(10, sizeof(i32), cmpint);
+
+		i32 i;
+		i	= 0; prioqueue_push(pq, &i);
+		i	= 1; prioqueue_push(pq, &i);
+		i	= 2; prioqueue_push(pq, &i);
+		i	= 3; prioqueue_push(pq, &i);
+		i	= 4; prioqueue_push(pq, &i);
+		i	= 5; prioqueue_push(pq, &i);
+		i	= 6; prioqueue_push(pq, &i);
+		i	= 7; prioqueue_push(pq, &i);
+		i	= 8; prioqueue_push(pq, &i);
+		i	= 9; prioqueue_push(pq, &i);
+
+		{
+			i32 expected[] = {9,8,7,6,5,4,3,2,1,0};
+			for (i32 i = 0; i < ARRLEN(expected); ++i) {
+				i32* ptr = (i32*)prioqueue_top(pq);
+				//printf("%d\n", *ptr);
+				asserteq(*ptr, expected[i]);
+				prioqueue_pop(pq);
+			}
+
+			asserteq(pq->size, 0);
+		}
+
+		prioqueue_free(pq);
+	}
+	it ("push and pop items") {
 		prioqueue* pq = prioqueue_new(10, sizeof(i32), cmpint);
 
 		i32 i;
@@ -78,15 +107,17 @@ describe(priority_queue) {
 		i	= 12; prioqueue_push(pq, &i);
 		i	= 11; prioqueue_push(pq, &i);
 
-		i32 expected[] = {12,11,10,6,5,4,3,2,1,0};
-		for (i32 i = 0; i < ARRLEN(expected); ++i) {
-			i32* ptr = (i32*)prioqueue_top(pq);
-			printf("%d\n", *ptr);
-			asserteq(*ptr, expected[i]);
-			prioqueue_pop(pq);
-		}
+		{
+			i32 expected[] = {12,11,10,6,5,4,3,2,1,0};
+			for (i32 i = 0; i < ARRLEN(expected); ++i) {
+				i32* ptr = (i32*)prioqueue_top(pq);
+				//printf("%d\n", *ptr);
+				asserteq(*ptr, expected[i]);
+				prioqueue_pop(pq);
+			}
 
-		asserteq(pq->size, 0);
+			asserteq(pq->size, 0);
+		}
 
 		prioqueue_free(pq);
 	}

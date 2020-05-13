@@ -1,6 +1,6 @@
 #include "common/common.h"
 
-typedef f64 integrand(f64);
+typedef f64 integrand(f64, void*);
 
 typedef struct {
 	// Order of the Gauss-Kronod method used.
@@ -14,12 +14,15 @@ typedef struct {
 	// The maximum allowed function evaluations of
 	// the supplied integrand.
 	i32 max_evals;
+
+	void* userdata;
 } integration_settings;
 
 typedef struct {
 	f64 integral;
 	f64 error;
 	i32 performed_evals;
+	bool converged;
 } integration_result;
 
 extern integration_result quadgk(integrand* f, f64 start, f64 end, integration_settings settings);

@@ -7,15 +7,23 @@
 #include <sbmf/common/grid.h>
 #include <sbmf/common/eigenproblem.h>
 
+#include <sbmf/basis/harmonic_oscillator.h>
+
 //#include <stdio.h>
 //#include <unistd.h>
 
 #include <plot/plot.h>
 
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // TEST NUMERICAL INTEGRATION VIA QUADGK
 #include <sbmf/quadgk.h>
+
+static f64 integrand_cos(f64 x, void* data) {return cos(x);}
+static f64 integrand_sin(f64 x, void* data) {return sin(x);}
+static f64 integrand_x2(f64 x, void* data) { return x*x; }
+static f64 integrand_expx(f64 x, void* data) { return exp(x); }
+static f64 integrand_expnx(f64 x, void* data) { return exp(-x); }
+static f64 integrand_expnabsx(f64 x, void* data) { return exp(-fabs(x)); }
 
 describe(quadgk_integration) {
 	integration_settings settings = {
@@ -28,21 +36,75 @@ describe(quadgk_integration) {
 	integration_result res;
 
 	it ("cosine 0 -> 1") {
-		res = quadgk(cos, 0,1, settings);
+		res = quadgk(integrand_cos, 0,1, settings);
 		assert(res.integral - 0.84 < 0.01);
 		assert(res.error < 1e-4);
 	}
 
 	it ("exp 0 -> 1") {
-		res = quadgk(exp, 0,1, settings);
+		res = quadgk(integrand_expx, 0,1, settings);
 		assert(res.integral - 1.78 < 0.01);
 		assert(res.error < 1e-4);
+		assert(res.converged);
 	}
 
 	it ("sine 0 -> 2pi") {
-		res = quadgk(sin, 0,2*M_PI, settings);
+		res = quadgk(integrand_sin, 0,2*M_PI, settings);
 		assert(res.integral - 0.0 < 0.01);
 		assert(res.error < 1e-4);
+		assert(res.converged);
+	}
+
+	it ("x^2 -1 -> 1") {
+		res = quadgk(integrand_x2, -1, 1, settings);
+		assert(res.integral - 2.0/3.0 < 0.01);
+		assert(res.error < 1e-4);
+		assert(res.converged);
+	}
+	
+	it ("exp(-x) 0 -> inf") {
+		res = quadgk(integrand_expnx, 0, INFINITY, settings);
+		//printf("\n%lf\n", res.integral);
+		assert(res.integral - 1.0 < 0.01);
+		assert(res.error < 1e-4);
+		assert(res.converged);
+	}
+
+	it ("exp(-x) inf -> 0") {
+		res = quadgk(integrand_expnx, INFINITY, 0, settings);
+		assert(res.integral - (-1.0) < 0.01);
+		assert(res.error < 1e-4);
+		assert(res.converged);
+	}
+
+	it ("exp(x) -inf -> 0") {
+		res = quadgk(integrand_expx, -INFINITY, 0, settings);
+		assert(res.integral - (1.0) < 0.01);
+		assert(res.error < 1e-4);
+		assert(res.converged);
+	}
+
+	it ("exp(x) 0 -> -inf") {
+		res = quadgk(integrand_expx, 0, -INFINITY, settings);
+		//printf("\n%lf\n", res.integral);
+		assert(res.integral - (-1.0) < 0.01);
+		assert(res.error < 1e-4);
+		assert(res.converged);
+	}
+
+	it ("exp(-|x|) -inf -> inf") {
+		res = quadgk(integrand_expnabsx, -INFINITY, INFINITY, settings);
+		assert(res.integral - (2.0) < 0.01);
+		assert(res.error < 1e-4);
+		assert(res.converged);
+	}
+
+	it ("exp(-|x|) inf -> -inf") {
+		res = quadgk(integrand_expnabsx, -INFINITY, INFINITY, settings);
+		//printf("\n%lf\n", res.integral);
+		assert(res.integral - (-2.0) < 0.01);
+		assert(res.error < 1e-4);
+		assert(res.converged);
 	}
 }
 
@@ -124,6 +186,56 @@ describe(priority_queue) {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
+// TEST SOLVING HAMILTONIAN VIA HARMONIC OSC. BASIS FUNCTIONS
+
+static i32 row_eigenfunction = 0;
+static i32 col_eigenfunction = 0;
+
+static f64 temp_potential(f64 x) {
+	return ho_potential(&x, 1, 0);
+}
+
+static f64 compute_matrix_element(f64 x, void* data) {
+	return (ho_eigenfunction(&row_eigenfunction, &x, 1)) * (temp_potential(x) - ho_potential(&x, 1, 0)) * (ho_eigenfunction(&col_eigenfunction, &x, 1));
+}
+
+describe(solve_hamiltonian_ho_basis) {
+	it("temp"){
+		static const i32 states_to_include = 5;
+		static const i32 matrix_order = states_to_include*states_to_include;
+
+		f64 mat[matrix_order];
+		memset(mat, 0, matrix_order*sizeof(i32));
+
+		integration_settings settings = {
+			.order = 7,
+			.abs_error_tol = 0,
+			.rel_error_tol = 1e-1,
+			.max_evals = 1e4,
+		};
+
+		integration_result res;
+
+		for (i32 row = 0; row < states_to_include; ++row) {
+			for (i32 col = 0; col < states_to_include; ++col) {
+				row_eigenfunction = row;
+				col_eigenfunction = col;
+
+				res = quadgk(compute_matrix_element, -INFINITY,INFINITY, settings);
+				assert(res.converged);
+
+				mat[row*states_to_include + col] = res.integral;
+
+				if (row == col) {
+					mat[col*states_to_include + col] += ho_eigenvalue(&row, 1);
+				}
+			}
+		}
+
+	}
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
 // TEST GRID BASED EIGENVALUE SOLVER AGAINST KNOWN SOLUTIONS
 
 static void normalize_function_c64(c64* func, i32 size) {
@@ -188,46 +300,6 @@ c64 initial_guess(f64* v, i32 n) {
 	return 1.0/10*10;
 }
 
-static u64 factorial(u64 n) {
-	assert(n <= 20); // largest factorial supported by u64
-
-	if (n < 1) {
-		return 1;
-	} else {
-		return n*factorial(n-1);
-	}
-}
-
-static inline f64 hermite_poly(i32 n, f64 x) {
-	// H_n(z) = (-1)^n * exp(z^2) * (d^n/dz^n) (exp(-z^2))
-	//
-	// Explicit form:
-	// 		H_n(x) = n! sum_(m=0)^(floor(n/2)) (-1)^m/(m!*(n-2m)!) * (2x)^(n-2m)
-
-	f64 sum = 0.0;
-	i32 upper_bound = n/2;
-	for (i32 m = 0; m <= upper_bound; ++m) {
-		sum += pow(-1,m) / (factorial(m) * factorial(n-2*m)) * pow(2*x, n-2*m);
-	}
-
-	return factorial(n)*sum;
-}
-
-static inline f64 psi_ho(i32 states[], f64 point[], i32 dims) {
-	f64 sum = 0.0;
-	for (i32 i = 0; i < dims; ++i)
-		sum += exp(-point[i]*point[i]/2.0) * hermite_poly(states[i], point[i]);
-	return sum;
-}
-
-static inline f64 energy_ho(i32 states[], i32 dims) {
-	f64 sum = 0.0;
-	for (i32 i = 0; i < dims; ++i) 
-		sum += states[i];
-	
-	return sum + dims/2.0;
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 static inline void test_eigenvalue_solving_harmonic_osc_1d() {
@@ -251,7 +323,7 @@ static inline void test_eigenvalue_solving_harmonic_osc_1d() {
 
 		for (i32 i = 0; i < fdm.size; ++i) {
 			i32 idx = fdm.size*(fdm.bandcount-1) + i;
-			fdm.bands[idx] += (c64) harmonic_osc_potential(&g.points[i], g.dimensions, 0.0);
+			fdm.bands[idx] += (c64) ho_potential(&g.points[i], g.dimensions, 0.0);
 		}	
 	}
 	PROFILE_END("gen. fdm  ho 1d");
@@ -268,7 +340,7 @@ static inline void test_eigenvalue_solving_harmonic_osc_1d() {
 	f32 v[g.total_pointcount];
 	for (i32 i = 0; i < g.total_pointcount; ++i) {
 		x[i] = g.points[i];
-		v[i] = harmonic_osc_potential(&g.points[i], g.dimensions, 0.0);
+		v[i] = ho_potential(&g.points[i], g.dimensions, 0.0);
 	}
 	plot_1d(state, x, v, g.total_pointcount);
 
@@ -278,7 +350,7 @@ static inline void test_eigenvalue_solving_harmonic_osc_1d() {
 		
 		for (i32 j = 0; j < g.total_pointcount; ++j) {
 			//expected_answer[j] = psi_ho_1d(i, g.points[j]);
-			expected_answer[j] = psi_ho(&i, &g.points[j], g.dimensions);
+			expected_answer[j] = ho_eigenfunction(&i, &g.points[j], g.dimensions);
 		}
 		normalize_function_f64(expected_answer, g.total_pointcount);
 
@@ -290,7 +362,7 @@ static inline void test_eigenvalue_solving_harmonic_osc_1d() {
 			}
 		}
 
-		f64 expected_energy = energy_ho(&i, g.dimensions);
+		f64 expected_energy = ho_eigenvalue(&i, g.dimensions);
 		if (fabs(eigenvalues[i] - expected_energy) > 0.05) {
 			//fprintf(stderr, "\t - Eigenvalue calculation failed: got %lf, expected %lf\n", eigenvalues[i], expected_energy);
 		}
@@ -299,7 +371,7 @@ static inline void test_eigenvalue_solving_harmonic_osc_1d() {
 		f32 z[g.total_pointcount];
 		for (i32 j = 0; j < g.total_pointcount; ++j) {
 			//y[j] = E_ho_1d(i) + expected_answer[j];
-			y[j] = energy_ho(&i, g.dimensions) + expected_answer[j];
+			y[j] = ho_eigenvalue(&i, g.dimensions) + expected_answer[j];
 			z[j] = eigenvalues[i] + creal(eigenvectors[i*g.total_pointcount + j]);
 		}
 
@@ -366,9 +438,9 @@ static inline void test_eigenvalue_solving_harmonic_osc_2d() {
 	for (i32 i = 0; i < g.total_pointcount; ++i) {
 		x[i] = g.points[2*i];
 		y[i] = g.points[2*i+1];
-		v[i] = harmonic_osc_potential(&g.points[2*i], g.dimensions, 0.0);
+		v[i] = ho_potential(&g.points[2*i], g.dimensions, 0.0);
 		u[i] = -10*creal(eigenvectors[1*g.total_pointcount + i]);
-		e[i] = psi_ho((i32[]){1,0}, &g.points[2*i], g.dimensions);
+		e[i] = ho_eigenfunction((i32[]){1,0}, &g.points[2*i], g.dimensions);
 	}
 
 	for (i32 i = 0; i < g.total_pointcount; ++i) {

@@ -13,7 +13,7 @@ PLOT_SRCS = $(shell find src/plot -name "*.c")
 
 PROJ_LIBS = -lfftw3 -llapacke -larpack -lm
 PLOT_LIBS = -lglfw -lpthread -lm -ldl
-TEST_LIBS = -l$(PROJECT) -lplot -lm
+TEST_LIBS = -l$(PROJECT) -lplot -lm -larpack -lcblas
 
 #PROJ_FLAGS = -fsanitize=address -fsanitize=leak -g -fpic -Wall -Werror -Isrc
 #TEST_FLAGS = -fsanitize=address -fsanitize=leak -g -Wall -Werror -Isrc -Isrc/test/plotting/third_party

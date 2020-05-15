@@ -1,15 +1,8 @@
 #pragma once
 
 #include "common.h"
-#include <string.h>
-#include <stdlib.h>
-
-typedef struct {
-	i32 order;
-	i32 size;
-	i32 bandcount;
-	c64* bands;
-} bandmat;
+#include <string.h> // memcpy
+#include <stdlib.h> // malloc
 
 // Generates [n x n] finite difference matrix of order dim, with diagonal element -k.
 // For example 
@@ -57,15 +50,17 @@ typedef struct {
 static inline bandmat generate_fd_matrix(i32 n, i32 dim, f64 ds[]) {
 	i32 k = pow(2,dim);
 
-	bandmat b;
-	b.size = pow(n, dim);
-	b.order = b.size*b.size;
-	b.bandcount = pow(n,dim-1)+1;
-	b.bands = malloc(b.bandcount*b.size*sizeof(c64));
-	memset(b.bands, 0, b.bandcount*b.size*sizeof(c64));
+	bandmat b = {
+		.size = pow(n,dim),
+		.super_diags = pow(n,dim),
+		.sub_diags = 0,
+	};
+
+	b.bands = malloc((b.super_diags + 1)*b.size*sizeof(c64));
+	memset(b.bands, 0, (b.super_diags + 1)*b.size*sizeof(c64));
 
 	// Setup main diagonal
-	for (i32 i = (b.bandcount-1)*b.size; i < b.bandcount*b.size; ++i) {
+	for (i32 i = b.super_diags*b.size; i < (b.super_diags+1)*b.size; ++i) {
 		b.bands[i] = -k/(ds[0]*ds[0]);
 	}
 
@@ -73,7 +68,7 @@ static inline bandmat generate_fd_matrix(i32 n, i32 dim, f64 ds[]) {
 	for (i32 i = 1; i <= dim; ++i) {
 		i32 bandindex = pow(n, i-1);
 		for (i32 j = 0; j < b.size; ++j) {
-			b.bands[j + (b.bandcount-1 - bandindex)*b.size] = 1/(ds[i-1]*ds[i-1]);
+			b.bands[j + (b.super_diags - bandindex)*b.size] = 1/(ds[i-1]*ds[i-1]);
 		}
 	}
 

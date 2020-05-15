@@ -36,3 +36,10 @@ static inline bool f64equal(f64 a, f64 b) {
 static inline bool f32equal(f32 a, f32 b) {
 	return (a-b <= EPSILON);
 }
+
+typedef struct {
+	u32 size;
+	u32 super_diags;
+	u32 sub_diags;
+	c64* bands;
+} bandmat;

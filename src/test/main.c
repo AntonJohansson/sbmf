@@ -543,35 +543,34 @@ describe(solve_eigenproblems_bandmat) {
 	};
 
 	static f64 eigvals_answer[] = {
-		-11.7856,
-		-8.4171 ,
-		-7.5371 ,
-		-4.9893 ,
-		-2.7593 ,
-		2.27    ,
-		4.866   ,
-		8.448   ,
-		13.3963 ,
-		16.8239 
+		-11.785562861423848,
+		-8.41709283554329,
+		-7.5370741723957915,
+		-4.989284977718224,
+		-2.7593112024185578,
+		2.0207266054245863,
+		4.806575870197963,
+		8.440803849012717,
+		13.3962999372205,
+		16.823919787643952,
 	};
-
-	c64 bands[] = {
-		0,0,0,1,2,3,4,5,6,7,
-		0,9,8,7,6,5,4,3,2,1,
-		1,1,1,1,1,1,1,1,1,1,
-		9,8,7,6,5,4,3,2,1,0,
-		0,1,2,3,4,5,6,7,0,0,
-	};
-
-	bandmat bm = {
-		.size = 10,
-		.super_diags = 2,
-		.sub_diags = 2,
-		.bands = bands,
-	};
-
 
 	it ("dense (symetric) upper tridiagonal band matrix") {
+		c64 bands[] = {
+			0,0,0,1,2,3,4,5,6,7,
+			0,9,8,7,6,5,4,3,2,1,
+			1,1,1,1,1,1,1,1,1,1,
+			9,8,7,6,5,4,3,2,1,0,
+			0,1,2,3,4,5,6,7,0,0,
+		};
+
+		bandmat bm = {
+			.size = 10,
+			.super_diags = 2,
+			.sub_diags = 2,
+			.bands = bands,
+		};
+
 		f64 eigvals[bm.size];
 		c64 eigvecs[bm.size*bm.size];
 		// Only use upper portion (including main diag) of bandmat bm.
@@ -593,54 +592,118 @@ describe(solve_eigenproblems_bandmat) {
 	}
 
 	it ("sparse bandmatrix") {
+		c64 bands[] = {
+			0,0,0,1,2,3,4,5,6,7,
+			0,9,8,7,6,5,4,3,2,1,
+			1,1,1,1,1,1,1,1,1,1,
+			9,8,7,6,5,4,3,2,1,0,
+			0,1,2,3,4,5,6,7,0,0,
+		};
+
+		bandmat bm = {
+			.size = 10,
+			.super_diags = 2,
+			.sub_diags = 2,
+			.bands = bands,
+		};
+
 		c64 eigvals[bm.size];
 		c64 eigvecs[bm.size*bm.size];
 
 		i32 eigenpairs_to_find = 4;
+		eig_sparse_bandmat(bm, eigenpairs_to_find, EV_SMALLEST_RE, eigvals, eigvecs);
+
+		//// check eigenvalues
+		//for (i32 i = 0; i < eigenpairs_to_find; ++i) {
+		//	printf("%lf + i%lf\n", creal(eigvals[i]), cimag(eigvals[i]));
+		//	//assert(fabs(eigvals[i] - eigvals_answer[i]) <= 1);
+		//}
+
+		//// Check eigenvectors
+		//for (int i = 0; i < eigenpairs_to_find; ++i) {
+		//	for (int j = 0; j < bm.size; ++j) {
+		//		c64 got = eigvecs[i*bm.size + j]; 
+		//		c64 expected = eigvecs_answer[j*bm.size + i];
+		//		//assert(cabs(got)-cabs(expected) <= 1);
+		//	}
+		//}
+	}
+
+	it ("trivial bandmatrix example 1") {
+		bandmat bm = {
+			.size = 3,
+			.super_diags = 1,
+			.sub_diags = 1,
+			.bands = (c64*)(c64[]){
+				0,4,5,
+				1,2,3,
+				4,5,0,
+			},
+		};
+
+		c64 eigvals[bm.size];
+		c64 eigvecs[bm.size*bm.size];
+
+		i32 eigenpairs_to_find = 1;
 		eig_sparse_bandmat(bm, eigenpairs_to_find, EV_SMALLEST_MAG, eigvals, eigvecs);
+	}
 
-		// check eigenvalues
-		for (i32 i = 0; i < eigenpairs_to_find; ++i) {
-			printf("%lf + i%lf\n", creal(eigvals[i]), cimag(eigvals[i]));
-			assert(fabs(eigvals[i] - eigvals_answer[i]) <= 1);
-		}
+	it ("trivial bandmatrix example 2") {
+		bandmat bm = {
+			.size = 3,
+			.super_diags = 2,
+			.sub_diags = 2,
+			.bands = (c64*)(c64[]){
+				0,0,1,
+				0,0,0,
+				1,2,3,
+				0,0,0,
+				1,0,0
+			},
+		};
 
-		// Check eigenvectors
-		for (int i = 0; i < eigenpairs_to_find; ++i) {
-			for (int j = 0; j < bm.size; ++j) {
-				c64 got = eigvecs[i*bm.size + j]; 
-				c64 expected = eigvecs_answer[j*bm.size + i];
-				assert(cabs(got)-cabs(expected) <= 1);
-			}
-		}
+		c64 eigvals[bm.size];
+		c64 eigvecs[bm.size*bm.size];
+
+		i32 eigenpairs_to_find = 1;
+		eig_sparse_bandmat(bm, eigenpairs_to_find, EV_SMALLEST_MAG, eigvals, eigvecs);
+	}
+
+
+	it ("trivial real matrix example") {
+		f64 mat[3*3] = {
+			1,4,0,
+			4,2,5,
+			0,5,3
+		};
+
+		eig_sparse_real(mat, 3, 1, NULL,NULL);
 	}
 }
 
 #include <cblas.h>
 describe(test_cblas) {
 	it ("zgbmv") {
-		c64 bands[] = {
-			0,0,1,9,0,
-			0,9,1,8,1,
-			0,8,1,7,2,
-			1,7,1,6,3,
-			2,6,1,5,4,
-			3,5,1,4,5,
-			4,4,1,3,6,
-			5,3,1,2,7,
-			6,2,1,1,0,
-			7,1,1,0,0,
-		};
-
 		i32 kl = 2, ku = 2;
-#define n 10
+		i32 n = 10;
 		i32 lda = 5;
 
-		c64 x[n] = {0,1,2,3,4,5,6,7,8,9};
+		c64 bands[] = {
+			0,0,0,1,2,3,4,5,6,7,
+			0,9,8,7,6,5,4,3,2,1,
+			1,1,1,1,1,1,1,1,1,1,
+			9,8,7,6,5,4,3,2,1,0,
+			0,1,2,3,4,5,6,7,0,0,
+		};
+
+		c64 input_mat[lda*n];
+		mat_transpose(input_mat, bands, lda, n);
+
+		c64 x[10] = {0,1,2,3,4,5,6,7,8,9};
 		c64 y[n];
 
 		c64 zero = 0, one = 1;
-		cblas_zgbmv(CblasColMajor, CblasNoTrans, n, n, kl, ku, &one, bands, 
+		cblas_zgbmv(CblasColMajor, CblasNoTrans, n, n, kl, ku, &one, input_mat, 
 				lda, x, 1, &zero, y, 1);
 
 		//	1 9 0                   0
@@ -665,7 +728,7 @@ describe(test_cblas) {
 		//  67
 		//  66
 		
-		c64 expected_y[n] = {9,20,39,57,75,93,111,129,67,66};
+		c64 expected_y[10] = {9,20,39,57,75,93,111,129,67,66};
 		for (i32 i = 0; i < n; ++i) {
 			asserteq(expected_y[i], y[i]);
 		}
@@ -684,6 +747,28 @@ describe(simple_math_funcs) {
 		asserteq(factorial(5), 120);
 		asserteq(factorial(10), 3628800);
 		asserteq(factorial(20), 2432902008176640000);
+	}
+}
+
+describe(common) {
+	it ("matrix transpose") {
+		i32 m = 5;
+		i32 n = 3;
+		c64 mat[5*3] = {
+			1,  2, 3,
+			4,  5, 6,
+			8,  9,10,
+			11,12,13,
+			14,15,16
+		};
+
+		c64 ans[m*n];
+		mat_transpose(ans, mat, m,n);
+		mat_transpose(ans, ans, n,m);
+
+		for (i32 i = 0; i < m*n; ++i) {
+			asserteq(ans[i], mat[i]);
+		}
 	}
 }
 

@@ -10,16 +10,6 @@
 #include <stdio.h> // printf
 
 
-static inline void mat_transpose(c64* ans, c64* m, i32 rows, i32 cols) {
-	c64 temp[rows*cols];
-	memcpy(temp, m, sizeof(c64)*rows*cols);
-	for (i32 c = 0; c < cols; ++c) {
-		for (i32 r = 0; r < rows; ++r) {
-			temp[r + c*rows] = m[c + r*cols];
-		}
-	}
-	memcpy(ans, temp, sizeof(c64)*rows*cols);
-}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -66,18 +56,13 @@ static const char* arpack_zneupd_error_code_to_string(i32 err);
 static const char* which_eigenpairs_to_arpack_string(which_eigenpairs which);
 
 void eig_sparse_bandmat(bandmat bm, u32 num_eigenvalues, which_eigenpairs which_pairs, c64* out_eigvals, c64* out_eigvecs) {
-	// BEGIN PARAMS FOR ZNAUPD
 	i32 ido = 0;
-	char* bmat = "I";
-	i32 n = bm.size;//*bm.size; // order of matrix
+	i32 n = bm.size; // order of matrix
 	const char* which = which_eigenpairs_to_arpack_string(which_pairs);
 	i32 nev = num_eigenvalues; // number of eigenvalues to find
 	f64 tol = 0.0; // relative error tolerance to achieve.
 	c64 resid[n]; // residual vectors
-	memset(resid, 0, sizeof(c64)*n);
-	i32 ncv = n; // number of columns in V
-	i32 ldv = n;
-	c64 v[ncv*ldv];
+	c64 v[n*n];
 	i32 iparam[11] = {
 		[0] = 1, 		// Exact shift is used
 		[2] = 300, 	// Max iterations
@@ -87,73 +72,79 @@ void eig_sparse_bandmat(bandmat bm, u32 num_eigenvalues, which_eigenpairs which_
 	i32 ipntr[14];
 
 	c64 workd[3*n];
-	memset(workd, 0, sizeof(c64)*3*n);
-	
-	i32 lworkl = (3*ncv)*(3*ncv) + 5*ncv;
+	i32 lworkl = 3*n*n + 5*n;
 	c64 workl[lworkl];
-	memset(workl, 0, sizeof(c64)*lworkl);
+	f64 rwork[n];
 
-	f64 rwork[ncv];
-	memset(rwork, 0, sizeof(f64)*ncv);
 	i32 info = 0;
-	// END PARAMS FOR ZNAUPD
 
-	// BEGIN PARAMS FOR ZNEUPD
-	bool rvec = true;
-	char* howmny = "A";
-	i32 select[ncv]; // not used
-	c64 d[nev+1];
-	c64 z[n*nev];
-	i32 ldz = n;
-	c64 sigma = 0; // not used
-	c64 workev[2*ncv];
-	// END PARAMS FOR ZNEUPD
-
-	i32 kl = bm.super_diags; // number of superdiags
-	i32 ku = bm.sub_diags; // number of subdiags
-	i32 lda = kl + ku + 1;
+	i32 num_of_diags = bm.super_diags + bm.sub_diags + 1; // 1 for main diag
 			
 	c64 one = 1, zero = 0;
 
-	c64 a[lda*n];
-	c64 m[lda*n];
-	// Convert bands to col major ans save in a
-	mat_transpose(a, bm.bands, lda, n);
+	c64 input_bands[num_of_diags*n];
+	mat_transpose(input_bands, bm.bands, num_of_diags, n);
  
 	while (ido != 99 && info == 0) {
-		znaupd_c(&ido, bmat, n, which, nev, tol, resid, ncv,
-				v, ldv, iparam, ipntr, workd, workl, lworkl,
-				rwork, &info);
-		//printf("ido == %d\n", ido);
+		znaupd_c(&ido, "I", n, which, nev, tol, resid, n, v, n, iparam, ipntr, 
+				workd, workl, lworkl, rwork, &info);
+
+		if (info != 0) {
+			printf("arpack znaupd error: %d (%s)\n", info, arpack_znaupd_error_code_to_string(info));
+			break;
+		}
 
 		if (ido == -1 || ido == 1) {
-			cblas_zgbmv(CblasColMajor, CblasNoTrans, n, n, kl, ku, &one, a, 
-					lda, &workd[ipntr[0]-1], 1, &zero, 
-					&workd[ipntr[1]-1], 1);
-		} else if (ido == 2) {
-			cblas_zgbmv(CblasColMajor, CblasNoTrans, n, n, kl, ku, &one, m, 
-					lda, &workd[ipntr[0]-1], 1, &zero, 
-					&workd[ipntr[1]-1], 1);
-		} else {
-			// Convergence or errro
-			if (info != 0) {
-				// Error, just print the code
-				printf("arpack znaupd error: %d (%s)\n", info, arpack_znaupd_error_code_to_string(info));
-			} else {
-				zneupd_c(rvec, howmny, select, d, z, ldz, sigma,
-						workev, bmat, n, which, nev, tol,
-						resid, ncv, v, ldv, iparam, ipntr, workd,
-						workl, lworkl, rwork, &info);
-				if (info != 0) {
-					// Error just print code
-					printf("arpack zneupd error: %d (%s)\n", info, arpack_zneupd_error_code_to_string(info));
-				}
-			}
+			cblas_zgbmv(CblasColMajor, CblasNoTrans, n,n, bm.sub_diags, bm.super_diags, &one, input_bands, 
+					num_of_diags, &workd[ipntr[0]-1], 1, &zero, &workd[ipntr[1]-1], 1);
 		}
 	}
 
-	memcpy(out_eigvals, d, sizeof(c64)*(nev+1));
-	mat_transpose(out_eigvecs, z, n, nev);
+	// Convergence or error
+	if (info == 0) {
+		i32 select[n]; // not used
+		c64 d[nev+1];
+		c64 z[n*nev];
+		c64 sigma = 0; // not used
+		c64 workev[2*n];
+
+		zneupd_c(true, "A", select, d, z, n, sigma, workev, 
+				"I", n, which, nev, tol, resid, n, v, n, iparam, ipntr, workd, workl, lworkl, rwork, &info);
+
+		if (info != 0) {
+			printf("arpack zneupd error: %d (%s)\n", info, arpack_zneupd_error_code_to_string(info));
+		} else {
+			// Calculate ||Ax - lx||, l == "eigenvalues"
+			{
+			}
+			// Print info
+			i32 nconv = iparam[4];
+			printf("\nConvergence info:\n");
+			printf("\t Matrix size: %d\n", n);
+			printf("\t Number of requested eigenvalues: %d\n", nev);
+			printf("\t Number of generated Arnoldi vectors: %d\n", n);
+			printf("\t Number of converged Ritz values: %d\n", nconv);
+			printf("\t Sought eigenvalues: %s\n", which);
+			printf("\t Number of iterations: %d\n", iparam[2]);
+			printf("\t Number of OP*x: %d\n", iparam[8]);
+			printf("\t Convergence tolerance: %lf\n", tol);
+
+			printf("\nEigenvalue -- Residual\n");
+			for (i32 i = 0; i < nconv; ++i) {
+				c64 ax[n];
+				cblas_zgbmv(CblasColMajor, CblasNoTrans, n,n, bm.sub_diags, bm.super_diags, &one,
+								input_bands, num_of_diags, &z[i*n], 1, &zero, ax, 1);
+				c64 neg_eigenvalue = -d[i];
+				cblas_zaxpy(n, &neg_eigenvalue, &z[i*n], 1, ax, 1);
+				printf("\t %lf + %lfi -- %e\n", creal(d[i]), cimag(d[i]), cblas_dznrm2(n, ax, 1));
+			}
+
+			memcpy(out_eigvals, d, sizeof(c64)*(nev+1));
+			mat_transpose(out_eigvecs, z, n, nev);
+		}
+
+	}
+
 }
 
 static inline const char* arpack_znaupd_error_code_to_string(i32 err) {
@@ -164,7 +155,7 @@ static inline const char* arpack_znaupd_error_code_to_string(i32 err) {
 		case 3: return "No shifts could be applied during a cycle of the Implicitly restarted Arnoldi iteration. One possibility is to increase the size of NCV relative to NEV.  See remark 4 below.";
 		case -1: return "N must be positive.";
 		case -2: return "NEV must be positive.";
-		case -3: return "NCV-NEV >case 2 and less than or equal to N.";
+		case -3: return "NCV-NEV >= 2 and less than or equal to N.";
 		case -4: return "The maximum number of Arnoldi update iteration must be greater than zero.";
 		case -5: return "WHICH must be one of 'LM', 'SM', 'LR', 'SR', 'LI', 'SI'";
 		case -6: return "BMAT must be one of 'I' or 'G'.";
@@ -208,4 +199,85 @@ static inline const char* which_eigenpairs_to_arpack_string(which_eigenpairs whi
 		case EV_SMALLEST_IM:		return "SI";
 		default: 								return "unknown (which)";
 	};
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+void eig_sparse_real(f64* mat, i32 n, i32 nev, f64* out_eigvals, f64* out_eigvecs) {
+	i32 ido = 0;
+	f64 tol = 0;
+	f64 resid[n];
+	f64 v[n*n];
+	i32 iparam[11] = {
+		[0] = 1,
+		[2] = 300,
+		[3] = 1,
+		[6] = 1,
+	};
+	i32 ipntr[14];
+
+	f64 workd[3*n];
+	i32 lworkl = 3*n*n + 6*n;
+	f64 workl[lworkl];
+
+	i32 info = 0;
+
+	const char* which = "SM";
+
+	while (ido != 99 && info == 0) {
+		dnaupd_c(&ido, "I", n, which, nev, tol, resid, n, v, n, iparam, ipntr, workd, workl, lworkl, &info);
+
+		if (info != 0) {
+			printf("arpack dnaupd error: %d\n", info);
+			break;
+		}
+
+		if (ido == -1 || ido == 1) {
+			cblas_dgemv(CblasRowMajor, CblasNoTrans, n,n, 1, mat, n, &workd[ipntr[0]-1], 1, 0, &workd[ipntr[1]-1], 1);
+		}
+	}
+
+	if (info == 0) {
+		i32 select[n];
+
+		f64 dr[nev+1];
+		f64 di[nev+1];
+
+		f64 sigmar = 0;
+		f64 sigmai = 0;
+
+		f64 workev[3*n];
+
+		dneupd_c(true, "A", select, dr, di, v, n, 
+				sigmar, sigmai, workev, "I", n, which, nev, tol, 
+				resid, n, v, n, iparam, ipntr, workd, workl,
+				lworkl, &info);
+
+		i32 nconv = iparam[4];
+		printf("Eigenvalues\n");
+		for (i32 i = 0; i < nconv; ++i) {
+			printf("%lf + %lfi\n", dr[i], di[i]);
+		}
+	}
 }

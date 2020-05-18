@@ -8,9 +8,6 @@
 
 #include <sbmf/common/eigenproblem.h>
 
-//#include <stdio.h>
-//#include <unistd.h>
-
 #include <plot/plot.h>
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -291,242 +288,238 @@ c64 initial_guess(f64* v, i32 n) {
 	return 1.0/10*10;
 }
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////
-describe(grid_based_ho_hamiltonian_solving) {
-	return;
-	const f64 assert_limit = 0.1;
-
-	it ("1D") {
-		const i32 N = 64;
-
-		grid g = generate_grid(1, 
-				(f64[]){-10},
-				(f64[]){ 10},
-				(i32[]){ N}
-				);
-
-		bandmat fdm;
-		{
-			// NOTE: g.pointcounts[0] forces it to be square!
-			fdm = generate_fd_matrix(g.pointcounts[0], g.dimensions, g.deltas);
-
-			for (i32 i = 0; i < fdm.size*(fdm.super_diags+1); ++i) {
-				fdm.bands[i] = -0.5*fdm.bands[i];
-			}
-
-			for (i32 i = 0; i < fdm.size; ++i) {
-				i32 idx = fdm.size*(fdm.super_diags) + i;
-				fdm.bands[idx] += (c64) ho_potential(&g.points[i], g.dimensions, 0.0);
-			}	
-		}
-
-		f64* eigenvalues = malloc(fdm.size * sizeof(f64));
-		c64* eigenvectors = malloc((fdm.size*fdm.size) * sizeof(c64));
-		eig_dense_symetric_upper_tridiag_bandmat(fdm, eigenvalues, eigenvectors);
-
-		f64 expected_answer[g.total_pointcount];
-		for (i32 i = 0; i < 10; ++i) {
-			normalize_function_c64(&eigenvectors[i*g.total_pointcount], g.total_pointcount);
-
-			for (i32 j = 0; j < g.total_pointcount; ++j) {
-				expected_answer[j] = ho_eigenfunction(&i, &g.points[j], g.dimensions);
-			}
-			normalize_function_f64(expected_answer, g.total_pointcount);
-
-			for (i32 j = 0; j < g.total_pointcount; ++j) {
-				f64 expected = fabs(expected_answer[j]);
-				f64 got = fabs(creal(eigenvectors[i*g.total_pointcount + j]));
-				assert(expected-got < assert_limit);
-			}
-
-			f64 expected_energy = ho_eigenvalue(&i, g.dimensions);
-			assert(eigenvalues[i] - expected_energy < assert_limit);
-		}
-
-		(void)normalize_function_f32;
-		free(fdm.bands);
-		free(eigenvalues);
-		free(eigenvectors);
-		free_grid(g);
-	}
-	it ("2D") {
-		const i32 N = 64;
-
-		grid g = generate_grid(2, 
-				(f64[]){-10,-10},
-				(f64[]){ 10, 10},
-				(i32[]){ N,  N}
-				);
-
-		bandmat fdm;
-		{
-			// NOTE: g.pointcounts[0] forces it to be square!
-			fdm = generate_fd_matrix(g.pointcounts[0], g.dimensions, g.deltas);
-
-			for (i32 i = 0; i < fdm.size*(fdm.super_diags+1); ++i) {
-				fdm.bands[i] = -0.5*fdm.bands[i];
-			}
-
-			for (i32 i = 0; i < fdm.size; ++i) {
-				i32 idx = fdm.size*(fdm.super_diags) + i;
-				fdm.bands[idx] += (c64) ho_potential(&g.points[i], g.dimensions, 0.0);
-			}	
-		}
-
-		f64* eigenvalues = malloc(fdm.size * sizeof(f64));
-		c64* eigenvectors = malloc((fdm.size*fdm.size) * sizeof(c64));
-		eig_dense_symetric_upper_tridiag_bandmat(fdm, eigenvalues, eigenvectors);
-
-		f64 expected_answer[g.total_pointcount];
-		for (i32 i = 0; i < 10; ++i) {
-			normalize_function_c64(&eigenvectors[i*g.total_pointcount], g.total_pointcount);
-
-			for (i32 j = 0; j < g.total_pointcount; ++j) {
-				expected_answer[j] = ho_eigenfunction(&i, &g.points[j], g.dimensions);
-			}
-			normalize_function_f64(expected_answer, g.total_pointcount);
-
-			for (i32 j = 0; j < g.total_pointcount; ++j) {
-				f64 expected = fabs(expected_answer[j]);
-				f64 got = fabs(creal(eigenvectors[i*g.total_pointcount + j]));
-				assert(expected-got < assert_limit);
-			}
-
-			f64 expected_energy = ho_eigenvalue(&i, g.dimensions);
-			assert(eigenvalues[i] - expected_energy < assert_limit);
-		}
-
-		(void)normalize_function_f32;
-		free(fdm.bands);
-		free(eigenvalues);
-		free(eigenvectors);
-		free_grid(g);
-	}
-	it ("3D") {
-		const i32 N = 64;
-
-		grid g = generate_grid(3, 
-				(f64[]){-10,-10,-10},
-				(f64[]){ 10, 10, 10},
-				(i32[]){ N,  N,  N}
-				);
-
-		bandmat fdm;
-		{
-			// NOTE: g.pointcounts[0] forces it to be square!
-			fdm = generate_fd_matrix(g.pointcounts[0], g.dimensions, g.deltas);
-
-			for (i32 i = 0; i < fdm.size*(fdm.super_diags+1); ++i) {
-				fdm.bands[i] = -0.5*fdm.bands[i];
-			}
-
-			for (i32 i = 0; i < fdm.size; ++i) {
-				i32 idx = fdm.size*(fdm.super_diags) + i;
-				fdm.bands[idx] += (c64) ho_potential(&g.points[i], g.dimensions, 0.0);
-			}	
-		}
-
-		f64* eigenvalues = malloc(fdm.size * sizeof(f64));
-		c64* eigenvectors = malloc((fdm.size*fdm.size) * sizeof(c64));
-		eig_dense_symetric_upper_tridiag_bandmat(fdm, eigenvalues, eigenvectors);
-
-		f64 expected_answer[g.total_pointcount];
-		for (i32 i = 0; i < 10; ++i) {
-			normalize_function_c64(&eigenvectors[i*g.total_pointcount], g.total_pointcount);
-
-			for (i32 j = 0; j < g.total_pointcount; ++j) {
-				expected_answer[j] = ho_eigenfunction(&i, &g.points[j], g.dimensions);
-			}
-			normalize_function_f64(expected_answer, g.total_pointcount);
-
-			for (i32 j = 0; j < g.total_pointcount; ++j) {
-				f64 expected = fabs(expected_answer[j]);
-				f64 got = fabs(creal(eigenvectors[i*g.total_pointcount + j]));
-				assert(expected-got < assert_limit);
-			}
-
-			f64 expected_energy = ho_eigenvalue(&i, g.dimensions);
-			assert(eigenvalues[i] - expected_energy < assert_limit);
-		}
-
-		(void)normalize_function_f32;
-		free(fdm.bands);
-		free(eigenvalues);
-		free(eigenvectors);
-		free_grid(g);
-	}
-}
-////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-static inline void test_eigenvalue_solving_harmonic_osc_3d() { }
-static inline void test_eigenvalue_solving_particle_in_a_box_1d() { }
-static inline void test_eigenvalue_solving_particle_in_a_box_2d() { }
-static inline void test_eigenvalue_solving_particle_in_a_box_3d() { }
-static inline void test_eigenvalue_solving_periodic_pot_1d() {
-	//printf("-- Running 1D periodic test\n");
-
-	const i32 N = 256;
-
-	grid g = generate_grid(1, 
-			(f64[]){-5},
-			(f64[]){ 5},
-			 (i32[]){ N}
-			);
-
-	PROFILE_BEGIN("gen. fdm ho 1d");
-	bandmat fdm;
-	{
-		// NOTE: g.pointcounts[0] forces it to be square!
-		fdm = generate_fd_matrix(g.pointcounts[0], g.dimensions, g.deltas);
-
-		for (i32 i = 0; i < fdm.size*(fdm.super_diags+1); ++i) {
-			fdm.bands[i] = -0.5*fdm.bands[i];
-		}
-
-		for (i32 i = 0; i < fdm.size; ++i) {
-			i32 idx = fdm.size*(fdm.super_diags) + i;
-			fdm.bands[idx] += (c64) periodic_pot(&g.points[i], g.dimensions, 0.0);
-		}	
-	}
-	PROFILE_END("gen. fdm  ho 1d");
-
-
-	PROFILE_BEGIN("e.v. prob. ho 1d");
-	f64* eigenvalues = malloc(fdm.size * sizeof(f64));
-	c64* eigenvectors = malloc((fdm.size*fdm.size) * sizeof(c64));
-	eig_dense_symetric_upper_tridiag_bandmat(fdm, eigenvalues, eigenvectors);
-	PROFILE_END("e.v. prob. ho 1d");
-
-
-	plotstate* state = plot_init();
-
-	f32 x[g.total_pointcount];
-	f32 v[g.total_pointcount];
-	f32 u[g.total_pointcount];
-	for (i32 i = 0; i < g.total_pointcount; ++i) {
-		x[i] = g.points[i];
-		v[i] = periodic_pot(&g.points[i], g.dimensions, 0.0);
-	}
-
-	plot_1d(state, x, v, g.total_pointcount);
-
-	for (i32 i = 0; i < 5; ++i) {
-		normalize_function_c64(&eigenvectors[i*g.total_pointcount], g.total_pointcount);
-		for (i32 j = 0; j < g.total_pointcount; ++j) {
-			u[j] = 10*creal(eigenvectors[i*g.total_pointcount + j]);
-		}
-
-		plot_1d(state, x, u, g.total_pointcount);
-	}
-
-
-	plot_wait_on_join(state);
-	plot_shutdown(state);
-
-	(void)normalize_function_f32;
-	free_grid(g);
-}
-
+//////////////////////////////////////////////////////////////////////////////////////////////////////////
+//describe(grid_based_ho_hamiltonian_solving) {
+//	return;
+//	const f64 assert_limit = 0.1;
+//
+//	it ("1D") {
+//		const i32 N = 64;
+//
+//		grid g = generate_grid(1, 
+//				(f64[]){-10},
+//				(f64[]){ 10},
+//				(i32[]){ N}
+//				);
+//
+//		bandmat fdm;
+//		{
+//			// NOTE: g.pointcounts[0] forces it to be square!
+//			fdm = generate_fd_matrix(g.pointcounts[0], g.dimensions, g.deltas);
+//
+//			for (i32 i = 0; i < fdm.size*(fdm.super_diags+1); ++i) {
+//				fdm.bands[i] = -0.5*fdm.bands[i];
+//			}
+//
+//			for (i32 i = 0; i < fdm.size; ++i) {
+//				i32 idx = fdm.size*(fdm.super_diags) + i;
+//				fdm.bands[idx] += (c64) ho_potential(&g.points[i], g.dimensions, 0.0);
+//			}	
+//		}
+//
+//		f64* eigenvalues = malloc(fdm.size * sizeof(f64));
+//		c64* eigenvectors = malloc((fdm.size*fdm.size) * sizeof(c64));
+//		eig_dense_symetric_upper_tridiag_bandmat(fdm, eigenvalues, eigenvectors);
+//
+//		f64 expected_answer[g.total_pointcount];
+//		for (i32 i = 0; i < 10; ++i) {
+//			normalize_function_c64(&eigenvectors[i*g.total_pointcount], g.total_pointcount);
+//
+//			for (i32 j = 0; j < g.total_pointcount; ++j) {
+//				expected_answer[j] = ho_eigenfunction(&i, &g.points[j], g.dimensions);
+//			}
+//			normalize_function_f64(expected_answer, g.total_pointcount);
+//
+//			for (i32 j = 0; j < g.total_pointcount; ++j) {
+//				f64 expected = fabs(expected_answer[j]);
+//				f64 got = fabs(creal(eigenvectors[i*g.total_pointcount + j]));
+//				assert(expected-got < assert_limit);
+//			}
+//
+//			f64 expected_energy = ho_eigenvalue(&i, g.dimensions);
+//			assert(eigenvalues[i] - expected_energy < assert_limit);
+//		}
+//
+//		(void)normalize_function_f32;
+//		free(fdm.bands);
+//		free(eigenvalues);
+//		free(eigenvectors);
+//		free_grid(g);
+//	}
+//	it ("2D") {
+//		const i32 N = 64;
+//
+//		grid g = generate_grid(2, 
+//				(f64[]){-10,-10},
+//				(f64[]){ 10, 10},
+//				(i32[]){ N,  N}
+//				);
+//
+//		bandmat fdm;
+//		{
+//			// NOTE: g.pointcounts[0] forces it to be square!
+//			fdm = generate_fd_matrix(g.pointcounts[0], g.dimensions, g.deltas);
+//
+//			for (i32 i = 0; i < fdm.size*(fdm.super_diags+1); ++i) {
+//				fdm.bands[i] = -0.5*fdm.bands[i];
+//			}
+//
+//			for (i32 i = 0; i < fdm.size; ++i) {
+//				i32 idx = fdm.size*(fdm.super_diags) + i;
+//				fdm.bands[idx] += (c64) ho_potential(&g.points[i], g.dimensions, 0.0);
+//			}	
+//		}
+//
+//		f64* eigenvalues = malloc(fdm.size * sizeof(f64));
+//		c64* eigenvectors = malloc((fdm.size*fdm.size) * sizeof(c64));
+//		eig_dense_symetric_upper_tridiag_bandmat(fdm, eigenvalues, eigenvectors);
+//
+//		f64 expected_answer[g.total_pointcount];
+//		for (i32 i = 0; i < 10; ++i) {
+//			normalize_function_c64(&eigenvectors[i*g.total_pointcount], g.total_pointcount);
+//
+//			for (i32 j = 0; j < g.total_pointcount; ++j) {
+//				expected_answer[j] = ho_eigenfunction(&i, &g.points[j], g.dimensions);
+//			}
+//			normalize_function_f64(expected_answer, g.total_pointcount);
+//
+//			for (i32 j = 0; j < g.total_pointcount; ++j) {
+//				f64 expected = fabs(expected_answer[j]);
+//				f64 got = fabs(creal(eigenvectors[i*g.total_pointcount + j]));
+//				assert(expected-got < assert_limit);
+//			}
+//
+//			f64 expected_energy = ho_eigenvalue(&i, g.dimensions);
+//			assert(eigenvalues[i] - expected_energy < assert_limit);
+//		}
+//
+//		(void)normalize_function_f32;
+//		free(fdm.bands);
+//		free(eigenvalues);
+//		free(eigenvectors);
+//		free_grid(g);
+//	}
+//	it ("3D") {
+//		const i32 N = 64;
+//
+//		grid g = generate_grid(3, 
+//				(f64[]){-10,-10,-10},
+//				(f64[]){ 10, 10, 10},
+//				(i32[]){ N,  N,  N}
+//				);
+//
+//		bandmat fdm;
+//		{
+//			// NOTE: g.pointcounts[0] forces it to be square!
+//			fdm = generate_fd_matrix(g.pointcounts[0], g.dimensions, g.deltas);
+//
+//			for (i32 i = 0; i < fdm.size*(fdm.super_diags+1); ++i) {
+//				fdm.bands[i] = -0.5*fdm.bands[i];
+//			}
+//
+//			for (i32 i = 0; i < fdm.size; ++i) {
+//				i32 idx = fdm.size*(fdm.super_diags) + i;
+//				fdm.bands[idx] += (c64) ho_potential(&g.points[i], g.dimensions, 0.0);
+//			}	
+//		}
+//
+//		f64* eigenvalues = malloc(fdm.size * sizeof(f64));
+//		c64* eigenvectors = malloc((fdm.size*fdm.size) * sizeof(c64));
+//		eig_dense_symetric_upper_tridiag_bandmat(fdm, eigenvalues, eigenvectors);
+//
+//		f64 expected_answer[g.total_pointcount];
+//		for (i32 i = 0; i < 10; ++i) {
+//			normalize_function_c64(&eigenvectors[i*g.total_pointcount], g.total_pointcount);
+//
+//			for (i32 j = 0; j < g.total_pointcount; ++j) {
+//				expected_answer[j] = ho_eigenfunction(&i, &g.points[j], g.dimensions);
+//			}
+//			normalize_function_f64(expected_answer, g.total_pointcount);
+//
+//			for (i32 j = 0; j < g.total_pointcount; ++j) {
+//				f64 expected = fabs(expected_answer[j]);
+//				f64 got = fabs(creal(eigenvectors[i*g.total_pointcount + j]));
+//				assert(expected-got < assert_limit);
+//			}
+//
+//			f64 expected_energy = ho_eigenvalue(&i, g.dimensions);
+//			assert(eigenvalues[i] - expected_energy < assert_limit);
+//		}
+//
+//		(void)normalize_function_f32;
+//		free(fdm.bands);
+//		free(eigenvalues);
+//		free(eigenvectors);
+//		free_grid(g);
+//	}
+//}
+//////////////////////////////////////////////////////////////////////////////////////////////////////////
+//
+//static inline void test_eigenvalue_solving_periodic_pot_1d() {
+//	//printf("-- Running 1D periodic test\n");
+//
+//	const i32 N = 256;
+//
+//	grid g = generate_grid(1, 
+//			(f64[]){-5},
+//			(f64[]){ 5},
+//			 (i32[]){ N}
+//			);
+//
+//	PROFILE_BEGIN("gen. fdm ho 1d");
+//	bandmat fdm;
+//	{
+//		// NOTE: g.pointcounts[0] forces it to be square!
+//		fdm = generate_fd_matrix(g.pointcounts[0], g.dimensions, g.deltas);
+//
+//		for (i32 i = 0; i < fdm.size*(fdm.super_diags+1); ++i) {
+//			fdm.bands[i] = -0.5*fdm.bands[i];
+//		}
+//
+//		for (i32 i = 0; i < fdm.size; ++i) {
+//			i32 idx = fdm.size*(fdm.super_diags) + i;
+//			fdm.bands[idx] += (c64) periodic_pot(&g.points[i], g.dimensions, 0.0);
+//		}	
+//	}
+//	PROFILE_END("gen. fdm  ho 1d");
+//
+//
+//	PROFILE_BEGIN("e.v. prob. ho 1d");
+//	f64* eigenvalues = malloc(fdm.size * sizeof(f64));
+//	c64* eigenvectors = malloc((fdm.size*fdm.size) * sizeof(c64));
+//	eig_dense_symetric_upper_tridiag_bandmat(fdm, eigenvalues, eigenvectors);
+//	PROFILE_END("e.v. prob. ho 1d");
+//
+//
+//	plotstate* state = plot_init();
+//
+//	f32 x[g.total_pointcount];
+//	f32 v[g.total_pointcount];
+//	f32 u[g.total_pointcount];
+//	for (i32 i = 0; i < g.total_pointcount; ++i) {
+//		x[i] = g.points[i];
+//		v[i] = periodic_pot(&g.points[i], g.dimensions, 0.0);
+//	}
+//
+//	plot_1d(state, x, v, g.total_pointcount);
+//
+//	for (i32 i = 0; i < 5; ++i) {
+//		normalize_function_c64(&eigenvectors[i*g.total_pointcount], g.total_pointcount);
+//		for (i32 j = 0; j < g.total_pointcount; ++j) {
+//			u[j] = 10*creal(eigenvectors[i*g.total_pointcount + j]);
+//		}
+//
+//		plot_1d(state, x, u, g.total_pointcount);
+//	}
+//
+//
+//	plot_wait_on_join(state);
+//	plot_shutdown(state);
+//
+//	(void)normalize_function_f32;
+//	free_grid(g);
+//}
+//
 describe(solve_eigenproblems_bandmat) {
 	// Produced by matlab, (warning COLUMN MAJOR!)
 	static c64 eigvecs_answer[] = {
@@ -564,28 +557,34 @@ describe(solve_eigenproblems_bandmat) {
 			0,1,2,3,4,5,6,7,0,0,
 		};
 
+		i32 size = 10;
+
 		bandmat bm = {
-			.size = 10,
+			.base = {
+				.is_row_major = true,
+				.rows = size,
+				.cols = size,
+				.data = bands
+			},
 			.super_diags = 2,
 			.sub_diags = 2,
-			.bands = bands,
 		};
 
-		f64 eigvals[bm.size];
-		c64 eigvecs[bm.size*bm.size];
+		f64 eigvals[size];
+		c64 eigvecs[size*size];
 		// Only use upper portion (including main diag) of bandmat bm.
 		// Also, this solves for all eigenvalues!
 		eig_dense_symetric_upper_tridiag_bandmat(bm, eigvals, eigvecs);
 		// check eigenvalues
-		for (i32 i = 0; i < bm.size; ++i) {
+		for (i32 i = 0; i < size; ++i) {
 			assert(fabs(eigvals[i] - eigvals_answer[i]) <= 1);
 		}
 
 		// Check eigenvectors
-		for (int i = 0; i < bm.size; ++i) {
-			for (int j = 0; j < bm.size; ++j) {
-				c64 got = eigvecs[i*bm.size + j]; 
-				c64 expected = eigvecs_answer[j*bm.size + i];
+		for (int i = 0; i < size; ++i) {
+			for (int j = 0; j < size; ++j) {
+				c64 got = eigvecs[i*size + j]; 
+				c64 expected = eigvecs_answer[j*size + i];
 				assert(cabs(got)-cabs(expected) <= 1);
 			}
 		}
@@ -600,15 +599,21 @@ describe(solve_eigenproblems_bandmat) {
 			0,1,2,3,4,5,6,7,0,0,
 		};
 
+		i32 size = 10;
+
 		bandmat bm = {
-			.size = 10,
+			.base = {
+				.is_row_major = true,
+				.rows = size,
+				.cols = size,
+				.data = bands
+			},
 			.super_diags = 2,
 			.sub_diags = 2,
-			.bands = bands,
 		};
 
-		c64 eigvals[bm.size];
-		c64 eigvecs[bm.size*bm.size];
+		c64 eigvals[size];
+		c64 eigvecs[size*size];
 
 		i32 eigenpairs_to_find = 4;
 		eig_sparse_bandmat(bm, eigenpairs_to_find, EV_SMALLEST_RE, eigvals, eigvecs);
@@ -628,111 +633,6 @@ describe(solve_eigenproblems_bandmat) {
 		//	}
 		//}
 	}
-
-	it ("trivial bandmatrix example 1") {
-		bandmat bm = {
-			.size = 3,
-			.super_diags = 1,
-			.sub_diags = 1,
-			.bands = (c64*)(c64[]){
-				0,4,5,
-				1,2,3,
-				4,5,0,
-			},
-		};
-
-		c64 eigvals[bm.size];
-		c64 eigvecs[bm.size*bm.size];
-
-		i32 eigenpairs_to_find = 1;
-		eig_sparse_bandmat(bm, eigenpairs_to_find, EV_SMALLEST_MAG, eigvals, eigvecs);
-	}
-
-	it ("trivial bandmatrix example 2") {
-		bandmat bm = {
-			.size = 3,
-			.super_diags = 2,
-			.sub_diags = 2,
-			.bands = (c64*)(c64[]){
-				0,0,1,
-				0,0,0,
-				1,2,3,
-				0,0,0,
-				1,0,0
-			},
-		};
-
-		c64 eigvals[bm.size];
-		c64 eigvecs[bm.size*bm.size];
-
-		i32 eigenpairs_to_find = 1;
-		eig_sparse_bandmat(bm, eigenpairs_to_find, EV_SMALLEST_MAG, eigvals, eigvecs);
-	}
-
-
-	it ("trivial real matrix example") {
-		f64 mat[3*3] = {
-			1,4,0,
-			4,2,5,
-			0,5,3
-		};
-
-		eig_sparse_real(mat, 3, 1, NULL,NULL);
-	}
-}
-
-#include <cblas.h>
-describe(test_cblas) {
-	it ("zgbmv") {
-		i32 kl = 2, ku = 2;
-		i32 n = 10;
-		i32 lda = 5;
-
-		c64 bands[] = {
-			0,0,0,1,2,3,4,5,6,7,
-			0,9,8,7,6,5,4,3,2,1,
-			1,1,1,1,1,1,1,1,1,1,
-			9,8,7,6,5,4,3,2,1,0,
-			0,1,2,3,4,5,6,7,0,0,
-		};
-
-		c64 input_mat[lda*n];
-		mat_transpose(input_mat, bands, lda, n);
-
-		c64 x[10] = {0,1,2,3,4,5,6,7,8,9};
-		c64 y[n];
-
-		c64 zero = 0, one = 1;
-		cblas_zgbmv(CblasColMajor, CblasNoTrans, n, n, kl, ku, &one, input_mat, 
-				lda, x, 1, &zero, y, 1);
-
-		//	1 9 0                   0
-		//	9 1 8 1 								1
-		// 	0 8 1 7 2 							2
-		//    1 7 1 6 3 						3
-		//      2 6 1 5 4 					4
-		//        3 5 1 4 5 				5
-		//          4 4 1 3 6 			6
-		//            5 3 1 2 7			7
-		//              6 2 1 1			8
-		//                7 1 1			9
-		
-		//	9                   
-		//	20 								
-		// 	39
-		//  57
-		//  72
-		//  93
-		//  111
-		//  129
-		//  67
-		//  66
-		
-		c64 expected_y[10] = {9,20,39,57,75,93,111,129,67,66};
-		for (i32 i = 0; i < n; ++i) {
-			asserteq(expected_y[i], y[i]);
-		}
-	}
 }
 
 describe(simple_math_funcs) {
@@ -747,28 +647,6 @@ describe(simple_math_funcs) {
 		asserteq(factorial(5), 120);
 		asserteq(factorial(10), 3628800);
 		asserteq(factorial(20), 2432902008176640000);
-	}
-}
-
-describe(common) {
-	it ("matrix transpose") {
-		i32 m = 5;
-		i32 n = 3;
-		c64 mat[5*3] = {
-			1,  2, 3,
-			4,  5, 6,
-			8,  9,10,
-			11,12,13,
-			14,15,16
-		};
-
-		c64 ans[m*n];
-		mat_transpose(ans, mat, m,n);
-		mat_transpose(ans, ans, n,m);
-
-		for (i32 i = 0; i < m*n; ++i) {
-			asserteq(ans[i], mat[i]);
-		}
 	}
 }
 

@@ -5,7 +5,6 @@
 #include <stdint.h>
 #include <math.h>
 #include <stdbool.h>
-#include <string.h> // memcpy
 
 #define ARRLEN(arr) \
 	(sizeof(arr)/sizeof(arr[0]))
@@ -36,22 +35,4 @@ static inline bool f64equal(f64 a, f64 b) {
 }
 static inline bool f32equal(f32 a, f32 b) {
 	return (a-b <= EPSILON);
-}
-
-typedef struct {
-	u32 size;
-	u32 super_diags;
-	u32 sub_diags;
-	c64* bands;
-} bandmat;
-
-static inline void mat_transpose(c64* ans, c64* m, i32 rows, i32 cols) {
-	c64 temp[rows*cols];
-	memcpy(temp, m, sizeof(c64)*rows*cols);
-	for (i32 c = 0; c < cols; ++c) {
-		for (i32 r = 0; r < rows; ++r) {
-			temp[r + c*rows] = m[c + r*cols];
-		}
-	}
-	memcpy(ans, temp, sizeof(c64)*rows*cols);
 }

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "common.h"
+#include "matrix.h"
 #include <string.h> // memcpy
 #include <stdlib.h> // malloc
 
@@ -50,25 +51,31 @@
 static inline bandmat generate_fd_matrix(i32 n, i32 dim, f64 ds[]) {
 	i32 k = pow(2,dim);
 
+	i32 size = pow(n,dim);
 	bandmat b = {
-		.size = pow(n,dim),
-		.super_diags = pow(n,dim),
+		.base = {
+			.is_row_major = true,
+			.rows = size,
+			.cols = size,
+		},
+
+		.super_diags = size,
 		.sub_diags = 0,
 	};
 
-	b.bands = malloc((b.super_diags + 1)*b.size*sizeof(c64));
-	memset(b.bands, 0, (b.super_diags + 1)*b.size*sizeof(c64));
+	b.base.data = malloc((b.super_diags + 1)*size*sizeof(c64));
+	memset(b.base.data, 0, (b.super_diags + 1)*size*sizeof(c64));
 
 	// Setup main diagonal
-	for (i32 i = b.super_diags*b.size; i < (b.super_diags+1)*b.size; ++i) {
-		b.bands[i] = -k/(ds[0]*ds[0]);
+	for (i32 i = b.super_diags*size; i < (b.super_diags+1)*size; ++i) {
+		b.base.data[i] = -k/(ds[0]*ds[0]);
 	}
 
 	// Setup off-diagonal elements
 	for (i32 i = 1; i <= dim; ++i) {
 		i32 bandindex = pow(n, i-1);
-		for (i32 j = 0; j < b.size; ++j) {
-			b.bands[j + (b.super_diags - bandindex)*b.size] = 1/(ds[i-1]*ds[i-1]);
+		for (i32 j = 0; j < size; ++j) {
+			b.base.data[j + (b.super_diags - bandindex)*size] = 1/(ds[i-1]*ds[i-1]);
 		}
 	}
 

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "common.h"
+#include "matrix.h"
 
 typedef enum {
 	EV_LARGEST_MAG 		= 0,

@@ -2,7 +2,7 @@
 
 #include "common/common.h"
 #include <stdlib.h>
-#include <assert.h>
+//#include <assert.h>
 #include <stdbool.h>
 #include <string.h> // memcpy, memmove
 
@@ -23,7 +23,7 @@ typedef struct {
 
 static inline prioqueue* prioqueue_new(u32 items, u32 item_size, cmpfunc* cmp) {
 	void* mem = malloc(items*item_size + sizeof(prioqueue));
-	assert(mem);
+	//assert(mem);
 
 	prioqueue* pq = (prioqueue*) mem;
 
@@ -49,7 +49,7 @@ static inline void* prioqueue_get(prioqueue* pq, i32 index) {
 }
 
 static inline void prioqueue_push(prioqueue* pq, void* data) {
-	assert(pq->size < pq->max_size);
+	//assert(pq->size < pq->max_size);
 
 	i32 insert_index = 0;
 	for (; insert_index < pq->size; ++insert_index) {

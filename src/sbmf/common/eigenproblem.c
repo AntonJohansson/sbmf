@@ -14,20 +14,20 @@
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 void eig_dense_symetric_upper_tridiag_bandmat(bandmat bm, f64* out_eigvals, c64* out_eigvecs) {
-	f64* offdiag_elements 	= malloc((bm.size - 1)*sizeof(f64));
-	c64* colmaj_eigvecs = malloc((bm.size*bm.size)*sizeof(c64));
+	f64* offdiag_elements 	= malloc((bm.base.rows - 1)*sizeof(f64));
+	c64* colmaj_eigvecs = malloc((bm.base.rows*bm.base.rows)*sizeof(c64));
 
 	i32 res = 0;
 
 	// Start by reducing (complex hermitian) bandmatrix to tri-diagonal mat.
 	{
 		res = LAPACKE_zhbtrd(LAPACK_ROW_MAJOR, 'V', 'U', 
-				bm.size,
+				bm.base.rows,
 				bm.super_diags, 
-				bm.bands, 
-				bm.size, 
+				bm.base.data, 
+				bm.base.rows, 
 				out_eigvals, offdiag_elements, colmaj_eigvecs, 
-				bm.size);
+				bm.base.rows);
 		
 		assert(res == 0); // @TODO, handle these errors better
 	}
@@ -35,15 +35,15 @@ void eig_dense_symetric_upper_tridiag_bandmat(bandmat bm, f64* out_eigvals, c64*
 	// Solve eigenvalue problem via QR factorisation of tridiagonal matrix
 	{
 		res = LAPACKE_zsteqr(LAPACK_ROW_MAJOR, 'V', 
-				bm.size, 
+				bm.base.rows, 
 				out_eigvals, offdiag_elements, colmaj_eigvecs, 
-				bm.size);
+				bm.base.rows);
 
 		assert(res == 0); // @TODO, handle these errors better
 	}
 
 	// Convert eigenvectors to row-major, as we expected them to be.
-	mat_transpose(out_eigvecs, colmaj_eigvecs, bm.size, bm.size);
+	//TODO mat_transpose(out_eigvecs, colmaj_eigvecs, bm.size, bm.size);
 	
 	free(offdiag_elements);
 	free(colmaj_eigvecs);
@@ -57,7 +57,7 @@ static const char* which_eigenpairs_to_arpack_string(which_eigenpairs which);
 
 void eig_sparse_bandmat(bandmat bm, u32 num_eigenvalues, which_eigenpairs which_pairs, c64* out_eigvals, c64* out_eigvecs) {
 	i32 ido = 0;
-	i32 n = bm.size; // order of matrix
+	i32 n = bm.base.rows; // order of matrix
 	const char* which = which_eigenpairs_to_arpack_string(which_pairs);
 	i32 nev = num_eigenvalues; // number of eigenvalues to find
 	f64 tol = 0.0; // relative error tolerance to achieve.
@@ -82,8 +82,13 @@ void eig_sparse_bandmat(bandmat bm, u32 num_eigenvalues, which_eigenpairs which_
 			
 	c64 one = 1, zero = 0;
 
-	c64 input_bands[num_of_diags*n];
-	mat_transpose(input_bands, bm.bands, num_of_diags, n);
+	c64 data[num_of_diags*n];
+	mat input_mat = {
+		.data = data,
+	};
+	bm.base.rows = num_of_diags;
+	bm.base.cols = n;
+	mat_transpose(&input_mat, bm.base);
  
 	while (ido != 99 && info == 0) {
 		znaupd_c(&ido, "I", n, which, nev, tol, resid, n, v, n, iparam, ipntr, 
@@ -95,7 +100,7 @@ void eig_sparse_bandmat(bandmat bm, u32 num_eigenvalues, which_eigenpairs which_
 		}
 
 		if (ido == -1 || ido == 1) {
-			cblas_zgbmv(CblasColMajor, CblasNoTrans, n,n, bm.sub_diags, bm.super_diags, &one, input_bands, 
+			cblas_zgbmv(CblasColMajor, CblasNoTrans, n,n, bm.sub_diags, bm.super_diags, &one, input_mat.data, 
 					num_of_diags, &workd[ipntr[0]-1], 1, &zero, &workd[ipntr[1]-1], 1);
 		}
 	}
@@ -133,14 +138,14 @@ void eig_sparse_bandmat(bandmat bm, u32 num_eigenvalues, which_eigenpairs which_
 			for (i32 i = 0; i < nconv; ++i) {
 				c64 ax[n];
 				cblas_zgbmv(CblasColMajor, CblasNoTrans, n,n, bm.sub_diags, bm.super_diags, &one,
-								input_bands, num_of_diags, &z[i*n], 1, &zero, ax, 1);
+								input_mat.data, num_of_diags, &z[i*n], 1, &zero, ax, 1);
 				c64 neg_eigenvalue = -d[i];
 				cblas_zaxpy(n, &neg_eigenvalue, &z[i*n], 1, ax, 1);
 				printf("\t %lf + %lfi -- %e\n", creal(d[i]), cimag(d[i]), cblas_dznrm2(n, ax, 1));
 			}
 
 			memcpy(out_eigvals, d, sizeof(c64)*(nev+1));
-			mat_transpose(out_eigvecs, z, n, nev);
+			// TODO mat_transpose(out_eigvecs, z, n, nev);
 		}
 
 	}
@@ -199,85 +204,4 @@ static inline const char* which_eigenpairs_to_arpack_string(which_eigenpairs whi
 		case EV_SMALLEST_IM:		return "SI";
 		default: 								return "unknown (which)";
 	};
-}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-void eig_sparse_real(f64* mat, i32 n, i32 nev, f64* out_eigvals, f64* out_eigvecs) {
-	i32 ido = 0;
-	f64 tol = 0;
-	f64 resid[n];
-	f64 v[n*n];
-	i32 iparam[11] = {
-		[0] = 1,
-		[2] = 300,
-		[3] = 1,
-		[6] = 1,
-	};
-	i32 ipntr[14];
-
-	f64 workd[3*n];
-	i32 lworkl = 3*n*n + 6*n;
-	f64 workl[lworkl];
-
-	i32 info = 0;
-
-	const char* which = "SM";
-
-	while (ido != 99 && info == 0) {
-		dnaupd_c(&ido, "I", n, which, nev, tol, resid, n, v, n, iparam, ipntr, workd, workl, lworkl, &info);
-
-		if (info != 0) {
-			printf("arpack dnaupd error: %d\n", info);
-			break;
-		}
-
-		if (ido == -1 || ido == 1) {
-			cblas_dgemv(CblasRowMajor, CblasNoTrans, n,n, 1, mat, n, &workd[ipntr[0]-1], 1, 0, &workd[ipntr[1]-1], 1);
-		}
-	}
-
-	if (info == 0) {
-		i32 select[n];
-
-		f64 dr[nev+1];
-		f64 di[nev+1];
-
-		f64 sigmar = 0;
-		f64 sigmai = 0;
-
-		f64 workev[3*n];
-
-		dneupd_c(true, "A", select, dr, di, v, n, 
-				sigmar, sigmai, workev, "I", n, which, nev, tol, 
-				resid, n, v, n, iparam, ipntr, workd, workl,
-				lworkl, &info);
-
-		i32 nconv = iparam[4];
-		printf("Eigenvalues\n");
-		for (i32 i = 0; i < nconv; ++i) {
-			printf("%lf + %lfi\n", dr[i], di[i]);
-		}
-	}
 }

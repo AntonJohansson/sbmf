@@ -1,9 +1,10 @@
 #pragma once
 
-#include "common.h"
-#include <stdlib.h>
-#include <string.h>
-#include <stdio.h>
+
+#include <sbmf/common/common.h>
+#include <sbmf/memory/stack_allocator.h>
+
+#include <string.h> // memcpy, memset
 
 // 2D
 //  0  1  2  3
@@ -72,7 +73,7 @@ static inline grid generate_grid(i32 dimensions, f64 mins[], f64 maxs[], i32 poi
 
 	i32 size_points  = dimensions*total_pointcount*sizeof(f64);
 
-	void* mem = malloc(dimensions*(4*sizeof(f64) + sizeof(i32)) + size_points);
+	void* mem = sa_push(_sbmf.main_stack, dimensions*(4*sizeof(f64) + sizeof(i32)) + size_points);
 	grid g = {
 		.total_pointcount = total_pointcount,
 		.dimensions = dimensions,
@@ -95,20 +96,6 @@ static inline grid generate_grid(i32 dimensions, f64 mins[], f64 maxs[], i32 poi
 
 	i32 indices[dimensions];
 	memset(indices, 0, dimensions*sizeof(i32));
-
-	//for (i32 i = 0; i < total_pointcount; ++i) {
-	//	for (i32 j = 0; j < dimensions; ++j) {
-	//		g.points[dimensions*i + j] = mins[j] + indices[j]*g.deltas[j];
-	//	}
-
-	//	indices[dimensions-1] = (indices[dimensions-1]+1) % pointcounts[dimensions-1];
-	//	for (i32 j = dimensions-1; j > 0; --j) {
-	//		if (indices[j] % pointcounts[j] == 0)
-	//			indices[j-1] = (indices[j-1]+1) % pointcounts[j-1];
-	//		else
-	//			break;
-	//	}
-	//}
 
 	{
 		i32 indices[g.dimensions];
@@ -140,7 +127,7 @@ static inline grid mimic_grid(grid base) {
 	i32 size_points  = base.dimensions*base.total_pointcount*sizeof(f64);
 	i32 total_size = base.dimensions*(4*sizeof(f64) + sizeof(i32)) + size_points;
 
-	void* mem = malloc(total_size);
+	void* mem = sa_push(_sbmf.main_stack, total_size);
 	grid g = {
 		.dimensions = base.dimensions,
 		.total_pointcount = base.total_pointcount,
@@ -157,10 +144,3 @@ static inline grid mimic_grid(grid base) {
 
 	return g;
 }
-
-static inline void free_grid(grid g) {
-	free(g.memory);
-}
-
-#define FOREACH_GRIDPOINT(grid, i) \
-		for (i32 i = 0; i < grid.total_pointcount; i += grid.dimensions)

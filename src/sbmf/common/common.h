@@ -23,16 +23,13 @@ typedef double 		f64;
 typedef float complex 	c32;
 typedef double complex 	c64;
 
-#define EPSILON 0.01
-#define fequal(a, b) 				\
-	_Generic(a,								\
-			f64: f64equal(a,b), 	\
-			f32: f32equal(a,b), 	\
-			default: false)
+struct stack_allocator;
 
-static inline bool f64equal(f64 a, f64 b) {
-	return (a-b <= EPSILON);
-}
-static inline bool f32equal(f32 a, f32 b) {
-	return (a-b <= EPSILON);
-}
+typedef struct {
+	struct stack_allocator* main_stack;
+} sbmf_state;
+
+extern sbmf_state _sbmf;
+
+extern void sbmf_init();
+extern void sbmf_shutdown();

@@ -8,6 +8,8 @@ PROJ_SRCS = \
 	src/sbmf/common/profile.c \
 	src/sbmf/common/eigenproblem.c \
 	src/sbmf/common/matrix.c \
+	src/sbmf/common/log.c \
+	src/sbmf/common/common.c \
 	src/sbmf/quadgk.c
 TEST_SRCS = $(shell find src/test -name "*.c")
 PLOT_SRCS = $(shell find src/plot -name "*.c")

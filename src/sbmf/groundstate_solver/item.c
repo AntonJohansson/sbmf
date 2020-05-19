@@ -263,7 +263,7 @@ gss_result item_execute(gss_settings settings, gss_potential_func* potential, gs
 	apply_step_op(1.0, dt/2.0, result.wavefunction, potential, settings.g, result.wavefunction);
 
 	// Cleanup
-	free_grid(kgrid);
+	//free_grid(kgrid);
 	fftw_destroy_plan(fft_plan);
 	fftw_destroy_plan(ifft_plan);
 	fftw_free(fft_in);

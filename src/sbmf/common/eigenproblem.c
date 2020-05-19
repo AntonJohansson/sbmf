@@ -9,25 +9,25 @@
 #include <string.h> // memcpy, memset
 #include <stdio.h> // printf
 
-
+#include <sbmf/memory/stack_allocator.h>
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-void eig_dense_symetric_upper_tridiag_bandmat(bandmat bm, f64* out_eigvals, c64* out_eigvecs) {
-	f64* offdiag_elements 	= malloc((bm.base.rows - 1)*sizeof(f64));
-	c64* colmaj_eigvecs = malloc((bm.base.rows*bm.base.rows)*sizeof(c64));
+void eig_dense_symetric_upper_tridiag_bandmat(hermitian_bandmat bm, f64* out_eigvals, c64* out_eigvecs) {
+	f64* offdiag_elements = (f64*)sa_push(_sbmf.main_stack, (bm.size-1)*sizeof(f64));
+	c64* colmaj_eigvecs = (c64*)sa_push(_sbmf.main_stack, bm.size*bm.size*sizeof(c64));
 
 	i32 res = 0;
 
 	// Start by reducing (complex hermitian) bandmatrix to tri-diagonal mat.
 	{
 		res = LAPACKE_zhbtrd(LAPACK_ROW_MAJOR, 'V', 'U', 
-				bm.base.rows,
-				bm.super_diags, 
+				bm.size,
+				bm.bandcount-1, 
 				bm.base.data, 
-				bm.base.rows, 
+				bm.size, 
 				out_eigvals, offdiag_elements, colmaj_eigvecs, 
-				bm.base.rows);
+				bm.size);
 		
 		assert(res == 0); // @TODO, handle these errors better
 	}
@@ -35,18 +35,20 @@ void eig_dense_symetric_upper_tridiag_bandmat(bandmat bm, f64* out_eigvals, c64*
 	// Solve eigenvalue problem via QR factorisation of tridiagonal matrix
 	{
 		res = LAPACKE_zsteqr(LAPACK_ROW_MAJOR, 'V', 
-				bm.base.rows, 
+				bm.size, 
 				out_eigvals, offdiag_elements, colmaj_eigvecs, 
-				bm.base.rows);
+				bm.size);
 
 		assert(res == 0); // @TODO, handle these errors better
 	}
 
 	// Convert eigenvectors to row-major, as we expected them to be.
 	//TODO mat_transpose(out_eigvecs, colmaj_eigvecs, bm.size, bm.size);
-	
-	free(offdiag_elements);
-	free(colmaj_eigvecs);
+	for (i32 r = 0; r < bm.size; ++r) {
+		for (i32 c = 0; c < bm.size; ++c) {
+			out_eigvecs[r + c*bm.size] = colmaj_eigvecs[c + r*bm.size];
+		}
+	}
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -288,6 +288,66 @@ c64 initial_guess(f64* v, i32 n) {
 	return 1.0/10*10;
 }
 
+#include <stdio.h>
+describe(finite_difference_method) {
+	it ("fdm construction 1D [5x5]") {
+		sbmf_init();
+		f64 deltas[5] = {1,1,1,1,1};
+		hermitian_bandmat fdm = construct_finite_diff_mat(5, 1, deltas);
+		c64 expected_ans[] = {
+			 1, 1, 1, 1, 1,
+			-2,-2,-2,-2,-2
+		};
+		for (i32 i = 0; i < fdm.base.rows*fdm.base.cols; ++i) {
+			asserteq(fdm.base.data[i], expected_ans[i]);
+		}
+		sbmf_shutdown();
+	}
+
+	it ("1D") {
+		sbmf_init();
+
+		const i32 N = 64;
+		grid g = generate_grid(1, 
+				(f64[]){-5},
+				(f64[]){ 5},
+				(i32[]){ N});
+
+		hermitian_bandmat fdm = construct_finite_diff_mat(N, g.dimensions, g.deltas);
+		for (i32 i = 0; i < fdm.size*fdm.bandcount; ++i) {
+			fdm.base.data[i] = -0.5*fdm.base.data[i];
+		}
+		for (i32 i = 0; i < fdm.size; ++i) {
+			i32 idx = fdm.size*(fdm.bandcount-1) + i;
+			fdm.base.data[idx] += (c64) ho_potential(&g.points[i], g.dimensions, 0.0);
+		}	
+
+		f64 out_eigvals[N];
+		c64 out_eigvecs[N*N];
+		eig_dense_symetric_upper_tridiag_bandmat(fdm, out_eigvals, out_eigvecs);
+
+		plotstate* state = plot_init();
+		f32 x[N], y[N];
+		for (i32 j = 0; j < N; ++j) {
+			x[j] = g.points[j];
+			y[j] = ho_potential(&g.points[j], g.dimensions, 0.0);
+		}
+		plot_1d(state, x,y, N);
+
+		for (i32 i = 0; i < 5; ++i) {
+			log_info("eigvals: %lf\n", out_eigvals[i]);
+			for (i32 j = 0; j < N; ++j) {
+				y[j] = out_eigvals[i] + cabs(out_eigvecs[i*N + j]);
+			}
+			plot_1d(state, x, y, N);
+		}
+		plot_wait_on_join(state);
+		plot_shutdown(state);
+
+		sbmf_shutdown();
+	}
+}
+
 //////////////////////////////////////////////////////////////////////////////////////////////////////////
 //describe(grid_based_ho_hamiltonian_solving) {
 //	return;
@@ -549,6 +609,8 @@ describe(solve_eigenproblems_bandmat) {
 	};
 
 	it ("dense (symetric) upper tridiagonal band matrix") {
+		sbmf_init();
+
 		c64 bands[] = {
 			0,0,0,1,2,3,4,5,6,7,
 			0,9,8,7,6,5,4,3,2,1,
@@ -559,15 +621,14 @@ describe(solve_eigenproblems_bandmat) {
 
 		i32 size = 10;
 
-		bandmat bm = {
+		hermitian_bandmat bm = {
 			.base = {
 				.is_row_major = true,
 				.rows = size,
 				.cols = size,
 				.data = bands
 			},
-			.super_diags = 2,
-			.sub_diags = 2,
+			.bandcount = 3,
 		};
 
 		f64 eigvals[size];
@@ -588,6 +649,7 @@ describe(solve_eigenproblems_bandmat) {
 				assert(cabs(got)-cabs(expected) <= 1);
 			}
 		}
+		sbmf_shutdown();
 	}
 
 	it ("sparse bandmatrix") {

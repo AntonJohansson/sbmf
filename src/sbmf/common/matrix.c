@@ -1,6 +1,22 @@
 #include "matrix.h"
-#include <string.h> // memcpy
+#include <string.h> // memcpy, memset
 #include <cblas.h>
+#include <sbmf/memory/stack_allocator.h>
+
+mat mat_new(mat_size_t rows, mat_size_t cols) {
+	return (mat){
+		.is_row_major = true,
+		.rows = rows,
+		.cols = cols,
+		.data = (mat_scalar_t*)sa_push(_sbmf.main_stack, sizeof(mat_scalar_t)*rows*cols)
+	};
+}
+
+mat mat_new_zero(mat_size_t rows, mat_size_t cols) {
+	mat m = mat_new(rows, cols);
+	memset(m.data, 0, mat_size(m));
+	return m;
+}
 
 void complex_hermitian_bandmat_mulv(mat_scalar_t* ans_vec, hermitian_bandmat mat, mat_scalar_t* vec) {
 	static const mat_scalar_t one = 1, zero = 0;
@@ -33,4 +49,30 @@ void mat_transpose(mat* ans_mat, mat m) {
 	ans_mat->is_row_major = !m.is_row_major;
 
 	memcpy(ans_mat->data, temp, sizeof(mat_scalar_t)*size);
+}
+
+hermitian_bandmat construct_finite_diff_mat(u32 samples_per_dimension, u32 dimensions, f64* deltas) {
+	i32 size = pow(samples_per_dimension, dimensions);
+	i32 bands = pow(samples_per_dimension, dimensions-1);
+	hermitian_bandmat m = {
+		.base = mat_new_zero(bands+1,size),
+		.bandcount = bands+1,
+		.size = size,
+	};
+
+	// Setup main diagonal
+	i32 main_diag_value = pow(2, dimensions);
+	for (i32 i = (m.bandcount-1)*size; i < (m.bandcount)*size; ++i) {
+		m.base.data[i] = -main_diag_value/(deltas[0]*deltas[0]);
+	}
+
+	// Setup off-diagonal elements
+	for (i32 i = 1; i <= dimensions; ++i) {
+		i32 bandindex = pow(samples_per_dimension, i-1);
+		for (i32 j = 0; j < size; ++j) {
+			m.base.data[j + (m.bandcount-1 - bandindex)*size] = 1/(deltas[i-1]*deltas[i-1]);
+		}
+	}
+
+	return m;
 }

@@ -2,6 +2,7 @@
 #include <string.h> // memcpy, memset
 #include <cblas.h>
 #include <sbmf/memory/stack_allocator.h>
+#include <assert.h>
 
 mat mat_new(mat_size_t rows, mat_size_t cols) {
 	return (mat){
@@ -18,12 +19,29 @@ mat mat_new_zero(mat_size_t rows, mat_size_t cols) {
 	return m;
 }
 
-void complex_hermitian_bandmat_mulv(mat_scalar_t* ans_vec, hermitian_bandmat mat, mat_scalar_t* vec) {
+mat mat_duplicate(mat m) {
+	mat n = mat_new(m.rows, m.cols);
+	n.is_row_major = m.is_row_major;
+	return n;
+}
+
+void complex_hermitian_bandmat_mulv(mat_scalar_t* ans_vec, hermitian_bandmat bmat, mat_scalar_t* vec) {
 	static const mat_scalar_t one = 1, zero = 0;
-	const mat_size_t num_super_diags = mat.bandcount-1;
-	cblas_zhbmv((mat.base.is_row_major) ? CblasRowMajor : CblasColMajor, CblasUpper, 
-			mat.base.rows*mat.base.cols, num_super_diags,
-			&one, mat.base.data, mat.base.rows, vec, 1, &zero, ans_vec, 1);
+	const mat_size_t num_super_diags = bmat.bandcount-1;
+	// TODO: Passing data with is_row_major doesnt produce correct result ://
+	// manually transpose?
+	if (bmat.base.is_row_major) {
+		mat tmp = mat_duplicate(bmat.base);
+		mat_transpose(&tmp, bmat.base);
+		cblas_zhbmv(CblasColMajor, CblasUpper, 
+				bmat.size, num_super_diags,
+				&one, tmp.data, bmat.bandcount, vec, 1, &zero, ans_vec, 1);
+	} else {
+		cblas_zhbmv(CblasColMajor, CblasUpper, 
+				bmat.size, num_super_diags,
+				&one, bmat.base.data, bmat.bandcount, vec, 1, &zero, ans_vec, 1);
+	}
+	
 }
 
 void complex_bandmat_mulv(mat_scalar_t* ans_vec, bandmat mat, mat_scalar_t* vec) {
@@ -33,22 +51,27 @@ void complex_bandmat_mulv(mat_scalar_t* ans_vec, bandmat mat, mat_scalar_t* vec)
 			&one, mat.base.data, mat.base.rows, vec, 1, &zero, ans_vec, 1);
 }
 
-void mat_transpose(mat* ans_mat, mat m) {
-	const mat_size_t size = m.rows*m.cols;
-	mat_scalar_t temp[size];
+void mat_transpose_raw(mat_scalar_t* ans, mat_scalar_t* in, mat_size_t rows, mat_size_t cols) {
+	// TODO: this can be freed
+	mat_scalar_t* temp = (mat_scalar_t*)sa_push(_sbmf.main_stack, sizeof(mat_scalar_t)*rows*cols);
 
-	for (mat_size_t c = 0; c < m.cols; ++c) {
-		for (mat_size_t r = 0; r < m.rows; ++r) {
-			temp[r + c*m.rows] = m.data[c + r*m.cols];
+	for (mat_size_t r = 0; r < rows; ++r) {
+		for (mat_size_t c = 0; c < cols; ++c) {
+			temp[r + c*(rows)] = in[c + r*(cols)];
 		}
 	}
 
-	mat_size_t swap_temp = ans_mat->rows;
-	ans_mat->rows = ans_mat->cols;
-	ans_mat->cols = swap_temp;
-	ans_mat->is_row_major = !m.is_row_major;
+	memcpy(ans, temp, sizeof(mat_scalar_t)*rows*cols);
+}
 
-	memcpy(ans_mat->data, temp, sizeof(mat_scalar_t)*size);
+void mat_transpose(mat* ans_mat, mat m) {
+	assert(m.rows*m.cols == ans_mat->rows*ans_mat->cols);
+	mat_transpose_raw(ans_mat->data, m.data, m.rows, m.cols);
+
+	ans_mat->is_row_major = !m.is_row_major;
+	mat_size_t swap_temp = m.rows;
+	ans_mat->rows = m.cols;
+	ans_mat->cols = swap_temp;
 }
 
 hermitian_bandmat construct_finite_diff_mat(u32 samples_per_dimension, u32 dimensions, f64* deltas) {

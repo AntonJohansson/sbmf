@@ -57,43 +57,47 @@ static const char* arpack_znaupd_error_code_to_string(i32 err);
 static const char* arpack_zneupd_error_code_to_string(i32 err);
 static const char* which_eigenpairs_to_arpack_string(which_eigenpairs which);
 
-void eig_sparse_bandmat(bandmat bm, u32 num_eigenvalues, which_eigenpairs which_pairs, c64* out_eigvals, c64* out_eigvecs) {
+void eig_sparse_bandmat(hermitian_bandmat bm, u32 num_eigenvalues, which_eigenpairs which_pairs, c64* out_eigvals, c64* out_eigvecs) {
 	i32 ido = 0;
-	i32 n = bm.base.rows; // order of matrix
+	i32 n = bm.size;
 	const char* which = which_eigenpairs_to_arpack_string(which_pairs);
 	i32 nev = num_eigenvalues; // number of eigenvalues to find
-	f64 tol = 0.0; // relative error tolerance to achieve.
+	f64 tol = 0.1; // relative error tolerance to achieve.
 	c64 resid[n]; // residual vectors
-	c64 v[n*n];
+
+	i32 ncv = nev + 2;
+	c64* v = (c64*)sa_push(_sbmf.main_stack, sizeof(c64)*n*ncv);
 	i32 iparam[11] = {
 		[0] = 1, 		// Exact shift is used
-		[2] = 300, 	// Max iterations
+		[2] = 1000, 	// Max iterations
 		[3] = 1, 		// will not work without this for some reason
 		[6] = 1, 		// Mode
 	};
 	i32 ipntr[14];
 
-	c64 workd[3*n];
-	i32 lworkl = 3*n*n + 5*n;
-	c64 workl[lworkl];
-	f64 rwork[n];
+	c64* workd = (c64*)sa_push(_sbmf.main_stack, sizeof(c64)*3*n);
+	i32 lworkl = 3*ncv*ncv + 5*ncv;
+	c64* workl = (c64*)sa_push(_sbmf.main_stack, sizeof(c64)*lworkl);
+	f64 rwork[ncv];
 
 	i32 info = 0;
 
-	i32 num_of_diags = bm.super_diags + bm.sub_diags + 1; // 1 for main diag
-			
-	c64 one = 1, zero = 0;
-
-	c64 data[num_of_diags*n];
-	mat input_mat = {
-		.data = data,
+	//c64 one = 1, zero = 0;
+	//i32 num_of_diags = bm.super_diags + bm.sub_diags + 1; // 1 for main diag
+	c64* data = (c64*)sa_push(_sbmf.main_stack, sizeof(c64)*bm.bandcount*n);
+	hermitian_bandmat input_mat = {
+		.base = {
+			.rows = bm.bandcount,
+			.cols = n,
+			.data = data,
+		},
+		.bandcount = bm.bandcount,
+		.size = bm.size,
 	};
-	bm.base.rows = num_of_diags;
-	bm.base.cols = n;
-	mat_transpose(&input_mat, bm.base);
+	mat_transpose(&input_mat.base, bm.base);
  
 	while (ido != 99 && info == 0) {
-		znaupd_c(&ido, "I", n, which, nev, tol, resid, n, v, n, iparam, ipntr, 
+		znaupd_c(&ido, "I", n, which, nev, tol, resid, ncv, v, n, iparam, ipntr, 
 				workd, workl, lworkl, rwork, &info);
 
 		if (info != 0) {
@@ -102,28 +106,27 @@ void eig_sparse_bandmat(bandmat bm, u32 num_eigenvalues, which_eigenpairs which_
 		}
 
 		if (ido == -1 || ido == 1) {
-			cblas_zgbmv(CblasColMajor, CblasNoTrans, n,n, bm.sub_diags, bm.super_diags, &one, input_mat.data, 
-					num_of_diags, &workd[ipntr[0]-1], 1, &zero, &workd[ipntr[1]-1], 1);
+			complex_hermitian_bandmat_mulv(&workd[ipntr[1]-1], input_mat, &workd[ipntr[0]-1]);
 		}
 	}
 
 	// Convergence or error
 	if (info == 0) {
 		i32 select[n]; // not used
-		c64 d[nev+1];
-		c64 z[n*nev];
+		//c64 d[nev+1];
+		//c64 z[n*nev];
+		c64* d = (c64*)sa_push(_sbmf.main_stack, sizeof(c64)*(nev+1));
+		c64* z = (c64*)sa_push(_sbmf.main_stack, sizeof(c64)*n*nev);
 		c64 sigma = 0; // not used
-		c64 workev[2*n];
+		//c64 workev[2*n];
+		c64* workev = (c64*)sa_push(_sbmf.main_stack, sizeof(c64)*2*n);
 
 		zneupd_c(true, "A", select, d, z, n, sigma, workev, 
-				"I", n, which, nev, tol, resid, n, v, n, iparam, ipntr, workd, workl, lworkl, rwork, &info);
+				"I", n, which, nev, tol, resid, ncv, v, n, iparam, ipntr, workd, workl, lworkl, rwork, &info);
 
 		if (info != 0) {
 			printf("arpack zneupd error: %d (%s)\n", info, arpack_zneupd_error_code_to_string(info));
 		} else {
-			// Calculate ||Ax - lx||, l == "eigenvalues"
-			{
-			}
 			// Print info
 			i32 nconv = iparam[4];
 			printf("\nConvergence info:\n");
@@ -139,19 +142,16 @@ void eig_sparse_bandmat(bandmat bm, u32 num_eigenvalues, which_eigenpairs which_
 			printf("\nEigenvalue -- Residual\n");
 			for (i32 i = 0; i < nconv; ++i) {
 				c64 ax[n];
-				cblas_zgbmv(CblasColMajor, CblasNoTrans, n,n, bm.sub_diags, bm.super_diags, &one,
-								input_mat.data, num_of_diags, &z[i*n], 1, &zero, ax, 1);
+				complex_hermitian_bandmat_mulv(ax, input_mat, &z[i*n]);
 				c64 neg_eigenvalue = -d[i];
 				cblas_zaxpy(n, &neg_eigenvalue, &z[i*n], 1, ax, 1);
 				printf("\t %lf + %lfi -- %e\n", creal(d[i]), cimag(d[i]), cblas_dznrm2(n, ax, 1));
 			}
 
-			memcpy(out_eigvals, d, sizeof(c64)*(nev+1));
-			// TODO mat_transpose(out_eigvecs, z, n, nev);
+			memcpy(out_eigvals, d, sizeof(c64)*(nev));
+			mat_transpose_raw(out_eigvecs, z, n, nev);
 		}
-
 	}
-
 }
 
 static inline const char* arpack_znaupd_error_code_to_string(i32 err) {

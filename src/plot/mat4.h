@@ -93,8 +93,8 @@ static inline void m4perspective(mat4* ans, float fov, float aspect, float near,
 	//		0, 	0,  -1,  0
 	//		);
 
-	float right = tanf(fov/2);
-	float top = right/aspect;
+	float top = tanf(fov/2)*near;
+	float right = top*aspect;
 
 	M4ASSIGN(*ans,
 			near/right,	0,  0,										 0,
@@ -102,8 +102,7 @@ static inline void m4perspective(mat4* ans, float fov, float aspect, float near,
 			0, 	0,	-(far+near)/(far-near), 			-2*far*near/(far-near),
 			0, 	0,  -1,  0
 			);
-
-
+	
 	//float top = tanf(fov/2);
 	//float right = top*aspect;
 

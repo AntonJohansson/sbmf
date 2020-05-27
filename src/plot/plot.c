@@ -22,7 +22,7 @@
 
 #define MAX_GLDRAWDATA_LEN 32
 
-#define MEM_RENDERGROUP_PREALLOC 64*1024
+#define MEM_RENDERGROUP_PREALLOC 1024*1024
 
 #define fclamp(val,min,max) \
 	fmax(fmin(val, max),min)
@@ -127,6 +127,10 @@ struct plotstate {
 	float mouse_x;
 	float mouse_y;
 
+	float scale_x;
+	float scale_y;
+	float scale_z;
+
 	render_group group;
 
 	uint32_t gldata_index;
@@ -174,8 +178,8 @@ static void mouse_move_callback(GLFWwindow* window, double x, double y){
 	if (state->is_lmb_down){
 		switch (state->cam.mode) {
 			case CAM_PAN: {
-				state->cam.tar_x += 20*state->cam.radius*dx;
-				state->cam.tar_y += 20*state->cam.radius*dy;
+				state->cam.tar_x += state->cam.radius*dx;
+				state->cam.tar_y += state->cam.radius*dy;
 				camera_update_pan(&state->cam);
 			} break;
 			case CAM_ARCBALL: {
@@ -238,6 +242,24 @@ static void  key_callback(GLFWwindow* window, i32 key, i32 scancode, i32 action,
 	plotstate* state = (plotstate*) glfwGetWindowUserPointer(window);
 	if (action == GLFW_PRESS && key >= GLFW_KEY_0 && key <= GLFW_KEY_9) {
 		plot_toggle_active(state, key - GLFW_KEY_0);
+	}
+	if (key == GLFW_KEY_U) {
+		state->scale_x += 0.1f;
+	} else if (key == GLFW_KEY_J) {
+		state->scale_x -= 0.1f;
+	} else if (key == GLFW_KEY_I) {
+		state->scale_y += 0.1f;
+	} else if (key == GLFW_KEY_K) {
+		state->scale_y -= 0.1f;
+	} else if (key == GLFW_KEY_O) {
+		state->scale_z += 0.1f;
+	} else if (key == GLFW_KEY_L) {
+		state->scale_z -= 0.1f;
+	}
+	if (action == GLFW_PRESS && key == GLFW_KEY_R) {
+		state->scale_x = 1.0f;
+		state->scale_y = 1.0f;
+		state->scale_z = 1.0f;
 	}
 }
 
@@ -370,6 +392,9 @@ static void* plot_update_func(void* data) {
 				"uniform mat4 M;\n"
 				"uniform mat4 V;\n"
 				"uniform mat4 P;\n"
+				"uniform float scale_x;\n"
+				"uniform float scale_y;\n"
+				"uniform float scale_z;\n"
 				"void main() {\n"
 				"	gl_Position = P*V*vec4(x, y, 0, 1);\n"
 				"}";
@@ -398,8 +423,11 @@ static void* plot_update_func(void* data) {
 				"uniform mat4 M;\n"
 				"uniform mat4 V;\n"
 				"uniform mat4 P;\n"
+				"uniform float scale_x;\n"
+				"uniform float scale_y;\n"
+				"uniform float scale_z;\n"
 				"void main() {\n"
-				"	gl_Position = P*V*vec4(x, y, z, 1);\n"
+				"	gl_Position = P*V*vec4(scale_x*x, scale_y*y, scale_z*z, 1);\n"
 				"}";
 
 			static const char* frag3d =
@@ -587,6 +615,9 @@ plotstate* plot_init() {
 	state->cam.tar_x = 0;
 	state->cam.tar_y = 0;
 	state->cam.tar_z = 0;
+	state->scale_x = 1;
+	state->scale_y = 1;
+	state->scale_z = 1;
 
 	camera_set_mode(&state->cam, CAM_PAN);
 
@@ -639,6 +670,13 @@ void plot_update(plotstate* state) {
 			glUniformMatrix4fv(uniform, 1, GL_TRUE, state->cam.view);
 			uniform = glGetUniformLocation(data->program, "P");
 			glUniformMatrix4fv(uniform, 1, GL_TRUE, state->cam.projection);
+
+			uniform = glGetUniformLocation(data->program, "scale_x");
+			glUniform1fv(uniform, 1, &state->scale_x);
+			uniform = glGetUniformLocation(data->program, "scale_y");
+			glUniform1fv(uniform, 1, &state->scale_y);
+			uniform = glGetUniformLocation(data->program, "scale_z");
+			glUniform1fv(uniform, 1, &state->scale_z);
 
 			uniform = glGetUniformLocation(data->program, "color");
 			float col[3] = {0};

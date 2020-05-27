@@ -43,10 +43,10 @@ static inline camera make_camera() {
 		.tar_y = 0,
 		.tar_z = 0,
 
-		.fov = 0.25*M_PI_4,
+		.fov = M_PI_4,
 		.aspect = 4.0/3.0,
 		.near = 0.01,
-		.far = 20,
+		.far = 50,
 
 		.mode = CAM_PAN,
 	};

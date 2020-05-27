@@ -269,13 +269,6 @@ static void normalize_function_f32(f32* func, i32 size) {
 	}
 }
 
-#define normalize_function(f, size) 									\
-	_Generic((f), 																			\
-			c64*: normalize_function_c64(f, size),					\
-			f64*: normalize_function_f64(f, size),					\
-			f32*: normalize_function_f32(f, size),					\
-			default: assert(0))
-
 f64 periodic_pot(f64* v, i32 n, c64 u) {
 	f64 temp = 0.0;
 	for (i32 i = 0; i < n; ++i) {
@@ -307,7 +300,7 @@ describe(finite_difference_method) {
 	it ("1D") {
 		sbmf_init();
 
-		const i32 N = 64;
+		const i32 N = 128;
 		grid g = generate_grid(1, 
 				(f64[]){-5},
 				(f64[]){ 5},
@@ -326,22 +319,94 @@ describe(finite_difference_method) {
 		c64 out_eigvecs[N*N];
 		eig_dense_symetric_upper_tridiag_bandmat(fdm, out_eigvals, out_eigvecs);
 
-		plotstate* state = plot_init();
-		f32 x[N], y[N];
-		for (i32 j = 0; j < N; ++j) {
-			x[j] = g.points[j];
-			y[j] = ho_potential(&g.points[j], g.dimensions, 0.0);
-		}
-		plot_1d(state, x,y, N);
+		////////////////////////////////////////////////////
+		// Plotting
+		//plotstate* state = plot_init();
+		//{
+		//	f32 x[N], y[N], exact_y[N];
+		//	for (i32 j = 0; j < N; ++j) {
+		//		x[j] = g.points[j];
+		//		y[j] = ho_potential(&g.points[j], g.dimensions, 0.0);
+		//	}
+		//	plot_1d(state, x,y, N);
 
-		for (i32 i = 0; i < 5; ++i) {
-			log_info("eigvals: %lf\n", out_eigvals[i]);
-			for (i32 j = 0; j < N; ++j) {
-				y[j] = out_eigvals[i] + cabs(out_eigvecs[i*N + j]);
-			}
-			plot_1d(state, x, y, N);
+		//	for (i32 i = 0; i < 5; ++i) {
+		//		normalize_function_c64(&out_eigvecs[i*N], N);
+		//		for (i32 j = 0; j < N; ++j) {
+		//			y[j] = out_eigvals[i] + cabs(out_eigvecs[i*N + j]);
+
+		//			i32 states[] = {i};
+		//			exact_y[j] = ho_eigenfunction(states, &g.points[j], g.dimensions);
+		//		}
+		//		normalize_function_f32(exact_y, N);
+		//		for (i32 j = 0; j < N; ++j) {
+		//			i32 states[] = {i};
+		//			exact_y[j] = ho_eigenvalue(states, g.dimensions) + fabs(exact_y[j]);
+		//		}
+		//		plot_1d(state, x, y, N);
+		//		plot_1d(state, x, exact_y, N);
+		//	}
+		//	plot_wait_on_join(state);
+		//}
+		//plot_shutdown(state);
+
+		sbmf_shutdown();
+	}
+
+	it ("2D") {
+		sbmf_init();
+
+		const i32 N = 64;
+		grid g = generate_grid(2, 
+				(f64[]){-2.5,-2.5},
+				(f64[]){ 2.5, 2.5},
+				(i32[]){ N, N});
+
+		hermitian_bandmat fdm = construct_finite_diff_mat(N, g.dimensions, g.deltas);
+		for (i32 i = 0; i < fdm.size*fdm.bandcount; ++i) {
+			fdm.base.data[i] = -0.5*fdm.base.data[i];
 		}
-		plot_wait_on_join(state);
+		for (i32 i = 0; i < fdm.size; ++i) {
+			i32 idx = fdm.size*(fdm.bandcount-1) + i;
+			fdm.base.data[idx] += (c64) ho_potential(&g.points[g.dimensions*i], g.dimensions, 0.0);
+		}	
+
+		u32 eigenvalues_to_find = 3;
+
+		c64 out_eigvals[eigenvalues_to_find];
+		c64 out_eigvecs[eigenvalues_to_find*N*N];
+		eig_sparse_bandmat(fdm, eigenvalues_to_find, EV_SMALLEST_RE, out_eigvals, out_eigvecs);
+
+		////////////////////////////////////////////////////
+		// Plotting
+		plotstate* state = plot_init();
+		{
+			f32 x[N*N], y[N*N], z[N*N], exact_z[N*N];
+			for (i32 j = 0; j < N*N; ++j) {
+				x[j] = g.points[g.dimensions*j];
+				y[j] = g.points[g.dimensions*j+1];
+				z[j] = ho_potential(&g.points[g.dimensions*j], g.dimensions, 0.0);
+			}
+			plot_2d(state, x,y,z, N*N);
+
+			for (i32 i = 0; i < eigenvalues_to_find; ++i) {
+				normalize_function_c64(&out_eigvecs[i*N*N], N*N);
+				for (i32 j = 0; j < N*N; ++j) {
+					z[j] = out_eigvals[i] + 10*cabs(out_eigvecs[i*N*N + j]);
+
+					i32 states[] = {i,i};
+					exact_z[j] = ho_eigenfunction(states, &g.points[g.dimensions*j], g.dimensions);
+				}
+				//normalize_function_f32(exact_z, N*N);
+				for (i32 j = 0; j < N*N; ++j) {
+					i32 states[] = {i,i};
+					exact_z[j] = ho_eigenvalue(states, g.dimensions) + 10*fabs(exact_z[j]);
+				}
+				plot_2d(state, x,y,z, N*N);
+				plot_2d(state, x,y,exact_z, N*N);
+			}
+			plot_wait_on_join(state);
+		}
 		plot_shutdown(state);
 
 		sbmf_shutdown();
@@ -580,7 +645,7 @@ describe(finite_difference_method) {
 //	free_grid(g);
 //}
 //
-describe(solve_eigenproblems_bandmat) {
+describe(matrix_ops) {
 	// Produced by matlab, (warning COLUMN MAJOR!)
 	static c64 eigvecs_answer[] = {
 		-0.4489,    0.0085,    0.2281,   -0.2686,    0.3344,    0.4139,    0.2168,   -0.4228,   -0.3533,    0.2015,
@@ -608,15 +673,18 @@ describe(solve_eigenproblems_bandmat) {
 		16.823919787643952,
 	};
 
-	it ("dense (symetric) upper tridiagonal band matrix") {
+	before_each() {
 		sbmf_init();
+	}
+	after_each() {
+		sbmf_shutdown();
+	}
 
+	it ("dense (symetric) upper tridiagonal band matrix") {
 		c64 bands[] = {
 			0,0,0,1,2,3,4,5,6,7,
 			0,9,8,7,6,5,4,3,2,1,
 			1,1,1,1,1,1,1,1,1,1,
-			9,8,7,6,5,4,3,2,1,0,
-			0,1,2,3,4,5,6,7,0,0,
 		};
 
 		i32 size = 10;
@@ -624,11 +692,12 @@ describe(solve_eigenproblems_bandmat) {
 		hermitian_bandmat bm = {
 			.base = {
 				.is_row_major = true,
-				.rows = size,
+				.rows = 3,
 				.cols = size,
 				.data = bands
 			},
 			.bandcount = 3,
+			.size = size,
 		};
 
 		f64 eigvals[size];
@@ -638,7 +707,7 @@ describe(solve_eigenproblems_bandmat) {
 		eig_dense_symetric_upper_tridiag_bandmat(bm, eigvals, eigvecs);
 		// check eigenvalues
 		for (i32 i = 0; i < size; ++i) {
-			assert(fabs(eigvals[i] - eigvals_answer[i]) <= 1);
+			assert(fabs(eigvals[i] - eigvals_answer[i]) <= 0.01);
 		}
 
 		// Check eigenvectors
@@ -649,7 +718,6 @@ describe(solve_eigenproblems_bandmat) {
 				assert(cabs(got)-cabs(expected) <= 1);
 			}
 		}
-		sbmf_shutdown();
 	}
 
 	it ("sparse bandmatrix") {
@@ -657,21 +725,19 @@ describe(solve_eigenproblems_bandmat) {
 			0,0,0,1,2,3,4,5,6,7,
 			0,9,8,7,6,5,4,3,2,1,
 			1,1,1,1,1,1,1,1,1,1,
-			9,8,7,6,5,4,3,2,1,0,
-			0,1,2,3,4,5,6,7,0,0,
 		};
 
 		i32 size = 10;
 
-		bandmat bm = {
+		hermitian_bandmat bm = {
 			.base = {
 				.is_row_major = true,
-				.rows = size,
+				.rows = 3,
 				.cols = size,
 				.data = bands
 			},
-			.super_diags = 2,
-			.sub_diags = 2,
+			.bandcount = 3,
+			.size = size,
 		};
 
 		c64 eigvals[size];
@@ -680,20 +746,46 @@ describe(solve_eigenproblems_bandmat) {
 		i32 eigenpairs_to_find = 4;
 		eig_sparse_bandmat(bm, eigenpairs_to_find, EV_SMALLEST_RE, eigvals, eigvecs);
 
-		//// check eigenvalues
-		//for (i32 i = 0; i < eigenpairs_to_find; ++i) {
-		//	printf("%lf + i%lf\n", creal(eigvals[i]), cimag(eigvals[i]));
-		//	//assert(fabs(eigvals[i] - eigvals_answer[i]) <= 1);
-		//}
+		// check eigenvalues
+		for (i32 i = 0; i < eigenpairs_to_find; ++i) {
+			assert(fabs(eigvals[i] - eigvals_answer[i]) <= 0.01);
+		}
 
-		//// Check eigenvectors
-		//for (int i = 0; i < eigenpairs_to_find; ++i) {
-		//	for (int j = 0; j < bm.size; ++j) {
-		//		c64 got = eigvecs[i*bm.size + j]; 
-		//		c64 expected = eigvecs_answer[j*bm.size + i];
-		//		//assert(cabs(got)-cabs(expected) <= 1);
-		//	}
-		//}
+		// Check eigenvectors
+		for (int i = 0; i < eigenpairs_to_find; ++i) {
+			for (int j = 0; j < bm.size; ++j) {
+				c64 got = eigvecs[i*bm.size + j]; 
+				c64 expected = eigvecs_answer[j*bm.size + i];
+				assert(cabs(got)-cabs(expected) <= 1);
+			}
+		}
+	}
+
+	it ("hermitian bandmat mulv") {
+		c64 data[10] = {
+			0,0,1,0,0,
+			1,1,1,1,1,
+		};
+
+		hermitian_bandmat m = {
+			.base = {
+				.is_row_major = true,
+				.rows = 2,
+				.cols = 5,
+				.data = data,
+			},
+			.bandcount = 2,
+			.size = 5,
+		};
+
+		c64 input[5] = {1,1,1,1,1};
+		c64 ans[5];
+		c64 expected[5] = {1,2,2,1,1};
+		complex_hermitian_bandmat_mulv(ans, m, input);
+
+		for (i32 i = 0; i < 5; ++i) {
+			asserteq(ans[i], expected[i]);
+		}
 	}
 }
 

@@ -28,6 +28,7 @@ typedef struct {
 
 extern mat mat_new(mat_size_t rows, mat_size_t cols);
 extern mat mat_new_zero(mat_size_t rows, mat_size_t cols);
+extern mat mat_duplicate(mat m);
 
 static inline u64 mat_size(mat m) {
 	return sizeof(mat_scalar_t)*m.rows*m.cols;
@@ -42,6 +43,7 @@ extern void complex_bandmat_mulv(mat_scalar_t* ans_vec, bandmat mat, mat_scalar_
 			case complex_bandmat: bandmat_mulv(mat, vec),													\
 			default: )
 
+extern void mat_transpose_raw(mat_scalar_t* ans, mat_scalar_t* in, mat_size_t rows, mat_size_t cols);
 extern void mat_transpose(mat* ans_mat, mat m);
 
 extern hermitian_bandmat construct_finite_diff_mat(u32 samples_per_dimension, u32 dimensions, f64* deltas);

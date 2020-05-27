@@ -20,9 +20,9 @@ TEST_LIBS = -l$(PROJECT) -lplot -lm -larpack -lcblas
 
 #PROJ_FLAGS = -fsanitize=address -fsanitize=leak -g -fpic -Wall -Werror -Isrc
 #TEST_FLAGS = -fsanitize=address -fsanitize=leak -g -Wall -Werror -Isrc -Isrc/test/plotting/third_party
-PROJ_FLAGS = -g -fpic -Wall -Werror -Isrc -O2
+PROJ_FLAGS = -g -fpic -Wall -Werror -Isrc
 PLOT_FLAGS = -g -fpic -Isrc/plot/third_party/ -O3
-TEST_FLAGS = -g -Isrc -O2 -fsanitize=address -fsanitize=leak
+TEST_FLAGS = -g -Isrc -fsanitize=address -fsanitize=leak
 
 default: $(BUILD_DIR)/lib$(PROJECT) $(BUILD_DIR)/test $(BUILD_DIR)/libplot
 

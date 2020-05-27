@@ -32,10 +32,12 @@ static inline f64 hermite_poly(i32 n, f64 x) {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 static inline f64 ho_eigenfunction(i32 states[], f64 point[], i32 dims) {
-	f64 sum = 0.0;
-	for (i32 i = 0; i < dims; ++i)
-		sum += exp(-point[i]*point[i]/2.0) * hermite_poly(states[i], point[i]);
-	return sum;
+	f64 prod = 1.0;
+	for (i32 i = 0; i < dims; ++i) {
+		f64 normalization_factor = 1.0/(pow(M_PI,0.25)*sqrt(pow(2,states[i])*factorial(states[i])));
+		prod *= normalization_factor*exp(-point[i]*point[i]/2.0) * hermite_poly(states[i], point[i]);
+	}
+	return prod;
 }
 
 static inline f64 ho_eigenvalue(i32 states[], i32 dims) {

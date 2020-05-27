@@ -4,7 +4,7 @@
 sbmf_state _sbmf;
 
 void sbmf_init() {
-	_sbmf.main_stack = sa_make(1024*1024); // 1 MB
+	_sbmf.main_stack = sa_make(32*1024*1024); // 1 MB
 }
 
 void sbmf_shutdown() {

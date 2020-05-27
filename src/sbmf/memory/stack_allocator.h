@@ -31,6 +31,7 @@ static inline void sa_destroy(stack_allocator* sa) {
 }
 
 static inline u8* sa_push(stack_allocator* sa, u32 size_in_bytes) {
+	log_info("stack allocator %p (%u/%u bytes)\n\ttrying to allocate %u bytes\n", sa, sa->top, sa->size, size_in_bytes);
 	if (sa->top + size_in_bytes > sa->size) {
 		log_error("stack allocator %p out of memory (%u/%u bytes)\n\ttrying to allocate %u bytes\n", sa, sa->top, sa->size, size_in_bytes);
 		return 0;

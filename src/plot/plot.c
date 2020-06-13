@@ -45,6 +45,7 @@
 typedef enum {
 	ENTRY_TYPE_render_entry_line_plot,
 	ENTRY_TYPE_render_entry_surface_plot,
+	ENTRY_TYPE_render_entry_pointcloud_plot,
 } render_entry_type;
 
 typedef struct {
@@ -59,6 +60,15 @@ typedef struct {
 	f32* y;
 	u32 point_count;
 } render_entry_line_plot;
+
+typedef struct {
+	render_entry_header header;
+
+	f32* x;
+	f32* y;
+	f32* z;
+	u32 point_count;
+} render_entry_pointcloud_plot;
 
 typedef struct {
 	render_entry_header header;
@@ -92,10 +102,12 @@ static inline void free_render_group(render_group group) {
 #define render_group_push_extra_size(group, type, extra_size) \
 	(type*) render_group_push_impl(group, sizeof(type) + extra_size, ENTRY_TYPE_##type)
 
-static inline void* render_group_push_impl(render_group* group, uint32_t entry_byte_size, render_entry_type type) {
+static inline void* render_group_push_impl(render_group* group,
+		uint32_t entry_byte_size, render_entry_type type) {
 	assert(group->top + entry_byte_size <= group->block_size);
 
-	render_entry_header* header = (render_entry_header*) (group->memory + group->top);
+	render_entry_header* header = (render_entry_header*) (group->memory +
+																group->top);
 	group->top += entry_byte_size;
 
 	header->type = type;
@@ -109,6 +121,13 @@ typedef struct {
 	uint32_t vertex_count;
 	GLuint vao;
 	GLuint vbo;
+
+	bool has_ebo;
+	GLuint ebo;
+
+	bool has_texture;
+	GLuint texture;
+
 	GLuint program;
 	GLenum drawmode;
 	bool active;
@@ -158,7 +177,7 @@ static void glfw_error_callback(int code, const char* desc) {
 	fprintf(stderr, "GLFW: %s (%d).\n", desc, code);
 }
 
-static void mouse_move_callback(GLFWwindow* window, double x, double y){
+static void mouse_move_callback(GLFWwindow* window, double x, double y) {
 	plotstate* state = (plotstate*) glfwGetWindowUserPointer(window);
 
 	static double last_normalized_x = 0.0, last_normalized_y = 0.0;
@@ -175,18 +194,20 @@ static void mouse_move_callback(GLFWwindow* window, double x, double y){
 	last_normalized_x = normalized_x;
 	last_normalized_y = normalized_y;
 
-	if (state->is_lmb_down){
+	if (state->is_lmb_down) {
 		switch (state->cam.mode) {
 			case CAM_PAN: {
 				state->cam.tar_x += state->cam.radius*dx;
 				state->cam.tar_y += state->cam.radius*dy;
 				camera_update_pan(&state->cam);
-			} break;
+			}
+			break;
 			case CAM_ARCBALL: {
 				state->cam.theta = fclamp(state->cam.theta - dy, 0.0f, M_PI);
 				state->cam.phi = fmod(state->cam.phi - dx, 2.0f*M_PI);
 				camera_update_arcball(&state->cam);
-			} break;
+			}
+			break;
 			default:
 				assert(0);
 		};
@@ -194,20 +215,21 @@ static void mouse_move_callback(GLFWwindow* window, double x, double y){
 	}
 }
 
-static void mouse_button_callback(GLFWwindow* window, int button, int action, int mods){
+static void mouse_button_callback(GLFWwindow* window, int button, int action,
+																	int mods) {
 	plotstate* state = (plotstate*) glfwGetWindowUserPointer(window);
 
 	if (button == GLFW_MOUSE_BUTTON_LEFT) {
-		switch(action){
-			case GLFW_PRESS:{
+		switch(action) {
+			case GLFW_PRESS: {
 				state->is_lmb_down = true;
 				state->is_mouse_disabled = true;
 				glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 				break;
-			} 		
-			case GLFW_RELEASE:{
-				state->is_lmb_down = false; 	
-				if (state->is_mouse_disabled){
+			}
+			case GLFW_RELEASE: {
+				state->is_lmb_down = false;
+				if (state->is_mouse_disabled) {
 					state->is_mouse_disabled = false;
 					glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
 				}
@@ -222,23 +244,27 @@ static void mouse_button_callback(GLFWwindow* window, int button, int action, in
 	}
 }
 
-static void scroll_callback(GLFWwindow* window, double xoffset, double yoffset){
+static void scroll_callback(GLFWwindow* window, double xoffset,
+														double yoffset) {
 	plotstate* state = (plotstate*) glfwGetWindowUserPointer(window);
 	state->cam.radius = fmax(state->cam.radius + -0.5f*yoffset, 0.1f);
 
 	switch (state->cam.mode) {
 		case CAM_PAN: {
 			camera_update_pan(&state->cam);
-		} break;
+		}
+		break;
 		case CAM_ARCBALL: {
 			camera_update_arcball(&state->cam);
-		} break;
+		}
+		break;
 		default:
 			assert(0);
 	};
 }
 
-static void  key_callback(GLFWwindow* window, i32 key, i32 scancode, i32 action, i32 mods) {
+static void  key_callback(GLFWwindow* window, i32 key, i32 scancode, i32 action,
+													i32 mods) {
 	plotstate* state = (plotstate*) glfwGetWindowUserPointer(window);
 	if (action == GLFW_PRESS && key >= GLFW_KEY_0 && key <= GLFW_KEY_9) {
 		plot_toggle_active(state, key - GLFW_KEY_0);
@@ -331,12 +357,13 @@ static GLFWwindow* setup_window() {
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 1);
 	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-  glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
-  glfwWindowHint(GLFW_RESIZABLE, GL_FALSE);
+	glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
+	glfwWindowHint(GLFW_RESIZABLE, GL_FALSE);
 
 	//glfwWindowHint(GLFW_SAMPLES, 4);
 
-	GLFWwindow* window = glfwCreateWindow(WINDOW_WIDTH, WINDOW_HEIGHT, "plot", 0, 0);
+	GLFWwindow* window = glfwCreateWindow(WINDOW_WIDTH, WINDOW_HEIGHT, "plot", 0,
+																				0);
 	if (!window) {
 		fprintf(stderr, "GLFW: Failed to create window!\n");
 		glfwTerminate();
@@ -357,8 +384,8 @@ static GLFWwindow* setup_window() {
 	//glFrontFace(GL_CW);
 	//glEnable(GL_CULL_FACE);
 	//glCullFace(GL_BACK);
-  glEnable(GL_DEPTH_TEST);
-  glDepthMask(GL_TRUE);
+	glEnable(GL_DEPTH_TEST);
+	glDepthMask(GL_TRUE);
 
 	glEnable(GL_MULTISAMPLE);
 
@@ -385,7 +412,7 @@ static void* plot_update_func(void* data) {
 			//glGenBuffers(MAX_CURVES_1D, state->vboxs1d);
 			//glGenBuffers(MAX_CURVES_1D, state->vboys1d);
 
-			static const char* vert2d = 
+			static const char* vert2d =
 				"#version 410\n"
 				"layout(location = 0) in float x;\n"
 				"layout(location = 1) in float y;\n"
@@ -415,7 +442,7 @@ static void* plot_update_func(void* data) {
 			program_bind_fragdata_location(&prog, "out_color");
 			program2d = prog.handle;
 
-			static const char* vert3d = 
+			static const char* vert3d =
 				"#version 410\n"
 				"layout(location = 0) in float x;\n"
 				"layout(location = 1) in float y;\n"
@@ -458,7 +485,7 @@ static void* plot_update_func(void* data) {
 
 	double timestep = 1.0/60.0;
 
-	double frame_start = glfwGetTime(), 
+	double frame_start = glfwGetTime(),
 				 frame_time = 0.0,
 				 frame_end = 0.0,
 				 accumulator = 0.0;
@@ -512,17 +539,23 @@ static void* plot_update_func(void* data) {
 							glBindBuffer(GL_ARRAY_BUFFER, gldata->vbo);
 							// The data in the entry is stored as xxxx....yyyy... where thera are entry->point_count
 							// x's and entry->point_count y's.
-							glBufferData(GL_ARRAY_BUFFER, sizeof(GL_FLOAT)*2*entry->point_count, entry->x, GL_STATIC_DRAW);
+							glBufferData(GL_ARRAY_BUFFER, sizeof(GL_FLOAT)*2*entry->point_count, entry->x,
+													 GL_STATIC_DRAW);
 							glUseProgram(program2d);
-							program_bind_vertex_attribute((VertexAttribute){0,1, GL_FLOAT, GL_FALSE, sizeof(GL_FLOAT), 0});
-							program_bind_vertex_attribute((VertexAttribute){1,1, GL_FLOAT, GL_FALSE, sizeof(GL_FLOAT), entry->point_count*sizeof(GL_FLOAT)});
+							program_bind_vertex_attribute((VertexAttribute) {
+								0,1, GL_FLOAT, GL_FALSE, sizeof(GL_FLOAT), 0
+							});
+							program_bind_vertex_attribute((VertexAttribute) {
+								1,1, GL_FLOAT, GL_FALSE, sizeof(GL_FLOAT), entry->point_count* sizeof(GL_FLOAT)
+							});
 
 							gldata->vertex_count = entry->point_count;
 							gldata->drawmode = GL_LINE_STRIP;
 							gldata->program = program2d;
-						} break;
-						case ENTRY_TYPE_render_entry_surface_plot: {
-							render_entry_surface_plot* entry = (render_entry_surface_plot*) header;
+						}
+						break;
+						case ENTRY_TYPE_render_entry_pointcloud_plot: {
+							render_entry_pointcloud_plot* entry = (render_entry_pointcloud_plot*) header;
 
 							assert(state->gldata_index + 1 < MAX_GLDRAWDATA_LEN);
 							gldrawdata* gldata = &state->gldata[state->gldata_index++];
@@ -535,16 +568,25 @@ static void* plot_update_func(void* data) {
 							glBindBuffer(GL_ARRAY_BUFFER, gldata->vbo);
 							// The data in the entry is stored as xxxx....yyyy...zzzzzz.... where thera are entry->point_count
 							// x's and entry->point_count y's.
-							glBufferData(GL_ARRAY_BUFFER, sizeof(GL_FLOAT)*3*entry->point_count, entry->x, GL_STATIC_DRAW);
+							glBufferData(GL_ARRAY_BUFFER, sizeof(GL_FLOAT)*3*entry->point_count, entry->x,
+													 GL_STATIC_DRAW);
 							glUseProgram(program3d);
-							program_bind_vertex_attribute((VertexAttribute){0,1, GL_FLOAT, GL_FALSE, sizeof(GL_FLOAT), 0});
-							program_bind_vertex_attribute((VertexAttribute){1,1, GL_FLOAT, GL_FALSE, sizeof(GL_FLOAT), entry->point_count*sizeof(GL_FLOAT)});
-							program_bind_vertex_attribute((VertexAttribute){2,1, GL_FLOAT, GL_FALSE, sizeof(GL_FLOAT), 2*entry->point_count*sizeof(GL_FLOAT)});
+							program_bind_vertex_attribute((VertexAttribute) {
+								0,1, GL_FLOAT, GL_FALSE, sizeof(GL_FLOAT), 0
+							});
+							program_bind_vertex_attribute((VertexAttribute) {
+								1,1, GL_FLOAT, GL_FALSE, sizeof(GL_FLOAT), entry->point_count* sizeof(GL_FLOAT)
+							});
+							program_bind_vertex_attribute((VertexAttribute) {
+								2,1, GL_FLOAT, GL_FALSE, sizeof(GL_FLOAT),
+								2*entry->point_count* sizeof(GL_FLOAT)
+							});
 
 							gldata->vertex_count = entry->point_count;
 							gldata->drawmode = GL_POINTS;
 							gldata->program = program3d;
-						} break;
+						}
+						break;
 						default:
 							assert(0);
 					};
@@ -645,6 +687,7 @@ void plot_shutdown(plotstate* state) {
 
 	//glDeleteProgram(state->program);
 
+	free_render_group(state->group);
 	free(state);
 }
 
@@ -714,7 +757,8 @@ void plot_1d(plotstate* state, f32* x, f32* y, u32 len) {
 	pthread_mutex_lock(&state->mutex);
 
 	render_entry_line_plot* entry;
-	entry = render_group_push_extra_size(&state->group, render_entry_line_plot, 2*len*sizeof(f32));
+	entry = render_group_push_extra_size(&state->group, render_entry_line_plot,
+																			 2*len*sizeof(f32));
 	entry->x = (f32*)(entry + 1);
 	entry->y = (f32*)((u8*)(entry + 1) + len*sizeof(f32));
 	entry->point_count = len;
@@ -742,8 +786,8 @@ void plot_1d(plotstate* state, f32* x, f32* y, u32 len) {
 void plot_2d(plotstate* state, f32* x, f32* y, f32* z, u32 len) {
 	pthread_mutex_lock(&state->mutex);
 
-	render_entry_surface_plot* entry;
-	entry = render_group_push_extra_size(&state->group, render_entry_surface_plot, 3*len*sizeof(f32));
+	render_entry_pointcloud_plot* entry;
+	entry = render_group_push_extra_size(&state->group, render_entry_pointcloud_plot, 3*len*sizeof(f32));
 	entry->x = (f32*)(entry + 1);
 	entry->y = (f32*)((u8*)(entry + 1) +   len*sizeof(f32));
 	entry->z = (f32*)((u8*)(entry + 1) + 2*len*sizeof(f32));
@@ -755,4 +799,79 @@ void plot_2d(plotstate* state, f32* x, f32* y, f32* z, u32 len) {
 
 	pthread_mutex_unlock(&state->mutex);
 }
+
 void plot_3d(plotstate* state, f64* points, u32 len) {}
+
+
+
+
+
+
+plotsurface* plot_make_surface(plotstate* state, u32 size) {
+	u32 vbo_size = sizeof(f32)*(4*(size)*(size));
+	u32 ebo_size = sizeof(u32)*(2*(size)* (size - 1)+(size-2));
+
+	plotsurface* surf = xmalloc(sizeof(plotsurface) + vbo_size + ebo_size);
+	surf->size = size;
+	surf->vbo_mem = (f32*)(surf+1);
+	surf->ebo_mem = (f32')((u8*)(surf->vbo_mem)+vbo_size);
+
+
+	f32 x0 = -0.5f, y0 = -0.5f;
+	f32 dx = 1/(f32)subdivisions, dy = 1/(f32)subdivisions;
+
+	i32 idx = 0;
+	for(i32 j = 0; j < size; ++j){
+		for(i32 i = 0; i < size; ++i){
+			idx = 4*(i+j*(size));
+			// xy
+			plane_vbo_memory[idx] 		= x0 + i*dx;
+			plane_vbo_memory[idx+1] 	= y0 + j*dy;
+			// uv
+			plane_vbo_memory[idx+2] = i/(f32)(size-1);
+			plane_vbo_memory[idx+3] = 1.0f-j/(f32)(size-1);
+
+			if(j < size-1){
+				idx = 2*i+j*(2*(size)+1);
+				plane_ebo_memory[idx] 	= i+j*(size);
+				plane_ebo_memory[idx+1] = i+(j+1)*(size);
+			}
+		}
+
+		if(j < size-2){
+			idx = 2*(size)+j*(2*(size)+1);
+			plane_ebo_memory[idx] = 65535;
+		}
+	}
+
+	glBindBuffer(GL_ARRAY_BUFFER, vbo);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(float)*vbo_size, plane_vbo_memory, GL_DYNAMIC_DRAW);
+
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
+	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(GLuint)*ebo_size, plane_ebo_memory, GL_DYNAMIC_DRAW);
+
+	return surf;
+}
+
+void plot_free_surface(plotstate* state, plotsurface* surf) {
+	free(surf);
+}
+
+
+
+
+
+
+
+
+
+
+
+void plot_surface(plotstate* state, plotsurface* surf, f32* z) {
+	pthread_mutex_lock(&state->mutex);
+
+
+	render_entry_surface_plot* entry;
+	entry = render_group_push_extra_size(&state->group, render_entry_surface_plot, vbo_size + ebo_size);
+	pthread_mutex_unlock(&state->mutex);
+}

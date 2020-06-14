@@ -100,9 +100,9 @@ static inline grid generate_grid(i32 dimensions, f64 mins[], f64 maxs[], i32 poi
 			// ...
 
 			i32 prodlen = 1;
-			for (i32 n = 0; n < g.dimensions; ++n) {
-			//for (i32 n = g.dimensions-1; n >= 0; --n) {
-				//indices[n] = fmod((index / prodlen), g.pointcounts[n]);
+			// TODO: does it matter if xyzxyzxyz... vs. zyxzyxzyx... ?
+			for (i32 n = g.dimensions-1; n >= 0; --n) {
+				indices[n] = fmod((index / prodlen), g.pointcounts[n]);
 				indices[n] = (index/prodlen) % g.pointcounts[n];
 				prodlen *= g.pointcounts[n];
 			}

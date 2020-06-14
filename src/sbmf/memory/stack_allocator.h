@@ -38,7 +38,9 @@ static inline u8* sa_push(stack_allocator* sa, u32 size_in_bytes) {
 	}
 
 	u32 alignment_padding = 8 - (sa->top % 8);
-	u8* ptr = sa->memory + sa->top + alignment_padding;
+	sa->top += alignment_padding;
+
+	u8* ptr = sa->memory + sa->top;
 	sa->top += size_in_bytes;
 
 	return ptr;

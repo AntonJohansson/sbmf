@@ -5,6 +5,11 @@
 #include <sbmf/memory/xmalloc.h>
 #include <sbmf/common/log.h>
 
+
+#ifndef SA_PRINT_DEBUG_INFO
+#define SA_PRINT_DEBUG_INFO 0
+#endif
+
 #define SA_PUSH(sa, type) \
 	(type*)sa_push(sa, sizeof(type))
 
@@ -31,7 +36,10 @@ static inline void sa_destroy(stack_allocator* sa) {
 }
 
 static inline u8* sa_push(stack_allocator* sa, u32 size_in_bytes) {
+#if SA_PRINT_DEBUG_INFO
 	log_info("stack allocator %p (%u/%u bytes)\n\ttrying to allocate %u bytes\n", sa, sa->top, sa->size, size_in_bytes);
+#endif
+
 	if (sa->top + size_in_bytes > sa->size) {
 		log_error("stack allocator %p out of memory (%u/%u bytes)\n\ttrying to allocate %u bytes\n", sa, sa->top, sa->size, size_in_bytes);
 		return 0;

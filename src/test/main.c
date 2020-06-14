@@ -10,6 +10,9 @@
 
 #include <plot/plot.h>
 
+#define PLOT_SPARSE_1D_FDM 0
+#define PLOT_SPARSE_2D_FDM 1
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // TEST NUMERICAL INTEGRATION VIA QUADGK
 #include <sbmf/quadgk.h>
@@ -343,38 +346,42 @@ describe(finite_difference_method) {
 		eig_result res = eig_sparse_bandmat(fdm, eigenvalues_to_find, EV_SMALLEST_RE);
 
 		// Plotting
-		plotstate* state = make_plotstate(800, 600);
-		f32 z[fdm.size];
+		{
+#if PLOT_SPARSE_1D_FDM
+			plotstate* state = make_plotstate(800, 600);
+			f32 z[fdm.size];
 
-		sample_space lin = make_linspace(1,-5,5,N);
+			sample_space lin = make_linspace(1,-5,5,N);
 
-		for (u32 i = 0; i < fdm.size; ++i) {
-			z[i] = ho_potential(&g.points[i], 1, 0);
-		}
-		push_line_plot(state, &lin, z, "potential", 0);
-
-		for (u32 n = 0; n < res.num_eigenpairs; ++n) {
 			for (u32 i = 0; i < fdm.size; ++i) {
-				z[i] = ho_eigenvalue((i32[]){n}, 1) + ho_eigenfunction((i32[]){n}, &g.points[i], 1);
+				z[i] = ho_potential(&g.points[i], 1, 0);
 			}
-			char buf[50];
-			sprintf(buf, "exact %d state", n);
-			push_line_plot(state, &lin, z, buf, 0);
-		}
+			push_line_plot(state, &lin, z, "potential", 0);
 
-		for (u32 n = 0; n < res.num_eigenpairs; ++n) {
-			for (u32 i = 0; i < fdm.size; ++i) {
-				z[i] = res.eigenvalues[n] + cabs(res.eigenvectors[n*fdm.size + i]);
+			for (u32 n = 0; n < res.num_eigenpairs; ++n) {
+				for (u32 i = 0; i < fdm.size; ++i) {
+					z[i] = ho_eigenvalue((i32[]){n}, 1) + ho_eigenfunction((i32[]){n}, &g.points[i], 1);
+				}
+				char buf[50];
+				sprintf(buf, "exact %d state", n);
+				push_line_plot(state, &lin, z, buf, 0);
 			}
-			char buf[50];
-			sprintf(buf, "numerical %d state", n);
-			push_line_plot(state, &lin, z, buf, 0);
+
+			for (u32 n = 0; n < res.num_eigenpairs; ++n) {
+				for (u32 i = 0; i < fdm.size; ++i) {
+					z[i] = res.eigenvalues[n] + cabs(res.eigenvectors[n*fdm.size + i]);
+				}
+				char buf[50];
+				sprintf(buf, "numerical %d state", n);
+				push_line_plot(state, &lin, z, buf, 0);
+			}
+
+
+			plot_update_until_closed(state);
+			free_sample_space(&lin);
+			destroy_plotstate(state);
+#endif
 		}
-
-
-		plot_update_until_closed(state);
-		free_sample_space(&lin);
-		destroy_plotstate(state);
 
 		sbmf_shutdown();
 	}
@@ -396,26 +403,52 @@ describe(finite_difference_method) {
 			fdm.base.data[idx] += (c64) ho_potential(&g.points[g.dimensions*i], g.dimensions, 0.0);
 		}
 
-		u32 eigenvalues_to_find = 3;
-
+		u32 eigenvalues_to_find = 2;
 		eig_result res = eig_sparse_bandmat(fdm, eigenvalues_to_find, EV_SMALLEST_RE);
 
 
-//		{
-//			plotstate* state = make_plotstate(800, 600);
-//			sample_space surf = make_linspace(2, -2.5, 2.5, N);
-//			f32 v[N*N], z[N*N];
-//			for (u32 i = 0; i < N*N; ++i) {
-//				v[i] = ho_potential(&g.points[2*i], 2, 0.0);
-//				z[i] = out_eigvals[0] + 10*cabs(out_eigvecs[i]);
-//			}
-//			push_surface_plot(state, &surf, v, "potential", 0);
-//			push_surface_plot(state, &surf, z, "groundstate", 0);
-//			plot_update_until_closed(state);
-//			free_sample_space(&surf);
-//			destroy_plotstate(state);
-//		}
-//
+		// Plotting
+		{
+#if PLOT_SPARSE_2D_FDM
+			plotstate* state = make_plotstate(800, 600);
+
+			f32 z[fdm.size];
+			sample_space surf = make_linspace(g.dimensions, -2.5, 2.5, N);
+
+			for (u32 i = 0; i < fdm.size; ++i) {
+				z[i] = ho_potential(&g.points[g.dimensions*i], g.dimensions, 0.0);
+			}
+			push_surface_plot(state, &surf, z, "potential", 0);
+
+			for (u32 n1 = 0; n1 < res.num_eigenpairs; ++n1) {
+				for (u32 n2 = 0; n2 < res.num_eigenpairs; ++n2) {
+					i32 states[] = {n1,n2};
+					for (u32 i = 0; i < fdm.size; ++i) {
+						z[i] =  ho_eigenfunction(states, &g.points[g.dimensions*i], g.dimensions);
+					}
+
+					char buf[50];
+					sprintf(buf, "exact %d,%d state", n1,n2);
+					push_surface_plot(state, &surf, z, buf, ho_eigenvalue(states, g.dimensions));
+				}
+			}
+
+			for (u32 n = 0; n < res.num_eigenpairs; ++n) {
+				for (u32 i = 0; i < fdm.size; ++i) {
+					z[i] = 100*creal(res.eigenvectors[n*fdm.size + i]);
+				}
+
+				char buf[50];
+				sprintf(buf, "numerical %d state", n);
+				push_surface_plot(state, &surf, z, buf, res.eigenvalues[n]);
+			}
+
+			plot_update_until_closed(state);
+			free_sample_space(&surf);
+			destroy_plotstate(state);
+#endif
+		}
+
 		sbmf_shutdown();
 	}
 }

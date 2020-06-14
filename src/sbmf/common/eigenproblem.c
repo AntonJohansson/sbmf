@@ -71,7 +71,7 @@ eig_result eig_sparse_bandmat(hermitian_bandmat bm, u32 num_eigenvalues, which_e
 	c64* v = (c64*)sa_push(_sbmf.main_stack, sizeof(c64)*n*ncv);
 	i32 iparam[11] = {
 		[0] = 1, 		// Exact shift is used
-		[2] = 1000, 	// Max iterations
+		[2] = 7000, 	// Max iterations
 		[3] = 1, 		// will not work without this for some reason
 		[6] = 1, 		// Mode
 	};

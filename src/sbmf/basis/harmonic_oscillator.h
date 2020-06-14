@@ -42,9 +42,9 @@ static inline f64 ho_eigenfunction(i32 states[], f64 point[], i32 dims) {
 
 static inline f64 ho_eigenvalue(i32 states[], i32 dims) {
 	f64 sum = 0.0;
-	for (i32 i = 0; i < dims; ++i) 
+	for (i32 i = 0; i < dims; ++i)
 		sum += states[i];
-	
+
 	return sum + dims/2.0;
 }
 

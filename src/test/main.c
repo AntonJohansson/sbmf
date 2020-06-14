@@ -324,7 +324,7 @@ describe(finite_difference_method) {
 	}
 	it ("1D -- sparse diag") {
 		sbmf_init();
-		const i32 N = 20;
+		const i32 N = 40;
 		grid g = generate_grid(1,
 				(f64[]){-5},
 				(f64[]){ 5},
@@ -339,19 +339,39 @@ describe(finite_difference_method) {
 			fdm.base.data[idx] += (c64) ho_potential(&g.points[g.dimensions*i], g.dimensions, 0.0);
 		}
 
-		//u32 eigenvalues_to_find = 3;
-		//eig_result res = eig_sparse_bandmat(fdm, eigenvalues_to_find, EV_SMALLEST_RE);
+		u32 eigenvalues_to_find = 3;
+		eig_result res = eig_sparse_bandmat(fdm, eigenvalues_to_find, EV_SMALLEST_RE);
 
 		// Plotting
 		plotstate* state = make_plotstate(800, 600);
-		f32 exact_v[fdm.size],
-			exact_z[fdm.size];
-		for (u32 i = 0; i < fdm.size; ++i) {
-			printf("%lf\n", g.points[i]);
-			exact_v[i] = ho_potential(&g.points[i], 1, 0);
-		}
+		f32 z[fdm.size];
+
 		sample_space lin = make_linspace(1,-5,5,N);
-		push_line_plot(state, &lin, exact_v, "potential", 0);
+
+		for (u32 i = 0; i < fdm.size; ++i) {
+			z[i] = ho_potential(&g.points[i], 1, 0);
+		}
+		push_line_plot(state, &lin, z, "potential", 0);
+
+		for (u32 n = 0; n < res.num_eigenpairs; ++n) {
+			for (u32 i = 0; i < fdm.size; ++i) {
+				z[i] = ho_eigenvalue((i32[]){n}, 1) + ho_eigenfunction((i32[]){n}, &g.points[i], 1);
+			}
+			char buf[50];
+			sprintf(buf, "exact %d state", n);
+			push_line_plot(state, &lin, z, buf, 0);
+		}
+
+		for (u32 n = 0; n < res.num_eigenpairs; ++n) {
+			for (u32 i = 0; i < fdm.size; ++i) {
+				z[i] = res.eigenvalues[n] + cabs(res.eigenvectors[n*fdm.size + i]);
+			}
+			char buf[50];
+			sprintf(buf, "numerical %d state", n);
+			push_line_plot(state, &lin, z, buf, 0);
+		}
+
+
 		plot_update_until_closed(state);
 		free_sample_space(&lin);
 		destroy_plotstate(state);
@@ -732,7 +752,7 @@ describe(matrix_ops) {
 
 		// check eigenvalues
 		for (u32 i = 0; i < res.num_eigenpairs; ++i) {
-			assert(cabs(res.eigenvalues[i] - eigvals_answer[i]) <= 0.01);
+			assert(cabs(res.eigenvalues[i] - eigvals_answer[i]) <= 0.001);
 		}
 
 		// Check eigenvectors
@@ -740,7 +760,7 @@ describe(matrix_ops) {
 			for (u32 j = 0; j < res.points_per_eigenvector; ++j) {
 				c64 got = res.eigenvectors[i*bm.size + j];
 				c64 expected = eigvecs_answer[j*bm.size + i];
-				assert(cabs(got)-cabs(expected) <= 1);
+				assert(cabs(got)-cabs(expected) <= 0.01);
 			}
 		}
 	}

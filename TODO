@@ -12,9 +12,8 @@ SBMF (Slightly Beyond Mean Field):
 					[x] implement own quadrature?
 							[ ] is it possible to find a table of eval points online?
 					[ ] Use QUADPACK?
-	[ ] nasty bug
+	[x] nasty bug
 		the dimension n generate_grid is connected to a stack smashing bug, n = 1 => no smashing, n = 2 => smashing.
-
 	[x] memory allocation is 8-byte aligned
 	[x] Which ARPACK routines should we use for complex band matrices?
 		"znaupd, zneupd, ..."
@@ -54,16 +53,3 @@ Testing:
 	[ ] Timing is not accurate, averaging is wrong
 
 	[x] Separate out and test eigenvalue/-vector solving.
-
-Plotting:
-	[ ] Not freeing vaos/vbos in drawdata.
-	[ ] Plot 2d planes.
-	[ ] Plot 3d surfaces.
-	[ ] Text rendering,
-			[ ] stb font loading,
-			[ ] generate fonts,
-			[ ] draw fonts,
-			[ ] draw fonts in different colors.
-
-	[x] Handle switching between camera modes.
-	[x] Togglable plots.

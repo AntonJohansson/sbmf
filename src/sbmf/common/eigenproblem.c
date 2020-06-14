@@ -157,7 +157,7 @@ eig_result eig_sparse_bandmat(hermitian_bandmat bm, u32 num_eigenvalues, which_e
 				.points_per_eigenvector = bm.size,
 			};
 			memcpy(res.eigenvalues, d, sizeof(c64)*(nev));
-			mat_transpose_raw(res.eigenvectors, z, n, nev);
+			memcpy(res.eigenvectors, z, sizeof(c64)*n*nev);
 			return res;
 		}
 	}

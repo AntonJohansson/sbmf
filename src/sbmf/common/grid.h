@@ -5,6 +5,7 @@
 #include <sbmf/memory/stack_allocator.h>
 
 #include <string.h> // memcpy, memset
+#include <stdio.h>
 
 // 2D
 //  0  1  2  3
@@ -85,10 +86,9 @@ static inline grid generate_grid(i32 dimensions, f64 mins[], f64 maxs[], i32 poi
 		g.lens[i] = maxs[i] - mins[i];
 		g.mins[i] = mins[i];
 		g.maxs[i] = maxs[i];
+		g.deltas[i] = g.lens[i]/(pointcounts[i]-1);
 		g.pointcounts[i] = pointcounts[i];
-		g.deltas[i] = g.lens[i]/pointcounts[i];
 	}
-
 
 	{
 		i32 indices[g.dimensions];
@@ -100,16 +100,16 @@ static inline grid generate_grid(i32 dimensions, f64 mins[], f64 maxs[], i32 poi
 			// ...
 
 			i32 prodlen = 1;
-			for (i32 n = g.dimensions-1; n >= 0; --n) {
-				indices[n] = fmod((index / prodlen), g.pointcounts[n]);
+			for (i32 n = 0; n < g.dimensions; ++n) {
+			//for (i32 n = g.dimensions-1; n >= 0; --n) {
+				//indices[n] = fmod((index / prodlen), g.pointcounts[n]);
+				indices[n] = (index/prodlen) % g.pointcounts[n];
 				prodlen *= g.pointcounts[n];
 			}
 
 			for (i32 n = 0; n < g.dimensions; ++n) {
-				g.points[(g.dimensions)*index + n] = g.mins[n] + indices[n]*g.deltas[n];
-				//printf("%d\t", indices[n]);
+				g.points[g.dimensions*index + n] = g.mins[n] + indices[n]*g.deltas[n];
 			}
-			//printf("\n");
 		}
 	}
 

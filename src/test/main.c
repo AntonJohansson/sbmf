@@ -324,11 +324,11 @@ describe(finite_difference_method) {
 	}
 	it ("1D -- sparse diag") {
 		sbmf_init();
-		const i32 N = 10;
-		grid g = generate_grid(2,
-				(f64[]){-5,-5},
-				(f64[]){ 5, 5},
-				(i32[]){ N, N});
+		const i32 N = 20;
+		grid g = generate_grid(1,
+				(f64[]){-5},
+				(f64[]){ 5},
+				(i32[]){ N});
 
 		hermitian_bandmat fdm = construct_finite_diff_mat(N, g.dimensions, g.deltas);
 		for (i32 i = 0; i < fdm.size*fdm.bandcount; ++i) {
@@ -339,9 +339,22 @@ describe(finite_difference_method) {
 			fdm.base.data[idx] += (c64) ho_potential(&g.points[g.dimensions*i], g.dimensions, 0.0);
 		}
 
-		u32 eigenvalues_to_find = 3;
+		//u32 eigenvalues_to_find = 3;
+		//eig_result res = eig_sparse_bandmat(fdm, eigenvalues_to_find, EV_SMALLEST_RE);
 
-		eig_result res = eig_sparse_bandmat(fdm, eigenvalues_to_find, EV_SMALLEST_RE);
+		// Plotting
+		plotstate* state = make_plotstate(800, 600);
+		f32 exact_v[fdm.size],
+			exact_z[fdm.size];
+		for (u32 i = 0; i < fdm.size; ++i) {
+			printf("%lf\n", g.points[i]);
+			exact_v[i] = ho_potential(&g.points[i], 1, 0);
+		}
+		sample_space lin = make_linspace(1,-5,5,N);
+		push_line_plot(state, &lin, exact_v, "potential", 0);
+		plot_update_until_closed(state);
+		free_sample_space(&lin);
+		destroy_plotstate(state);
 
 		sbmf_shutdown();
 	}

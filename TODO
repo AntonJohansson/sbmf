@@ -7,14 +7,19 @@ SBMF (Slightly Beyond Mean Field):
 			[ ] See papers/item.pdf
 		[ ] particle in a box, maybe rounded corners?
 	[ ] interest is high in radial and toroidal geometry
-	[ ] Is there a more efficient LAPACKE routine for complex band matrices?
-	[ ] Which ARPACK routines should we use for complex band matrices?
 	[ ] Basis functions instead of fdm
 			[x] Quadgk for numerical integration
 					[x] implement own quadrature?
 							[ ] is it possible to find a table of eval points online?
 					[ ] Use QUADPACK?
+	[ ] nasty bug
+		the dimension n generate_grid is connected to a stack smashing bug, n = 1 => no smashing, n = 2 => smashing.
 
+	[x] memory allocation is 8-byte aligned
+	[x] Which ARPACK routines should we use for complex band matrices?
+		"znaupd, zneupd, ..."
+	[x] Is there a more efficient LAPACKE routine for complex band matrices?
+		"im gonna say no"
 	[x] Convert column to row major in eigenvalue solver
 	[x] numerical weirdness in results after a certain point?
 			[x] whats going on?

@@ -33,21 +33,21 @@ void complex_hermitian_bandmat_mulv(mat_scalar_t* ans_vec, hermitian_bandmat bma
 	if (bmat.base.is_row_major) {
 		mat tmp = mat_duplicate(bmat.base);
 		mat_transpose(&tmp, bmat.base);
-		cblas_zhbmv(CblasColMajor, CblasUpper, 
+		cblas_zhbmv(CblasColMajor, CblasUpper,
 				bmat.size, num_super_diags,
 				&one, tmp.data, bmat.bandcount, vec, 1, &zero, ans_vec, 1);
 	} else {
-		cblas_zhbmv(CblasColMajor, CblasUpper, 
+		cblas_zhbmv(CblasColMajor, CblasUpper,
 				bmat.size, num_super_diags,
 				&one, bmat.base.data, bmat.bandcount, vec, 1, &zero, ans_vec, 1);
 	}
-	
+
 }
 
 void complex_bandmat_mulv(mat_scalar_t* ans_vec, bandmat mat, mat_scalar_t* vec) {
 	static const mat_scalar_t one = 1, zero = 0;
-	cblas_zgbmv((mat.base.is_row_major) ? CblasRowMajor : CblasColMajor, CblasNoTrans, 
-			mat.base.rows, mat.base.cols, mat.sub_diags, mat.super_diags, 
+	cblas_zgbmv((mat.base.is_row_major) ? CblasRowMajor : CblasColMajor, CblasNoTrans,
+			mat.base.rows, mat.base.cols, mat.sub_diags, mat.super_diags,
 			&one, mat.base.data, mat.base.rows, vec, 1, &zero, ans_vec, 1);
 }
 
@@ -60,6 +60,10 @@ void mat_transpose_raw(mat_scalar_t* ans, mat_scalar_t* in, mat_size_t rows, mat
 			temp[r + c*(rows)] = in[c + r*(cols)];
 		}
 	}
+
+	// rows-1 + (cols-1)*rows
+	// rows-1 + cols*rows - rows
+	// cols*rows-1
 
 	memcpy(ans, temp, sizeof(mat_scalar_t)*rows*cols);
 }

@@ -19,12 +19,12 @@ TEST_LIBS = -l$(PROJECT) -lm -larpack -lcblas -L. -L/home/aj/.local/lib -lplot -
 PROJ_FLAGS = -g -fpic -Wall -Werror -Isrc
 TEST_FLAGS = -g -Isrc
 
-default: lib$(PROJECT) test
+default: lib$(PROJECT).so test
 
 # -Ithird_party/include -Lthird_party/lib  required on school comp
 #  How do I check for that?
-lib$(PROJECT): $(PROJ_SRCS)
+lib$(PROJECT).so: $(PROJ_SRCS)
 	$(CC) -o lib$(PROJECT).so -shared $(PROJ_SRCS) $(PROJ_FLAGS) $(PROJ_LIBS)
 
-test: $(TEST_SRCS) lib$(PROJECT)
+test: $(TEST_SRCS) lib$(PROJECT).so
 	$(CC) $(TEST_SRCS) -o test $(TEST_FLAGS) $(TEST_LIBS)

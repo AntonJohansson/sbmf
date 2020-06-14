@@ -54,11 +54,12 @@ void eig_dense_symetric_upper_tridiag_bandmat(hermitian_bandmat bm, f64* out_eig
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
+// Arpack helper funcs
 static const char* arpack_znaupd_error_code_to_string(i32 err);
 static const char* arpack_zneupd_error_code_to_string(i32 err);
 static const char* which_eigenpairs_to_arpack_string(which_eigenpairs which);
 
-void eig_sparse_bandmat(hermitian_bandmat bm, u32 num_eigenvalues, which_eigenpairs which_pairs, c64* out_eigvals, c64* out_eigvecs) {
+eig_result eig_sparse_bandmat(hermitian_bandmat bm, u32 num_eigenvalues, which_eigenpairs which_pairs) {
 	i32 ido = 0;
 	i32 n = bm.size;
 	const char* which = which_eigenpairs_to_arpack_string(which_pairs);
@@ -83,8 +84,6 @@ void eig_sparse_bandmat(hermitian_bandmat bm, u32 num_eigenvalues, which_eigenpa
 
 	i32 info = 0;
 
-	//c64 one = 1, zero = 0;
-	//i32 num_of_diags = bm.super_diags + bm.sub_diags + 1; // 1 for main diag
 	c64* data = (c64*)sa_push(_sbmf.main_stack, sizeof(c64)*bm.bandcount*n);
 	hermitian_bandmat input_mat = {
 		.base = {
@@ -119,12 +118,9 @@ void eig_sparse_bandmat(hermitian_bandmat bm, u32 num_eigenvalues, which_eigenpa
 	// Convergence or error
 	if (info == 0) {
 		i32 select[n]; // not used
-		//c64 d[nev+1];
-		//c64 z[n*nev];
 		c64* d = (c64*)sa_push(_sbmf.main_stack, sizeof(c64)*(nev+1));
 		c64* z = (c64*)sa_push(_sbmf.main_stack, sizeof(c64)*n*nev);
 		c64 sigma = 0; // not used
-		//c64 workev[2*n];
 		c64* workev = (c64*)sa_push(_sbmf.main_stack, sizeof(c64)*2*n);
 
 		zneupd_c(true, "A", select, d, z, n, sigma, workev,
@@ -154,10 +150,19 @@ void eig_sparse_bandmat(hermitian_bandmat bm, u32 num_eigenvalues, which_eigenpa
 				printf("\t %lf + %lfi -- %e\n", creal(d[i]), cimag(d[i]), cblas_dznrm2(n, ax, 1));
 			}
 
-			memcpy(out_eigvals, d, sizeof(c64)*(nev));
-			mat_transpose_raw(out_eigvecs, z, n, nev);
+			eig_result res = {
+				.eigenvalues = (c64*)sa_push(_sbmf.main_stack, sizeof(c64)*nev),
+				.eigenvectors = (c64*)sa_push(_sbmf.main_stack, sizeof(c64)*bm.size*nev),
+				.num_eigenpairs = nev,
+				.points_per_eigenvector = bm.size,
+			};
+			memcpy(res.eigenvalues, d, sizeof(c64)*(nev));
+			mat_transpose_raw(res.eigenvectors, z, n, nev);
+			return res;
 		}
 	}
+
+	return (eig_result){0};
 }
 
 static inline const char* arpack_znaupd_error_code_to_string(i32 err) {

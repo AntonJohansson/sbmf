@@ -89,8 +89,6 @@ static inline grid generate_grid(i32 dimensions, f64 mins[], f64 maxs[], i32 poi
 		g.deltas[i] = g.lens[i]/pointcounts[i];
 	}
 
-	i32 indices[dimensions];
-	memset(indices, 0, dimensions*sizeof(i32));
 
 	{
 		i32 indices[g.dimensions];
@@ -108,7 +106,7 @@ static inline grid generate_grid(i32 dimensions, f64 mins[], f64 maxs[], i32 poi
 			}
 
 			for (i32 n = 0; n < g.dimensions; ++n) {
-				g.points[dimensions*index + n] = g.mins[n] + indices[n]*g.deltas[n];
+				g.points[(g.dimensions)*index + n] = g.mins[n] + indices[n]*g.deltas[n];
 				//printf("%d\t", indices[n]);
 			}
 			//printf("\n");

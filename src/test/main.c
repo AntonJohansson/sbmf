@@ -296,7 +296,6 @@ describe(finite_difference_method) {
 		}
 		sbmf_shutdown();
 	}
-
 	it ("1D -- full diag") {
 		sbmf_init();
 
@@ -326,10 +325,10 @@ describe(finite_difference_method) {
 	it ("1D -- sparse diag") {
 		sbmf_init();
 		const i32 N = 10;
-		grid g = generate_grid(1,
-				(f64[]){-5},
-				(f64[]){ 5},
-				(i32[]){ N});
+		grid g = generate_grid(2,
+				(f64[]){-5,-5},
+				(f64[]){ 5, 5},
+				(i32[]){ N, N});
 
 		hermitian_bandmat fdm = construct_finite_diff_mat(N, g.dimensions, g.deltas);
 		for (i32 i = 0; i < fdm.size*fdm.bandcount; ++i) {
@@ -342,13 +341,10 @@ describe(finite_difference_method) {
 
 		u32 eigenvalues_to_find = 3;
 
-		c64 out_eigvals[eigenvalues_to_find];
-		c64 out_eigvecs[eigenvalues_to_find*N];
-		eig_sparse_bandmat(fdm, eigenvalues_to_find, EV_SMALLEST_RE, out_eigvals, out_eigvecs);
+		eig_result res = eig_sparse_bandmat(fdm, eigenvalues_to_find, EV_SMALLEST_RE);
 
 		sbmf_shutdown();
 	}
-
 	it ("2D") {
 		sbmf_init();
 
@@ -369,9 +365,7 @@ describe(finite_difference_method) {
 
 		u32 eigenvalues_to_find = 3;
 
-		c64 out_eigvals[eigenvalues_to_find];
-		c64 out_eigvecs[eigenvalues_to_find*N*N];
-		eig_sparse_bandmat(fdm, eigenvalues_to_find, EV_SMALLEST_RE, out_eigvals, out_eigvecs);
+		eig_result res = eig_sparse_bandmat(fdm, eigenvalues_to_find, EV_SMALLEST_RE);
 
 
 //		{
@@ -720,21 +714,18 @@ describe(matrix_ops) {
 			.size = size,
 		};
 
-		c64 eigvals[size];
-		c64 eigvecs[size*size];
-
-		i32 eigenpairs_to_find = 4;
-		eig_sparse_bandmat(bm, eigenpairs_to_find, EV_SMALLEST_RE, eigvals, eigvecs);
+		u32 eigenpairs_to_find = 4;
+		eig_result res = eig_sparse_bandmat(bm, eigenpairs_to_find, EV_SMALLEST_RE);
 
 		// check eigenvalues
-		for (i32 i = 0; i < eigenpairs_to_find; ++i) {
-			assert(fabs(eigvals[i] - eigvals_answer[i]) <= 0.01);
+		for (u32 i = 0; i < res.num_eigenpairs; ++i) {
+			assert(cabs(res.eigenvalues[i] - eigvals_answer[i]) <= 0.01);
 		}
 
 		// Check eigenvectors
-		for (int i = 0; i < eigenpairs_to_find; ++i) {
-			for (int j = 0; j < bm.size; ++j) {
-				c64 got = eigvecs[i*bm.size + j];
+		for (u32 i = 0; i < res.num_eigenpairs; ++i) {
+			for (u32 j = 0; j < res.points_per_eigenvector; ++j) {
+				c64 got = res.eigenvectors[i*bm.size + j];
 				c64 expected = eigvecs_answer[j*bm.size + i];
 				assert(cabs(got)-cabs(expected) <= 1);
 			}

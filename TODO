@@ -38,10 +38,10 @@ SBMF (Slightly Beyond Mean Field):
 Testing:
 	[ ] FDM Eigenvalue solver test-cases
 			[x] 1d Harmonic oscillator
-			[ ] 2d Harmonic oscillator
+			[x] 2d Harmonic oscillator
 			[ ] 3d Harmonic oscillator
-			[ ] 1d Particle in a box
-			[ ] 2d Particle in a box
+			[x] 1d Particle in a box
+			[x] 2d Particle in a box
 			[ ] 3d Particle in a box
 	[ ] HO basis functions Eigenvalue solver test-cases
 			[ ] 1d Harmonic oscillator

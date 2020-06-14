@@ -1,2 +1,6 @@
 tags
-build/*
+temp
+vgcore.*
+a.out
+*.so
+test

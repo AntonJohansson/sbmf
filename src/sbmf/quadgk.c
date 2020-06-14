@@ -88,7 +88,7 @@ segment evaluate_rule(integrand* f, f64 start, f64 end, integration_settings set
 	f64 error = norm(Ik_s - Ig_s);
 
 	// add nan/inf check on error
-	
+
 	return (segment){Ik_s, error, start, end};
 }
 
@@ -103,15 +103,15 @@ static inline bool should_exit(integration_result result, integration_settings s
 					result.performed_evals >= settings.max_evals);
 }
 
-static inline void workfunc(integrand* f, f64 start, f64 end, f64 x) {
-	//
-	//
-	//
-	// int_(-inf)^b f(x) dx = - int_(b)^(-inf) f(x) dx
-	// 	apply x = b - t/(1-t)
-	// int_0^1 f(b-t/(1-t)) 1/(1-t)^2 dt
-	//
-}
+
+
+
+
+
+
+
+
+
 
 typedef struct {
 	integrand* original_f;
@@ -141,12 +141,12 @@ static inline f64 integrand_both_endpoints_inf(f64 t, void* data) {
 }
 static inline f64 integrand_end_endpoint_inf(f64 t, void* data) {
 	coordinate_transform_data* tdata = data;
-	// x = a + t/(1-t) 	<=> (x-a)(1-t) = t 
+	// x = a + t/(1-t) 	<=> (x-a)(1-t) = t
 	// 									<=> (x-a) = t + t(x-a)
 	// 									<=> (x-a) = t(1 + (x-a))
 	// 									<=> t = (x-a)/(1 + (x-a))
-	// dx/dt 	= d/dt (t/(1-t)) 
-	// 				= (1*(1-t) - t*(-1))/(1-t)^2 
+	// dx/dt 	= d/dt (t/(1-t))
+	// 				= (1*(1-t) - t*(-1))/(1-t)^2
 	// 				= 1/(1-t)^2
 	f64 one_minus_t = (1.0 - t);
 	return tdata->original_f(tdata->original_start + t/one_minus_t, tdata->userdata) * (1.0/(one_minus_t*one_minus_t));

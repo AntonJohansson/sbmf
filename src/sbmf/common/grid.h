@@ -20,11 +20,11 @@
 // (i,j) = (, index%4)
 
 // If we have a 30x20x10 array the corresponding index would be for (i,j,k) would be
-// 
+//
 // 		index = i*(20*10) + j*10 + k
 //
 // we also have that
-// 		
+//
 // 		k = index % 10
 // 		j = (index/10) % 20
 // 		i = (index/(20*10)) % 30
@@ -56,7 +56,6 @@ typedef struct {
 	i32 dimensions;
 	i32 total_pointcount;
 
-	void* memory;
 	f64* lens;
 	f64* mins;
 	f64* maxs;
@@ -71,19 +70,15 @@ static inline grid generate_grid(i32 dimensions, f64 mins[], f64 maxs[], i32 poi
 	for (i32 i = 0; i < dimensions; ++i)
 		total_pointcount *= pointcounts[i];
 
-	i32 size_points  = dimensions*total_pointcount*sizeof(f64);
-
-	void* mem = sa_push(_sbmf.main_stack, dimensions*(4*sizeof(f64) + sizeof(i32)) + size_points);
 	grid g = {
-		.total_pointcount = total_pointcount,
 		.dimensions = dimensions,
-		.memory = mem,
-		.lens					= (f64*)(mem),
-		.mins 				= (f64*)((char*)mem + 		dimensions*sizeof(f64)),
-		.maxs 				= (f64*)((char*)mem +  2*dimensions*sizeof(f64)),
-		.deltas 			= (f64*)((char*)mem +  3*dimensions*sizeof(f64)),
-		.pointcounts 	=  (i32*)((char*)mem + 	4*dimensions*sizeof(f64)),
-		.points 			= (f64*)((char*)mem +  4*dimensions*sizeof(f64) + dimensions*sizeof(i32))
+		.total_pointcount = total_pointcount,
+		.lens        = (f64*)sa_push(_sbmf.main_stack, dimensions*sizeof(f64)),
+		.mins        = (f64*)sa_push(_sbmf.main_stack, dimensions*sizeof(f64)),
+		.maxs        = (f64*)sa_push(_sbmf.main_stack, dimensions*sizeof(f64)),
+		.deltas      = (f64*)sa_push(_sbmf.main_stack, dimensions*sizeof(f64)),
+		.pointcounts = (i32*)sa_push(_sbmf.main_stack, dimensions*sizeof(i32)),
+		.points      = (f64*)sa_push(_sbmf.main_stack, dimensions*total_pointcount*sizeof(f64)),
 	};
 
 	for (i32 i = 0; i < dimensions; ++i) {
@@ -124,23 +119,19 @@ static inline grid generate_grid(i32 dimensions, f64 mins[], f64 maxs[], i32 poi
 }
 
 static inline grid mimic_grid(grid base) {
-	i32 size_points  = base.dimensions*base.total_pointcount*sizeof(f64);
-	i32 total_size = base.dimensions*(4*sizeof(f64) + sizeof(i32)) + size_points;
 
-	void* mem = sa_push(_sbmf.main_stack, total_size);
 	grid g = {
 		.dimensions = base.dimensions,
 		.total_pointcount = base.total_pointcount,
-		.memory = mem,
-		.lens					= (f64*)(mem),
-		.mins 				= (f64*)((char*)mem +   base.dimensions*sizeof(f64)),
-		.maxs 				= (f64*)((char*)mem + 2*base.dimensions*sizeof(f64)),
-		.deltas 			= (f64*)((char*)mem + 3*base.dimensions*2*sizeof(f64)),
-		.pointcounts 	=  (i32*)((char*)mem + 4*base.dimensions*sizeof(f64)),
-		.points 			= (f64*)((char*)mem + 4*base.dimensions*sizeof(f64) + base.dimensions*sizeof(i32)),
+		.lens        = (f64*)sa_push(_sbmf.main_stack, base.dimensions*sizeof(f64)),
+		.mins        = (f64*)sa_push(_sbmf.main_stack, base.dimensions*sizeof(f64)),
+		.maxs        = (f64*)sa_push(_sbmf.main_stack, base.dimensions*sizeof(f64)),
+		.deltas      = (f64*)sa_push(_sbmf.main_stack, base.dimensions*sizeof(f64)),
+		.pointcounts = (i32*)sa_push(_sbmf.main_stack, base.dimensions*sizeof(i32)),
+		.points      = (f64*)sa_push(_sbmf.main_stack, base.dimensions*base.total_pointcount*sizeof(f64)),
 	};
 
-	memcpy(g.memory, base.memory, total_size);
+	memcpy(g.lens, base.lens, base.dimensions*(4*sizeof(f64) + sizeof(i32)) + base.dimensions*base.total_pointcount*sizeof(f64));
 
 	return g;
 }

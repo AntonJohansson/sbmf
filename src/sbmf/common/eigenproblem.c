@@ -3,6 +3,7 @@
 #include <lapacke.h>
 #include <cblas.h>
 #include <arpack/arpack.h>
+//#include <arpack/debug_c.h>
 
 #include <assert.h>
 #include <stdlib.h> // malloc
@@ -21,22 +22,22 @@ void eig_dense_symetric_upper_tridiag_bandmat(hermitian_bandmat bm, f64* out_eig
 
 	// Start by reducing (complex hermitian) bandmatrix to tri-diagonal mat.
 	{
-		res = LAPACKE_zhbtrd(LAPACK_ROW_MAJOR, 'V', 'U', 
+		res = LAPACKE_zhbtrd(LAPACK_ROW_MAJOR, 'V', 'U',
 				bm.size,
-				bm.bandcount-1, 
-				bm.base.data, 
-				bm.size, 
-				out_eigvals, offdiag_elements, colmaj_eigvecs, 
+				bm.bandcount-1,
+				bm.base.data,
+				bm.size,
+				out_eigvals, offdiag_elements, colmaj_eigvecs,
 				bm.size);
-		
+
 		assert(res == 0); // @TODO, handle these errors better
 	}
 
 	// Solve eigenvalue problem via QR factorisation of tridiagonal matrix
 	{
-		res = LAPACKE_zsteqr(LAPACK_ROW_MAJOR, 'V', 
-				bm.size, 
-				out_eigvals, offdiag_elements, colmaj_eigvecs, 
+		res = LAPACKE_zsteqr(LAPACK_ROW_MAJOR, 'V',
+				bm.size,
+				out_eigvals, offdiag_elements, colmaj_eigvecs,
 				bm.size);
 
 		assert(res == 0); // @TODO, handle these errors better
@@ -62,7 +63,7 @@ void eig_sparse_bandmat(hermitian_bandmat bm, u32 num_eigenvalues, which_eigenpa
 	i32 n = bm.size;
 	const char* which = which_eigenpairs_to_arpack_string(which_pairs);
 	i32 nev = num_eigenvalues; // number of eigenvalues to find
-	f64 tol = 0.1; // relative error tolerance to achieve.
+	f64 tol = 0.0; // relative error tolerance to achieve.
 	c64 resid[n]; // residual vectors
 
 	i32 ncv = nev + 2;
@@ -95,9 +96,14 @@ void eig_sparse_bandmat(hermitian_bandmat bm, u32 num_eigenvalues, which_eigenpa
 		.size = bm.size,
 	};
 	mat_transpose(&input_mat.base, bm.base);
- 
+
+	//debug_c(6, -3, 3,
+	//		3, 3, 3, 3, 3, 3, 3,
+	//		3, 3, 3, 3, 3, 3, 3,
+	//		3, 3, 3, 3, 3, 3, 3);
+
 	while (ido != 99 && info == 0) {
-		znaupd_c(&ido, "I", n, which, nev, tol, resid, ncv, v, n, iparam, ipntr, 
+		znaupd_c(&ido, "I", n, which, nev, tol, resid, ncv, v, n, iparam, ipntr,
 				workd, workl, lworkl, rwork, &info);
 
 		if (info != 0) {
@@ -121,7 +127,7 @@ void eig_sparse_bandmat(hermitian_bandmat bm, u32 num_eigenvalues, which_eigenpa
 		//c64 workev[2*n];
 		c64* workev = (c64*)sa_push(_sbmf.main_stack, sizeof(c64)*2*n);
 
-		zneupd_c(true, "A", select, d, z, n, sigma, workev, 
+		zneupd_c(true, "A", select, d, z, n, sigma, workev,
 				"I", n, which, nev, tol, resid, ncv, v, n, iparam, ipntr, workd, workl, lworkl, rwork, &info);
 
 		if (info != 0) {
@@ -173,7 +179,7 @@ static inline const char* arpack_znaupd_error_code_to_string(i32 err) {
 		case -11: return "IPARAM(7) case 1 and BMAT case 'G' are incompatable.";
 		case -12: return "IPARAM(1) must be equal to 0 or 1.";
 		case -9999: return "Could not build an Arnoldi factorization.  User input error highly likely.  Please check actual array dimensions and layout.  IPARAM(5) returns the size of the current Arnoldi factorization.";
-		default: return "Unknown error code";	
+		default: return "Unknown error code";
 	}
 }
 static inline const char* arpack_zneupd_error_code_to_string(i32 err) {
@@ -193,7 +199,7 @@ static inline const char* arpack_zneupd_error_code_to_string(i32 err) {
 		case -12: return "HOWMNY = 'S' not yet implemented";
 		case -13: return "HOWMNY must be one of 'A' or 'P' if RVEC = .true.";
 		case -14: return "ZNAUPD did not find any eigenvalues to sufficient accuracy.";
-		default: return "Unknown error code";	
+		default: return "Unknown error code";
 	}
 }
 static inline const char* which_eigenpairs_to_arpack_string(which_eigenpairs which) {

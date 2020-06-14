@@ -57,7 +57,7 @@ describe(quadgk_integration) {
 		assert(res.error < 1e-4);
 		assert(res.converged);
 	}
-	
+
 	it ("exp(-x) 0 -> inf") {
 		res = quadgk(integrand_expnx, 0, INFINITY, settings);
 		//printf("\n%lf\n", res.integral);
@@ -105,7 +105,7 @@ describe(quadgk_integration) {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-// TEST PRIORITY QUEUE 
+// TEST PRIORITY QUEUE
 #include <sbmf/prioqueue.h>
 
 static bool cmpint(void* a, void* b) {
@@ -297,11 +297,11 @@ describe(finite_difference_method) {
 		sbmf_shutdown();
 	}
 
-	it ("1D") {
+	it ("1D -- full diag") {
 		sbmf_init();
 
 		const i32 N = 128;
-		grid g = generate_grid(1, 
+		grid g = generate_grid(1,
 				(f64[]){-5},
 				(f64[]){ 5},
 				(i32[]){ N});
@@ -312,43 +312,39 @@ describe(finite_difference_method) {
 		}
 		for (i32 i = 0; i < fdm.size; ++i) {
 			i32 idx = fdm.size*(fdm.bandcount-1) + i;
-			fdm.base.data[idx] += (c64) ho_potential(&g.points[i], g.dimensions, 0.0);
-		}	
+			fdm.base.data[idx] += (c64) ho_potential(&g.points[g.dimensions*i], g.dimensions, 0.0);
+		}
 
 		f64 out_eigvals[N];
 		c64 out_eigvecs[N*N];
 		eig_dense_symetric_upper_tridiag_bandmat(fdm, out_eigvals, out_eigvecs);
-
 		////////////////////////////////////////////////////
 		// Plotting
-		//plotstate* state = plot_init();
-		//{
-		//	f32 x[N], y[N], exact_y[N];
-		//	for (i32 j = 0; j < N; ++j) {
-		//		x[j] = g.points[j];
-		//		y[j] = ho_potential(&g.points[j], g.dimensions, 0.0);
-		//	}
-		//	plot_1d(state, x,y, N);
 
-		//	for (i32 i = 0; i < 5; ++i) {
-		//		normalize_function_c64(&out_eigvecs[i*N], N);
-		//		for (i32 j = 0; j < N; ++j) {
-		//			y[j] = out_eigvals[i] + cabs(out_eigvecs[i*N + j]);
+		sbmf_shutdown();
+	}
+	it ("1D -- sparse diag") {
+		sbmf_init();
+		const i32 N = 10;
+		grid g = generate_grid(1,
+				(f64[]){-5},
+				(f64[]){ 5},
+				(i32[]){ N});
 
-		//			i32 states[] = {i};
-		//			exact_y[j] = ho_eigenfunction(states, &g.points[j], g.dimensions);
-		//		}
-		//		normalize_function_f32(exact_y, N);
-		//		for (i32 j = 0; j < N; ++j) {
-		//			i32 states[] = {i};
-		//			exact_y[j] = ho_eigenvalue(states, g.dimensions) + fabs(exact_y[j]);
-		//		}
-		//		plot_1d(state, x, y, N);
-		//		plot_1d(state, x, exact_y, N);
-		//	}
-		//	plot_wait_on_join(state);
-		//}
-		//plot_shutdown(state);
+		hermitian_bandmat fdm = construct_finite_diff_mat(N, g.dimensions, g.deltas);
+		for (i32 i = 0; i < fdm.size*fdm.bandcount; ++i) {
+			fdm.base.data[i] = -0.5*fdm.base.data[i];
+		}
+		for (i32 i = 0; i < fdm.size; ++i) {
+			i32 idx = fdm.size*(fdm.bandcount-1) + i;
+			fdm.base.data[idx] += (c64) ho_potential(&g.points[g.dimensions*i], g.dimensions, 0.0);
+		}
+
+		u32 eigenvalues_to_find = 3;
+
+		c64 out_eigvals[eigenvalues_to_find];
+		c64 out_eigvecs[eigenvalues_to_find*N];
+		eig_sparse_bandmat(fdm, eigenvalues_to_find, EV_SMALLEST_RE, out_eigvals, out_eigvecs);
 
 		sbmf_shutdown();
 	}
@@ -357,7 +353,7 @@ describe(finite_difference_method) {
 		sbmf_init();
 
 		const i32 N = 64;
-		grid g = generate_grid(2, 
+		grid g = generate_grid(2,
 				(f64[]){-2.5,-2.5},
 				(f64[]){ 2.5, 2.5},
 				(i32[]){ N, N});
@@ -369,7 +365,7 @@ describe(finite_difference_method) {
 		for (i32 i = 0; i < fdm.size; ++i) {
 			i32 idx = fdm.size*(fdm.bandcount-1) + i;
 			fdm.base.data[idx] += (c64) ho_potential(&g.points[g.dimensions*i], g.dimensions, 0.0);
-		}	
+		}
 
 		u32 eigenvalues_to_find = 3;
 
@@ -377,38 +373,22 @@ describe(finite_difference_method) {
 		c64 out_eigvecs[eigenvalues_to_find*N*N];
 		eig_sparse_bandmat(fdm, eigenvalues_to_find, EV_SMALLEST_RE, out_eigvals, out_eigvecs);
 
-		////////////////////////////////////////////////////
-		// Plotting
-		plotstate* state = plot_init();
-		{
-			f32 x[N*N], y[N*N], z[N*N], exact_z[N*N];
-			for (i32 j = 0; j < N*N; ++j) {
-				x[j] = g.points[g.dimensions*j];
-				y[j] = g.points[g.dimensions*j+1];
-				z[j] = ho_potential(&g.points[g.dimensions*j], g.dimensions, 0.0);
-			}
-			plot_2d(state, x,y,z, N*N);
 
-			for (i32 i = 0; i < eigenvalues_to_find; ++i) {
-				normalize_function_c64(&out_eigvecs[i*N*N], N*N);
-				for (i32 j = 0; j < N*N; ++j) {
-					z[j] = out_eigvals[i] + 10*cabs(out_eigvecs[i*N*N + j]);
-
-					i32 states[] = {i,i};
-					exact_z[j] = ho_eigenfunction(states, &g.points[g.dimensions*j], g.dimensions);
-				}
-				//normalize_function_f32(exact_z, N*N);
-				for (i32 j = 0; j < N*N; ++j) {
-					i32 states[] = {i,i};
-					exact_z[j] = ho_eigenvalue(states, g.dimensions) + 10*fabs(exact_z[j]);
-				}
-				plot_2d(state, x,y,z, N*N);
-				plot_2d(state, x,y,exact_z, N*N);
-			}
-			plot_wait_on_join(state);
-		}
-		plot_shutdown(state);
-
+//		{
+//			plotstate* state = make_plotstate(800, 600);
+//			sample_space surf = make_linspace(2, -2.5, 2.5, N);
+//			f32 v[N*N], z[N*N];
+//			for (u32 i = 0; i < N*N; ++i) {
+//				v[i] = ho_potential(&g.points[2*i], 2, 0.0);
+//				z[i] = out_eigvals[0] + 10*cabs(out_eigvecs[i]);
+//			}
+//			push_surface_plot(state, &surf, v, "potential", 0);
+//			push_surface_plot(state, &surf, z, "groundstate", 0);
+//			plot_update_until_closed(state);
+//			free_sample_space(&surf);
+//			destroy_plotstate(state);
+//		}
+//
 		sbmf_shutdown();
 	}
 }
@@ -421,7 +401,7 @@ describe(finite_difference_method) {
 //	it ("1D") {
 //		const i32 N = 64;
 //
-//		grid g = generate_grid(1, 
+//		grid g = generate_grid(1,
 //				(f64[]){-10},
 //				(f64[]){ 10},
 //				(i32[]){ N}
@@ -439,7 +419,7 @@ describe(finite_difference_method) {
 //			for (i32 i = 0; i < fdm.size; ++i) {
 //				i32 idx = fdm.size*(fdm.super_diags) + i;
 //				fdm.bands[idx] += (c64) ho_potential(&g.points[i], g.dimensions, 0.0);
-//			}	
+//			}
 //		}
 //
 //		f64* eigenvalues = malloc(fdm.size * sizeof(f64));
@@ -474,7 +454,7 @@ describe(finite_difference_method) {
 //	it ("2D") {
 //		const i32 N = 64;
 //
-//		grid g = generate_grid(2, 
+//		grid g = generate_grid(2,
 //				(f64[]){-10,-10},
 //				(f64[]){ 10, 10},
 //				(i32[]){ N,  N}
@@ -492,7 +472,7 @@ describe(finite_difference_method) {
 //			for (i32 i = 0; i < fdm.size; ++i) {
 //				i32 idx = fdm.size*(fdm.super_diags) + i;
 //				fdm.bands[idx] += (c64) ho_potential(&g.points[i], g.dimensions, 0.0);
-//			}	
+//			}
 //		}
 //
 //		f64* eigenvalues = malloc(fdm.size * sizeof(f64));
@@ -527,7 +507,7 @@ describe(finite_difference_method) {
 //	it ("3D") {
 //		const i32 N = 64;
 //
-//		grid g = generate_grid(3, 
+//		grid g = generate_grid(3,
 //				(f64[]){-10,-10,-10},
 //				(f64[]){ 10, 10, 10},
 //				(i32[]){ N,  N,  N}
@@ -545,7 +525,7 @@ describe(finite_difference_method) {
 //			for (i32 i = 0; i < fdm.size; ++i) {
 //				i32 idx = fdm.size*(fdm.super_diags) + i;
 //				fdm.bands[idx] += (c64) ho_potential(&g.points[i], g.dimensions, 0.0);
-//			}	
+//			}
 //		}
 //
 //		f64* eigenvalues = malloc(fdm.size * sizeof(f64));
@@ -585,7 +565,7 @@ describe(finite_difference_method) {
 //
 //	const i32 N = 256;
 //
-//	grid g = generate_grid(1, 
+//	grid g = generate_grid(1,
 //			(f64[]){-5},
 //			(f64[]){ 5},
 //			 (i32[]){ N}
@@ -604,7 +584,7 @@ describe(finite_difference_method) {
 //		for (i32 i = 0; i < fdm.size; ++i) {
 //			i32 idx = fdm.size*(fdm.super_diags) + i;
 //			fdm.bands[idx] += (c64) periodic_pot(&g.points[i], g.dimensions, 0.0);
-//		}	
+//		}
 //	}
 //	PROFILE_END("gen. fdm  ho 1d");
 //
@@ -713,7 +693,7 @@ describe(matrix_ops) {
 		// Check eigenvectors
 		for (int i = 0; i < size; ++i) {
 			for (int j = 0; j < size; ++j) {
-				c64 got = eigvecs[i*size + j]; 
+				c64 got = eigvecs[i*size + j];
 				c64 expected = eigvecs_answer[j*size + i];
 				assert(cabs(got)-cabs(expected) <= 1);
 			}
@@ -754,7 +734,7 @@ describe(matrix_ops) {
 		// Check eigenvectors
 		for (int i = 0; i < eigenpairs_to_find; ++i) {
 			for (int j = 0; j < bm.size; ++j) {
-				c64 got = eigvecs[i*bm.size + j]; 
+				c64 got = eigvecs[i*bm.size + j];
 				c64 expected = eigvecs_answer[j*bm.size + i];
 				assert(cabs(got)-cabs(expected) <= 1);
 			}

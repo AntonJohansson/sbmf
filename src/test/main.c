@@ -10,11 +10,13 @@
 
 #include <plot/plot.h>
 
+#include <sbmf/basis/harmonic_oscillator.h>
+
 #define PLOT_SPARSE_1D_HO_FDM 0
 #define PLOT_SPARSE_2D_HO_FDM 0
 
-#define PLOT_SPARSE_1D_PB_FDM 0
-#define PLOT_SPARSE_2D_PB_FDM 1
+#define PLOT_SPARSE_1D_PB_FDM 1
+#define PLOT_SPARSE_2D_PB_FDM 0
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // TEST NUMERICAL INTEGRATION VIA QUADGK
@@ -189,103 +191,8 @@ describe(priority_queue) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // TEST SOLVING HAMILTONIAN VIA HARMONIC OSC. BASIS FUNCTIONS
-#include <sbmf/basis/harmonic_oscillator.h>
-
-static i32 row_eigenfunction = 0;
-static i32 col_eigenfunction = 0;
-
-static f64 temp_potential(f64 x) {
-	return ho_potential(&x, 1, 0);
-}
-
-static f64 compute_matrix_element(f64 x, void* data) {
-	return (ho_eigenfunction(&row_eigenfunction, &x, 1)) * (temp_potential(x) - ho_potential(&x, 1, 0)) * (ho_eigenfunction(&col_eigenfunction, &x, 1));
-}
-
-describe(solve_hamiltonian_ho_basis) {
-	it("temp"){
-		static const i32 states_to_include = 5;
-		static const i32 matrix_order = states_to_include*states_to_include;
-
-		f64 mat[matrix_order];
-		memset(mat, 0, matrix_order*sizeof(i32));
-
-		integration_settings settings = {
-			.order = 7,
-			.abs_error_tol = 0,
-			.rel_error_tol = 1e-1,
-			.max_evals = 1e4,
-		};
-
-		integration_result res;
-
-		for (i32 row = 0; row < states_to_include; ++row) {
-			for (i32 col = 0; col < states_to_include; ++col) {
-				row_eigenfunction = row;
-				col_eigenfunction = col;
-
-				res = quadgk(compute_matrix_element, -INFINITY,INFINITY, settings);
-				assert(res.converged);
-
-				mat[row*states_to_include + col] = res.integral;
-
-				if (row == col) {
-					mat[col*states_to_include + col] += ho_eigenvalue(&row, 1);
-				}
-			}
-		}
-
-	}
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-// TEST GRID BASED EIGENVALUE SOLVER AGAINST KNOWN SOLUTIONS
-
-static void normalize_function_c64(c64* func, i32 size) {
-	f64 sum = 0.0;
-	for (i32 i = 0; i < size; ++i) {
-		sum += cabs(func[i])*cabs(func[i]);
-	}
-
-	f64 scaling_factor = 1.0/sqrt(sum);
-	for (i32 i = 0; i < size; ++i) {
-		func[i] *= scaling_factor;
-	}
-}
-static void normalize_function_f64(f64* func, i32 size) {
-	f64 sum = 0.0;
-	for (i32 i = 0; i < size; ++i) {
-		sum += func[i]*func[i];
-	}
-
-	f64 scaling_factor = 1.0/sqrt(sum);
-	for (i32 i = 0; i < size; ++i) {
-		func[i] *= scaling_factor;
-	}
-}
-static void normalize_function_f32(f32* func, i32 size) {
-	f32 sum = 0.0;
-	for (i32 i = 0; i < size; ++i) {
-		sum += func[i]*func[i];
-	}
-
-	f32 scaling_factor = 1.0/sqrt(sum);
-	for (i32 i = 0; i < size; ++i) {
-		func[i] *= scaling_factor;
-	}
-}
-
-f64 periodic_pot(f64* v, i32 n, c64 u) {
-	f64 temp = 0.0;
-	for (i32 i = 0; i < n; ++i) {
-		temp += cos(v[i])*cos(v[i]);
-	}
-	return temp;
-}
-
-c64 initial_guess(f64* v, i32 n) {
-	return 1.0/10*10;
-}
+// Hamiltonian solving via FDM
 
 describe(fdm_ho) {
 	it ("fdm construction 1D [5x5]") {
@@ -562,6 +469,135 @@ describe(fdm_pb) {
 		sbmf_shutdown();
 	}
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// Solving hamiltonian for Harmonic oscillator basis functions
+
+static i32 row_eigenfunction = 0;
+static i32 col_eigenfunction = 0;
+
+static f64 temp_potential(f64 x) {
+	f64 edge = 3.0;
+	f64 corner_radius = 0.5;
+	if (fabs(x) > edge) {
+		return 20.0;
+	} else if (fabs(fabs(x) - edge) <= corner_radius) {
+		f64 newx = fabs(x) - (edge-corner_radius);
+		return corner_radius - sqrt(corner_radius*corner_radius - newx*newx);
+	} else {
+		return 0;
+	}
+}
+
+static f64 compute_matrix_element(f64 x, void* data) {
+	return (ho_eigenfunction(&row_eigenfunction, &x, 1)) * (temp_potential(x) - ho_potential(&x,1,0)) * (ho_eigenfunction(&col_eigenfunction, &x, 1));
+}
+
+describe(basis_ho) {
+	it("1D"){
+		sbmf_init();
+
+		const i32 states_to_include = 16;
+		const i32 matrix_order = states_to_include*states_to_include;
+
+		c64 data[states_to_include*states_to_include];
+		hermitian_bandmat mat = {
+			.base = {
+				.is_row_major = true,
+				.rows = states_to_include,
+				.cols = states_to_include,
+				.data = data,
+			},
+			.bandcount = states_to_include,
+			.size = states_to_include,
+		};
+
+		integration_settings settings = {
+			.order = 7,
+			.abs_error_tol = 1e-15,
+			.rel_error_tol = 1e-1,
+			.max_evals = 1e4,
+		};
+
+		integration_result res;
+
+		printf("Matrix\n");
+		for (i32 row = 0; row < states_to_include; ++row) {
+			i32 starting_index = (states_to_include-1)*states_to_include + row;
+			for (i32 col = row; col < states_to_include; ++col) {
+				row_eigenfunction = row;
+				col_eigenfunction = col;
+				//																						(0,3) - 3
+				//		(0,0)	(0,1)	(0,2)	(0,3)										(0,2) - 6	(1,3) - 7
+				//		(1,0)	(1,1)	(1,2)	(1,3)		->					(0,1) - 9	(1,2) - 10	(2,3) - 11
+				//		(2,0)	(2,1)	(2,2)	(2,3)				(0,0) - 12	(1,1) - 13	(2,2) - 14	(3,3) - 15
+				//		(3,0)	(3,1)	(3,2)	(3,3)
+				//0.246380 (y)    -0.000000 (y)   -0.290000 (y)   -0.000000 (y)   0.048792 (y)
+				//-0.000000 (y)   0.851617 (y)    0.000000 (n)    -0.410967 (y)   0.000000 (n)
+				//-0.290000 (y)   -0.000000 (n)   1.604115 (y)    0.000000 (y)    -0.521686 (y)
+				//-0.000000 (y)   -0.410967 (y)   0.000000 (y)    2.244450 (y)    0.000000 (n)
+				//0.048792 (y)    0.000000 (n)    -0.521686 (y)   -0.000000 (n)   3.360399 (y)
+
+				//printf("(%d,%d) -- %d\t", row, col, starting_index - (states_to_include-1)*(col-row));
+				res = quadgk(compute_matrix_element, -INFINITY,INFINITY, settings);
+				////if (!res.converged)
+				////	printf("matrix element %d,%d failed to converge!\n", row, col);
+				////assert(res.converged);
+
+				i32 out_index = starting_index - (states_to_include-1)*(col-row);
+				c64* val = &data[out_index];
+				*val = res.integral;
+
+				if (row == col) {
+					*val += ho_eigenvalue(&row, 1);
+				}
+
+				printf("%lf (%s)\t", creal(*val), res.converged ? "y" : "n");
+			}
+			printf("\n");
+		}
+
+		eig_result eig_res = eig_sparse_bandmat(mat, 3, EV_SMALLEST_RE);
+
+		// Plotting
+		{
+			plotstate* state = make_plotstate(800, 600);
+			sample_space sp = make_linspace(1, -5,5, 150);
+			grid g = generate_grid(1, (f64[]){-5}, (f64[]){5}, (i32[]){150});
+			f32 z[sp.pointcount];
+			for (u32 i = 0; i < sp.pointcount; ++i)
+				z[i] = temp_potential(sp.points[i]);
+			push_line_plot(state, &sp, z, "potential", 0);
+
+			for (u32 n = 0; n < eig_res.num_eigenpairs; ++n) {
+				f64 E = eig_res.eigenvalues[n];
+				for (u32 i = 0; i < sp.pointcount; ++i) {
+					z[i] = E;
+				}
+				printf("Eigevector: %d\n", n);
+				for (u32 v = 0; v < eig_res.points_per_eigenvector; ++v) {
+					printf("\t%lf\n", eig_res.eigenvectors[n*eig_res.points_per_eigenvector + v]);
+					for (u32 i = 0; i < sp.pointcount; ++i) {
+						z[i] += eig_res.eigenvectors[n*eig_res.points_per_eigenvector +  v]*ho_eigenfunction(&v, (f64*)&g.points[i], 1);
+					}
+				}
+				char buf[50];
+				sprintf(buf, "numerical %d state\n", n);
+				push_line_plot(state, &sp, z, buf, 0);
+			}
+
+			free_sample_space(&sp);
+			plot_update_until_closed(state);
+			destroy_plotstate(state);
+		}
+
+		sbmf_shutdown();
+	}
+}
+
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// Basic operations
 
 describe(matrix_ops) {
 	// Produced by matlab, (warning COLUMN MAJOR!)

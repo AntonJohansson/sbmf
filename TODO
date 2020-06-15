@@ -1,4 +1,5 @@
 SBMF (Slightly Beyond Mean Field):
+	[ ] SAMPLING WITH PLOT SAMPLE_SPACE YIELDS INCORRECT RESULIT!!!!!!!!!!!!!! ALWAYS USE GRID!!!!!!!!!!!!!1
 	[ ] Unify memory allocation.
 	[ ] Many-body pertrubation theory
 			[ ] How is this different from regular P.T.?

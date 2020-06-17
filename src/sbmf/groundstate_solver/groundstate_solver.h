@@ -35,7 +35,4 @@ struct gss_result {
 
 extern void gss_free_result(gss_result res);
 
-extern gss_result niter_execute(gss_settings settings,
-																gss_potential_func* potential, gss_guess_func* guess);
-extern gss_result item_execute(gss_settings settings,
-																gss_potential_func* potential, gss_guess_func* guess);
+extern gss_result item_execute(gss_settings settings, gss_potential_func* potential, gss_guess_func* guess);

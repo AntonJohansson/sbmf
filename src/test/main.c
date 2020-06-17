@@ -15,8 +15,10 @@
 #define PLOT_SPARSE_1D_HO_FDM 0
 #define PLOT_SPARSE_2D_HO_FDM 0
 
-#define PLOT_SPARSE_1D_PB_FDM 1
+#define PLOT_SPARSE_1D_PB_FDM 0
 #define PLOT_SPARSE_2D_PB_FDM 0
+
+#define PLOT_SPARSE_1D_PB_HOBASIS 1
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // TEST NUMERICAL INTEGRATION VIA QUADGK
@@ -190,8 +192,6 @@ describe(priority_queue) {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-// TEST SOLVING HAMILTONIAN VIA HARMONIC OSC. BASIS FUNCTIONS
-////////////////////////////////////////////////////////////////////////////////////////////////////
 // Hamiltonian solving via FDM
 
 describe(fdm_ho) {
@@ -229,8 +229,6 @@ describe(fdm_ho) {
 		f64 out_eigvals[N];
 		c64 out_eigvecs[N*N];
 		eig_dense_symetric_upper_tridiag_bandmat(fdm, out_eigvals, out_eigvecs);
-		////////////////////////////////////////////////////
-		// Plotting
 
 		sbmf_shutdown();
 	}
@@ -257,38 +255,42 @@ describe(fdm_ho) {
 		// Plotting
 		{
 #if PLOT_SPARSE_1D_HO_FDM
-			plotstate* state = make_plotstate(800, 600);
-			f32 z[fdm.size];
-
+			plot_init(800, 600, "1D HO FDM");
 			sample_space lin = make_linspace(1,-5,5,N);
+			f32 z[lin.pointcount];
 
-			for (u32 i = 0; i < fdm.size; ++i) {
+			FOREACH_POINT_1D(lin, i)
 				z[i] = ho_potential(&g.points[i], 1, 0);
-			}
-			push_line_plot(state, &lin, z, "potential", 0);
+			push_line_plot(&(plot_push_desc){
+					.space = &lin,
+					.data = z,
+					.label = "potential",
+					});
 
 			for (u32 n = 0; n < res.num_eigenpairs; ++n) {
-				for (u32 i = 0; i < fdm.size; ++i) {
-					z[i] = ho_eigenvalue((i32[]){n}, 1) + ho_eigenfunction((i32[]){n}, &g.points[i], 1);
-				}
-				char buf[50];
-				sprintf(buf, "exact %d state", n);
-				push_line_plot(state, &lin, z, buf, 0);
+				FOREACH_POINT_1D(lin, i)
+					z[i] = ho_eigenfunction((i32[]){n}, &g.points[i], 1);
+				push_line_plot(&(plot_push_desc){
+						.space = &lin,
+						.data = z,
+						.label = plot_snprintf("exact %d state", n),
+						.offset = ho_eigenvalue((i32[]){n},1),
+						});
 			}
 
 			for (u32 n = 0; n < res.num_eigenpairs; ++n) {
-				for (u32 i = 0; i < fdm.size; ++i) {
-					z[i] = res.eigenvalues[n] + cabs(res.eigenvectors[n*fdm.size + i]);
-				}
-				char buf[50];
-				sprintf(buf, "numerical %d state", n);
-				push_line_plot(state, &lin, z, buf, 0);
+				FOREACH_POINT_1D(lin, i)
+					z[i] = cabs(res.eigenvectors[n*fdm.size + i]);
+				push_line_plot(&(plot_push_desc){
+						.space = &lin,
+						.data = z,
+						.label = plot_snprintf("numerical %d state", n),
+						.offset = res.eigenvalues[n],
+						});
 			}
 
-
-			plot_update_until_closed(state);
-			free_sample_space(&lin);
-			destroy_plotstate(state);
+			plot_update_until_closed();
+			plot_shutdown();
 #endif
 		}
 
@@ -319,42 +321,45 @@ describe(fdm_ho) {
 		// Plotting
 		{
 #if PLOT_SPARSE_2D_HO_FDM
-			plotstate* state = make_plotstate(800, 600);
-
-			f32 z[fdm.size];
+			plot_init(800, 600, "2D HO FDM");
 			sample_space surf = make_linspace(g.dimensions, -2.5, 2.5, N);
+			f32 z[surf.pointcount];
 
-			for (u32 i = 0; i < fdm.size; ++i) {
+			FOREACH_POINT_1D(surf, i)
 				z[i] = ho_potential(&g.points[g.dimensions*i], g.dimensions, 0.0);
-			}
-			push_surface_plot(state, &surf, z, "potential", 0);
+			push_surface_plot(&(plot_push_desc){
+					.space = &surf,
+					.data = z,
+					.label = "potential",
+					});
 
 			for (u32 n1 = 0; n1 < res.num_eigenpairs; ++n1) {
 				for (u32 n2 = 0; n2 < res.num_eigenpairs; ++n2) {
 					i32 states[] = {n1,n2};
-					for (u32 i = 0; i < fdm.size; ++i) {
+					FOREACH_POINT_1D(surf, i)
 						z[i] =  ho_eigenfunction(states, &g.points[g.dimensions*i], g.dimensions);
-					}
-
-					char buf[50];
-					sprintf(buf, "exact %d,%d state", n1,n2);
-					push_surface_plot(state, &surf, z, buf, ho_eigenvalue(states, g.dimensions));
+					push_surface_plot(&(plot_push_desc){
+							.space = &surf,
+							.data = z,
+							.label = plot_snprintf("exact %d,%d state", n1,n2),
+							.offset = ho_eigenvalue(states, g.dimensions),
+							});
 				}
 			}
 
 			for (u32 n = 0; n < res.num_eigenpairs; ++n) {
-				for (u32 i = 0; i < fdm.size; ++i) {
+				FOREACH_POINT_1D(surf, i)
 					z[i] = 100*creal(res.eigenvectors[n*fdm.size + i]);
-				}
-
-				char buf[50];
-				sprintf(buf, "numerical %d state", n);
-				push_surface_plot(state, &surf, z, buf, res.eigenvalues[n]);
+				push_surface_plot(&(plot_push_desc){
+						.space = &surf,
+						.data = z,
+						.label = plot_snprintf("numerical %d state", n),
+						.offset = res.eigenvalues[n],
+						});
 			}
 
-			plot_update_until_closed(state);
-			free_sample_space(&surf);
-			destroy_plotstate(state);
+			plot_update_until_closed();
+			plot_shutdown();
 #endif
 		}
 
@@ -393,27 +398,32 @@ describe(fdm_pb) {
 		// Plotting
 		{
 #if PLOT_SPARSE_1D_PB_FDM
-			plotstate* state = make_plotstate(800,600);
+			plot_init(800, 600, "1D PB FDM");
 
 			sample_space sp = make_linspace(g.dimensions, -5, 5, N);
-			f32 z[fdm.size];
+			f32 z[sp.pointcount];
 
-			for (u32 i = 0; i < fdm.size; ++i)
+			FOREACH_POINT_1D(sp, i)
 				z[i] = pb_potential(&g.points[g.dimensions*i], g.dimensions);
-			push_line_plot(state, &sp, z, "potential", 0);
+			push_line_plot(&(plot_push_desc){
+						.space = &sp,
+						.data = z,
+						.label = "potential",
+					});
 
 			for (u32 n = 0; n < res.num_eigenpairs; ++n) {
-				for (u32 i = 0; i < res.points_per_eigenvector; ++i) {
-					z[i] = res.eigenvalues[n] + creal(res.eigenvectors[n*res.points_per_eigenvector + i]);
-				}
-				char buf[50];
-				sprintf(buf, "numerical %d state", n);
-				push_line_plot(state, &sp, z, buf, 0);
+				FOREACH_POINT_1D(sp, i)
+					z[i] = creal(res.eigenvectors[n*res.points_per_eigenvector + i]);
+				push_line_plot(&(plot_push_desc){
+						.space = &sp,
+						.data = z,
+						.label = plot_snprintf("numerical %d state", n),
+						.offset = res.eigenvalues[n],
+						});
 			}
-			free_sample_space(&sp);
 
-			plot_update_until_closed(state);
-			destroy_plotstate(state);
+			plot_update_until_closed();
+			plot_shutdown();
 #endif
 		}
 
@@ -442,27 +452,32 @@ describe(fdm_pb) {
 		// Plotting
 		{
 #if PLOT_SPARSE_2D_PB_FDM
-			plotstate* state = make_plotstate(800,600);
+			plot_init(800, 600, "2D PB FDM");
 
 			sample_space sp = make_linspace(g.dimensions, -5, 5, N);
-			f32 z[fdm.size];
+			f32 z[sp.pointcount];
 
-			for (u32 i = 0; i < fdm.size; ++i)
+			FOREACH_POINT_1D(sp, i)
 				z[i] = pb_potential(&g.points[g.dimensions*i], g.dimensions);
-			push_surface_plot(state, &sp, z, "potential", 0);
+			push_surface_plot(&(plot_push_desc){
+					.space = &sp,
+					.data = z,
+					.label = "potential",
+					});
 
 			for (u32 n = 0; n < res.num_eigenpairs; ++n) {
-				for (u32 i = 0; i < res.points_per_eigenvector; ++i) {
+				FOREACH_POINT_1D(sp, i)
 					z[i] = 100*creal(res.eigenvectors[n*res.points_per_eigenvector + i]);
-				}
-				char buf[50];
-				sprintf(buf, "numerical %d state", n);
-				push_surface_plot(state, &sp, z, buf, res.eigenvalues[n]);
+				push_surface_plot(&(plot_push_desc){
+						.space = &sp,
+						.data = z,
+						.label = plot_snprintf("numerical %d state", n),
+						.offset = res.eigenvalues[n],
+						});
 			}
-			free_sample_space(&sp);
 
-			plot_update_until_closed(state);
-			destroy_plotstate(state);
+			plot_update_until_closed();
+			plot_shutdown();
 #endif
 		}
 
@@ -561,34 +576,39 @@ describe(basis_ho) {
 
 		// Plotting
 		{
-			plotstate* state = make_plotstate(800, 600);
+#if PLOT_SPARSE_1D_PB_HOBASIS
+			plot_init(800, 600, "1D PB HOBASIS");
 			sample_space sp = make_linspace(1, -5,5, 150);
 			grid g = generate_grid(1, (f64[]){-5}, (f64[]){5}, (i32[]){150});
 			f32 z[sp.pointcount];
-			for (u32 i = 0; i < sp.pointcount; ++i)
+
+			FOREACH_POINT_1D(sp, i)
 				z[i] = temp_potential(sp.points[i]);
-			push_line_plot(state, &sp, z, "potential", 0);
+			push_line_plot(&(plot_push_desc){
+					.space = &sp,
+					.data = z,
+					.label = "potential",
+					});
 
 			for (u32 n = 0; n < eig_res.num_eigenpairs; ++n) {
-				f64 E = eig_res.eigenvalues[n];
-				for (u32 i = 0; i < sp.pointcount; ++i) {
-					z[i] = E;
-				}
-				printf("Eigevector: %d\n", n);
+				printf("Eigenvector: %d\n", n);
+				memset(z, 0, sp.pointcount*sizeof(f32));
 				for (u32 v = 0; v < eig_res.points_per_eigenvector; ++v) {
 					printf("\t%lf\n", eig_res.eigenvectors[n*eig_res.points_per_eigenvector + v]);
-					for (u32 i = 0; i < sp.pointcount; ++i) {
+					FOREACH_POINT_1D(sp, i)
 						z[i] += eig_res.eigenvectors[n*eig_res.points_per_eigenvector +  v]*ho_eigenfunction(&v, (f64*)&g.points[i], 1);
-					}
 				}
-				char buf[50];
-				sprintf(buf, "numerical %d state\n", n);
-				push_line_plot(state, &sp, z, buf, 0);
+				push_line_plot(&(plot_push_desc){
+					.space = &sp,
+					.data = z,
+					.label = plot_snprintf("numerical %d state", n),
+					.offset = eig_res.eigenvalues[n],
+					});
 			}
 
-			free_sample_space(&sp);
-			plot_update_until_closed(state);
-			destroy_plotstate(state);
+			plot_update_until_closed();
+			plot_shutdown();
+#endif
 		}
 
 		sbmf_shutdown();

@@ -3,30 +3,35 @@
 #include <sbmf/common/common.h>
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
+#define FACTORIAL_MAX_N 20
 
-static u64 factorial(u64 n) {
-	assert(n <= 20); // largest factorial supported by u64
+static u64 factorial(u32 n) {
+	assert(n <= FACTORIAL_MAX_N); // largest factorial supported by u64
 
-	if (n < 1) {
-		return 1;
-	} else {
-		return n*factorial(n-1);
-	}
+	u64 res = 1;
+	while (n > 1)
+		res *= n--;
+
+	return res;
 }
 
 static inline f64 hermite_poly(i32 n, f64 x) {
-	// H_n(z) = (-1)^n * exp(z^2) * (d^n/dz^n) (exp(-z^2))
-	//
-	// Explicit form:
-	// 		H_n(x) = n! sum_(m=0)^(floor(n/2)) (-1)^m/(m!*(n-2m)!) * (2x)^(n-2m)
+	f64 H0 = 1;
+	f64 H1 = 2*x;
 
-	f64 sum = 0.0;
-	i32 upper_bound = n/2;
-	for (i32 m = 0; m <= upper_bound; ++m) {
-		sum += pow(-1,m) / (factorial(m) * factorial(n-2*m)) * pow(2*x, n-2*m);
+	if (n == 0)
+		return H0;
+	if (n == 1)
+		return H1;
+
+	f64 HN = 0.0;
+	for (i32 i = 2; i <= n; ++i) {
+		HN = 2*x*H1 - 2*(i-1)*H0;
+		H0 = H1;
+		H1 = HN;
 	}
 
-	return factorial(n)*sum;
+	return HN;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -34,7 +39,13 @@ static inline f64 hermite_poly(i32 n, f64 x) {
 static inline f64 ho_eigenfunction(i32 states[], f64 point[], i32 dims) {
 	f64 prod = 1.0;
 	for (i32 i = 0; i < dims; ++i) {
-		f64 normalization_factor = 1.0/(pow(M_PI,0.25)*sqrt(pow(2,states[i])*factorial(states[i])));
+		f64 normalization_factor = 0.0;
+		if (states[i] <= FACTORIAL_MAX_N) {
+			normalization_factor = 1.0/(pow(M_PI,0.25)*sqrt(pow(2,states[i])*factorial(states[i])));
+		} else {
+			f64 fac = sqrt(2*M_PI*states[i]) * pow( states[i]/exp(1), states[i]);
+			normalization_factor = 1.0/(pow(M_PI,0.25)*sqrt(pow(2,states[i])*fac));
+		}
 		prod *= normalization_factor*exp(-point[i]*point[i]/2.0) * hermite_poly(states[i], point[i]);
 	}
 	return prod;

@@ -22,10 +22,10 @@ typedef struct profile_data_t {
 extern size_t profile_used_data;
 extern profile_data_t profile_data[PROFILE_MAX_DATA];
 
-extern void profile_begin(char const name[]);
-extern void profile_end(char const name[]);
+void profile_begin(char const name[]);
+void profile_end(char const name[]);
 
-extern void profile_print_results_impl();
+void profile_print_results_impl();
 
 #if PROFILE_ENABLE
 	#define PROFILE_BEGIN(name)\
@@ -37,7 +37,7 @@ extern void profile_print_results_impl();
 	// comma operator. Expressions such as:
 	//
 	// 	int x = PROFILE_FUNC(compute_x())
-	// 
+	//
 	// should therefore be possible.
 	#define PROFILE_FUNC(func_call)\
 		(PROFILE_BEGIN( #func_call ), func_call); PROFILE_END( #func_call )

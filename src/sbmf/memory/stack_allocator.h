@@ -13,12 +13,11 @@
 #define SA_PUSH(sa, type) \
 	(type*)sa_push(sa, sizeof(type))
 
-typedef struct stack_allocator stack_allocator;
-struct stack_allocator {
+typedef struct stack_allocator {
 	u32 top;
 	u32 size;
 	u8* memory;
-};
+} stack_allocator;
 
 static inline stack_allocator* sa_make(u32 size_in_bytes) {
 	void* mem = xmalloc(sizeof(stack_allocator) + size_in_bytes);

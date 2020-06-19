@@ -3,9 +3,7 @@
 #include <sbmf/common/common.h>
 #include <sbmf/common/grid.h>
 
-struct gss_settings;
 typedef struct gss_settings gss_settings;
-struct gss_result;
 typedef struct gss_result gss_result;
 
 typedef f64 gss_potential_func(f64* v, i32 n, c64 u);
@@ -33,6 +31,5 @@ struct gss_result {
 	i32 iterations;
 };
 
-extern void gss_free_result(gss_result res);
-
-extern gss_result item_execute(gss_settings settings, gss_potential_func* potential, gss_guess_func* guess);
+void gss_free_result(gss_result res);
+gss_result item_execute(gss_settings settings, gss_potential_func* potential, gss_guess_func* guess);

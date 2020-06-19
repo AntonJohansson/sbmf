@@ -1,5 +1,5 @@
 #include "quadgk.h"
-#include "prioqueue.h"
+#include <sbmf/common/prioqueue.h>
 #include <string.h> // memcpy
 #include <stdio.h> // printf
 #include <math.h> // INFINITY and isinf

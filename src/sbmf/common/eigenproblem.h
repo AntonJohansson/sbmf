@@ -12,12 +12,12 @@ typedef enum {
 	EV_SMALLEST_IM		= 5
 } which_eigenpairs;
 
-typedef struct {
+typedef struct eig_result {
 	c64* eigenvalues;
 	c64* eigenvectors;
 	u32 num_eigenpairs;
 	u32 points_per_eigenvector;
 } eig_result;
 
-extern void eig_dense_symetric_upper_tridiag_bandmat(hermitian_bandmat bm, f64* out_eigvals, c64* out_eigvecs);
-extern eig_result eig_sparse_bandmat(hermitian_bandmat bm, u32 num_eigenvalues, which_eigenpairs which_pairs);
+void eig_dense_symetric_upper_tridiag_bandmat(hermitian_bandmat bm, f64* out_eigvals, c64* out_eigvecs);
+eig_result eig_sparse_bandmat(hermitian_bandmat bm, u32 num_eigenvalues, which_eigenpairs which_pairs);

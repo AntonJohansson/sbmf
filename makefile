@@ -9,8 +9,8 @@ PROJ_SRCS = \
 	src/sbmf/common/matrix.c \
 	src/sbmf/common/log.c \
 	src/sbmf/common/common.c \
-	src/sbmf/quadgk.c
-TEST_SRCS = $(shell find src/test -name "*.c")
+	src/sbmf/numerical_integration/quadgk.c
+TEST_SRCS = src/test/main.c
 
 PROJ_LIBS = -lfftw3 -llapacke -larpack -lm
 TEST_LIBS = -l$(PROJECT) -lm -larpack -lcblas -L. -L/home/aj/.local/lib -lplot -I/home/aj/.local/include

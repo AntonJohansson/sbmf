@@ -1,8 +1,8 @@
-#include "common/common.h"
+#include <sbmf/common/common.h>
 
 typedef f64 integrand(f64, void*);
 
-typedef struct {
+typedef struct integration_settings {
 	// Order of the Gauss-Kronod method used.
 	// This setting is currently ignored.
 	i32 order;
@@ -18,11 +18,11 @@ typedef struct {
 	void* userdata;
 } integration_settings;
 
-typedef struct {
+typedef struct integration_result {
 	f64 integral;
 	f64 error;
 	i32 performed_evals;
 	bool converged;
 } integration_result;
 
-extern integration_result quadgk(integrand* f, f64 start, f64 end, integration_settings settings);
+integration_result quadgk(integrand* f, f64 start, f64 end, integration_settings settings);

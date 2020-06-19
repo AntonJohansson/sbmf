@@ -1,6 +1,6 @@
 #pragma once
 
-#include <complex.h> 
+#include <complex.h>
 #include <float.h>
 #include <stdint.h>
 #include <math.h>
@@ -25,11 +25,11 @@ typedef double complex 	c64;
 
 struct stack_allocator;
 
-typedef struct {
+typedef struct sbmf_state {
 	struct stack_allocator* main_stack;
 } sbmf_state;
 
 extern sbmf_state _sbmf;
 
-extern void sbmf_init();
-extern void sbmf_shutdown();
+void sbmf_init();
+void sbmf_shutdown();

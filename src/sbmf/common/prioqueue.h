@@ -1,6 +1,6 @@
 #pragma once
 
-#include "common/common.h"
+#include "common.h"
 #include <stdlib.h>
 //#include <assert.h>
 #include <stdbool.h>
@@ -103,4 +103,3 @@ static inline bool prioqueue_pop(prioqueue* pq) {
 
 	return false;
 }
-

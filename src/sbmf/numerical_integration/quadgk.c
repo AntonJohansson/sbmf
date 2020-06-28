@@ -162,7 +162,7 @@ static inline f64 integrand_start_endpoint_inf(f64 t, void* data) {
 	// NOTE: when integrating -inf -> b, switch to b -> -inf and then apply
 	// transformation to get 0->1
 	f64 one_minus_t = (1.0 - t);
-	return tdata->original_f(tdata->original_start - t/one_minus_t, tdata->userdata) * (-1.0/(one_minus_t*one_minus_t));
+	return tdata->original_f(tdata->original_end - t/one_minus_t, tdata->userdata) * (-1.0/(one_minus_t*one_minus_t));
 }
 
 static inline integration_result hadapt(integrand* f, f64 start, f64 end, integration_settings settings) {
@@ -217,9 +217,21 @@ static inline integration_result hadapt(integrand* f, f64 start, f64 end, integr
 }
 
 integration_result quadgk(integrand* f, f64 start, f64 end, integration_settings settings) {
+	// Make sure the endpoints are ordered start < end
+	f64 output_factor = 1.0;
+	if (start > end) {
+		f64 temp = start;
+		start = end;
+		end = temp;
+		output_factor = -1.0;
+	}
+
 	// Check for infinities in integration interval
 	i32 start_isinf = isinf(start);
 	i32 end_isinf = isinf(end);
+
+	integration_result res;
+
 	if (start_isinf || end_isinf) {
 		coordinate_transform_data tdata = {
 			.original_f = f,
@@ -231,15 +243,16 @@ integration_result quadgk(integrand* f, f64 start, f64 end, integration_settings
 		settings.userdata = &tdata;
 
 		if (start_isinf && end_isinf) {
-			return hadapt(integrand_both_endpoints_inf, copysign(-1, start), copysign(1, end), settings);
+			res = hadapt(integrand_both_endpoints_inf, -1, 1, settings);
 		} else if (end_isinf) {
-			// endpoint infinity
-			return hadapt(integrand_end_endpoint_inf, 0, copysign(1, end), settings);
-		} else /*if (start_isinf) */ {
-			// startoint infinity
-			return hadapt(integrand_start_endpoint_inf, 0, copysign(1, end), settings);
+			res = hadapt(integrand_end_endpoint_inf, 0, 1, settings);
+		} else if (start_isinf) {
+			res = hadapt(integrand_start_endpoint_inf, 1, 0, settings);
 		}
 	} else {
-		return hadapt(f, start, end, settings);
+		res = hadapt(f, start, end, settings);
 	}
+
+	res.integral = output_factor*res.integral;
+	return res;
 }

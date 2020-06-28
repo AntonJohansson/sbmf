@@ -23,6 +23,11 @@ typedef double 		f64;
 typedef float complex 	c32;
 typedef double complex 	c64;
 
+#include <stdio.h>
+static inline bool float_compare(f64 a, f64 b, f64 epsilon) {
+	return (fabs(a-b) <= epsilon);
+}
+
 struct stack_allocator;
 
 typedef struct sbmf_state {

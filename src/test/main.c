@@ -10,15 +10,14 @@
 
 #include <plot/plot.h>
 
-#define PLOT_SPARSE_1D_HO_FDM 		0
-#define PLOT_SPARSE_2D_HO_FDM 		0
-#define PLOT_SPARSE_1D_PB_FDM 		0
-#define PLOT_SPARSE_2D_PB_FDM 		0
-#define PLOT_SPARSE_1D_PB_HOBASIS 	1
+//#define PLOT_SPARSE_1D_HO_FDM 		0
+//#define PLOT_SPARSE_2D_HO_FDM 		0
+//#define PLOT_SPARSE_1D_PB_FDM 		0
+//#define PLOT_SPARSE_2D_PB_FDM 		0
+//#define PLOT_SPARSE_1D_PB_HOBASIS 	0
 
-#include "basic.c"
 #include "integration.c"
-#include "fdm_solving.c"
-#include "ho_basis_func.c"
+//#include "fdm_solving.c"
+//#include "ho_basis_func.c"
 
 snow_main();

@@ -13,7 +13,7 @@ PROJ_SRCS = \
 TEST_SRCS = src/test/main.c
 
 PROJ_LIBS = -lfftw3 -llapacke -larpack -lm
-TEST_LIBS = -l$(PROJECT) -lm -larpack -lcblas -L. -L/home/aj/.local/lib -lplot -I/home/aj/.local/include
+TEST_LIBS = -l$(PROJECT) -lm -larpack -lcblas -lcimgui -L. -L/home/aj/.local/lib -lplot -I/home/aj/.local/include
 #PROJ_FLAGS = -fsanitize=address -fsanitize=leak -g -fpic -Wall -Werror -Isrc
 #TEST_FLAGS = -fsanitize=address -fsanitize=leak -g -Wall -Werror -Isrc -Isrc/test/plotting/third_party
 PROJ_FLAGS = -g -fpic -Wall -Werror -Isrc

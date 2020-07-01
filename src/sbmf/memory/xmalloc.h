@@ -1,6 +1,6 @@
 #pragma once
 
-#include <sbmf/common/log.h>
+#include <sbmf/debug/log.h>
 #include <sbmf/common/common.h>
 
 #include <stdlib.h>

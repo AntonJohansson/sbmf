@@ -7,7 +7,7 @@ PROJ_SRCS = \
 	src/sbmf/common/profile.c \
 	src/sbmf/common/eigenproblem.c \
 	src/sbmf/common/matrix.c \
-	src/sbmf/common/log.c \
+	src/sbmf/debug/log.c \
 	src/sbmf/common/common.c \
 	src/sbmf/numerical_integration/quadgk.c
 TEST_SRCS = src/test/main.c

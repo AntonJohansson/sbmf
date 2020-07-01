@@ -1,10 +1,7 @@
 #pragma once
 
 #include <sbmf/common/common.h>
-//#include <sbmf/memory/memory.h>
 #include <sbmf/memory/xmalloc.h>
-#include <sbmf/common/log.h>
-
 
 #ifndef SA_PRINT_DEBUG_INFO
 #define SA_PRINT_DEBUG_INFO 0

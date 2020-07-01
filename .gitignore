@@ -3,3 +3,4 @@ vgcore.*
 a.out
 *.so
 ./test
+*.log

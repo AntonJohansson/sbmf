@@ -23,10 +23,14 @@ typedef double 		f64;
 typedef float complex 	c32;
 typedef double complex 	c64;
 
-#include <stdio.h>
-static inline bool float_compare(f64 a, f64 b, f64 epsilon) {
+static inline bool f64_compare(f64 a, f64 b, f64 epsilon) {
 	return (fabs(a-b) <= epsilon);
 }
+
+static inline bool f64_is_valid(f64 f) {
+	return !isinf(f) && !isnan(f);
+}
+
 
 struct stack_allocator;
 

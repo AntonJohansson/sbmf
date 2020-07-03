@@ -47,3 +47,13 @@ void mat_transpose_raw(mat_scalar_t* ans, mat_scalar_t* in, mat_size_t rows, mat
 void mat_transpose(mat* ans_mat, mat m);
 
 hermitian_bandmat construct_finite_diff_mat(u32 samples_per_dimension, u32 dimensions, f64* deltas);
+
+static inline bool mat_is_valid(mat m) {
+	for (mat_size_t i = 0; i < m.rows*m.cols; ++i) {
+		if (!f64_is_valid(m.data[i]))
+			return false;
+	}
+	return true;
+}
+
+void mat_print(mat m, const char* label);

@@ -1,8 +1,12 @@
 #include "matrix.h"
-#include <string.h> // memcpy, memset
 #include <cblas.h>
+
 #include <sbmf/memory/stack_allocator.h>
+#include <sbmf/debug/log.h>
+
 #include <assert.h>
+#include <string.h> // memcpy, memset
+#include <stdio.h> // sprintf
 
 mat mat_new(mat_size_t rows, mat_size_t cols) {
 	return (mat){
@@ -102,4 +106,16 @@ hermitian_bandmat construct_finite_diff_mat(u32 samples_per_dimension, u32 dimen
 	}
 
 	return m;
+}
+
+void mat_print(mat m, const char* label) {
+	log_info("matrix %s", label);
+	char buf[1024];
+	for (mat_size_t r = 0; r < m.rows; ++r) {
+		i32 offset = 0;
+		for (mat_size_t c = 0; c < m.cols; ++c) {
+			offset += sprintf(&buf[offset], "%.1lf+%.1lfi\t", creal(m.data[r*m.cols + c]), cimag(m.data[r*m.cols + c]));
+		}
+		log_info("%s", buf);
+	}
 }

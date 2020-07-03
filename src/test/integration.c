@@ -8,7 +8,7 @@ f64 expnabsx(f64 x, void* p) {return exp(-fabs(x));}
 f64 sinx(f64 x, void* p) {return sin(x);}
 
 static void check_quadgk_converge(integration_result res, f64 expected) {
-	bool correct_ans = float_compare(res.integral, expected, 1e-9);
+	bool correct_ans = f64_compare(res.integral, expected, 1e-9);
 	if (!res.converged || !correct_ans) {
 		printf("Integral failed to converge or got wrong answer:\n\tconverged: %d\n\tintegral: %lf\n\terror: %lf\n\texpected: %lf\n", res.converged, res.integral, res.error, expected);
 	}

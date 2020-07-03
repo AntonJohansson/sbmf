@@ -17,6 +17,7 @@
 //#define PLOT_SPARSE_1D_PB_HOBASIS 	0
 
 #include "integration.c"
+#include "particle_in_a_box.c"
 //#include "fdm_solving.c"
 //#include "ho_basis_func.c"
 

@@ -8,9 +8,9 @@
 #include <assert.h>
 #include <stdlib.h> // malloc
 #include <string.h> // memcpy, memset
-#include <stdio.h> // printf
 
 #include <sbmf/memory/stack_allocator.h>
+#include <sbmf/debug/log.h>
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -63,11 +63,23 @@ eig_result eig_sparse_bandmat(hermitian_bandmat bm, u32 num_eigenvalues, which_e
 	i32 ido = 0;
 	i32 n = bm.size;
 	const char* which = which_eigenpairs_to_arpack_string(which_pairs);
+
 	i32 nev = num_eigenvalues; // number of eigenvalues to find
+	if (2 + nev > n) {
+		log_error("eig_sparse_bandmat(...) failed:");
+		log_error("\t the number of requested eigenvalues nev=%d and the matrix N=%d size must satisfy:", nev, n);
+		log_error("\t\t 2 + nev <= N");
+		return (eig_result){};
+	}
+
 	f64 tol = 0.0; // relative error tolerance to achieve.
 	c64 resid[n]; // residual vectors
 
-	i32 ncv = nev + 2;
+	// Needs to satisfy
+	// 		2+nev <= ncv <= n
+	i32 ncv = (2+nev+n)/2;
+	log_info("n: %d, ncv: %d, nev: %d", n, ncv, nev);
+
 	c64* v = (c64*)sa_push(_sbmf.main_stack, sizeof(c64)*n*ncv);
 	i32 iparam[11] = {
 		[0] = 1, 		// Exact shift is used
@@ -106,7 +118,7 @@ eig_result eig_sparse_bandmat(hermitian_bandmat bm, u32 num_eigenvalues, which_e
 				workd, workl, lworkl, rwork, &info);
 
 		if (info != 0) {
-			printf("arpack znaupd error: %d (%s)\n", info, arpack_znaupd_error_code_to_string(info));
+			log_error("arpack znaupd(...) error: (%d) %s", info, arpack_znaupd_error_code_to_string(info));
 			break;
 		}
 
@@ -127,27 +139,27 @@ eig_result eig_sparse_bandmat(hermitian_bandmat bm, u32 num_eigenvalues, which_e
 				"I", n, which, nev, tol, resid, ncv, v, n, iparam, ipntr, workd, workl, lworkl, rwork, &info);
 
 		if (info != 0) {
-			printf("arpack zneupd error: %d (%s)\n", info, arpack_zneupd_error_code_to_string(info));
+			log_error("arpack zneupd(...) error: (%d) %s", info, arpack_zneupd_error_code_to_string(info));
 		} else {
 			// Print info
 			i32 nconv = iparam[4];
-			printf("\nConvergence info:\n");
-			printf("\t Matrix size: %d\n", n);
-			printf("\t Number of requested eigenvalues: %d\n", nev);
-			printf("\t Number of generated Arnoldi vectors: %d\n", n);
-			printf("\t Number of converged Ritz values: %d\n", nconv);
-			printf("\t Sought eigenvalues: %s\n", which);
-			printf("\t Number of iterations: %d\n", iparam[2]);
-			printf("\t Number of OP*x: %d\n", iparam[8]);
-			printf("\t Convergence tolerance: %lf\n", tol);
+			log_info("arpack znaupd(...) convergence info:");
+			log_info("\t Matrix size: %d", n);
+			log_info("\t Number of requested eigenvalues: %d", nev);
+			log_info("\t Number of generated Arnoldi vectors: %d", n);
+			log_info("\t Number of converged Ritz values: %d", nconv);
+			log_info("\t Sought eigenvalues: %s", which);
+			log_info("\t Number of iterations: %d", iparam[2]);
+			log_info("\t Number of OP*x: %d", iparam[8]);
+			log_info("\t Convergence tolerance: %lf", tol);
 
-			printf("\nEigenvalue -- Residual\n");
+			log_info("\t Eigenvalue residuals:");
 			for (i32 i = 0; i < nconv; ++i) {
 				c64 ax[n];
 				complex_hermitian_bandmat_mulv(ax, input_mat, &z[i*n]);
 				c64 neg_eigenvalue = -d[i];
 				cblas_zaxpy(n, &neg_eigenvalue, &z[i*n], 1, ax, 1);
-				printf("\t %lf + %lfi -- %e\n", creal(d[i]), cimag(d[i]), cblas_dznrm2(n, ax, 1));
+				log_info("\t\t %lf + %lfi -- %e", creal(d[i]), cimag(d[i]), cblas_dznrm2(n, ax, 1));
 			}
 
 			eig_result res = {

@@ -59,6 +59,7 @@ void log_close_file() {
 		dump_buffer();
 
 	fclose(_log_state.fd);
+	_log_state.fd = 0;
 }
 
 static void log_impl(enum log_level level, const char* fmt, va_list args) {
@@ -89,7 +90,9 @@ static void log_impl(enum log_level level, const char* fmt, va_list args) {
 
 	u32 level_str_len = strlen(level_str);
 	strncpy(&_log_state.buffer[i][0], level_str, level_str_len);
+
 	vsnprintf(&_log_state.buffer[i][level_str_len], MAX_LOG_LEN-level_str_len, fmt, args);
+	//_log_state.buffer[i][bytes] = 0;
 
 	if (_log_state.current_log_level <= level) {
 		printf("%s\n", &_log_state.buffer[i][0]);

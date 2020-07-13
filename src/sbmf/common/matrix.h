@@ -6,7 +6,7 @@
 // the region in data
 
 typedef c64 mat_scalar_t;
-typedef u16 mat_size_t;
+typedef u32 mat_size_t;
 
 typedef struct mat {
 	bool is_row_major;

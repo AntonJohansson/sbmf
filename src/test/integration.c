@@ -18,7 +18,7 @@ static void check_quadgk_converge(integration_result res, f64 expected) {
 
 describe (quad_gk_numerical_integration){
 	integration_settings settings = {
-		.order = 7,
+		.gk = gk7,
 		.abs_error_tol = 1e-10,
 		.rel_error_tol = 1e-10,
 		.max_evals = 500,

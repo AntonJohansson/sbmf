@@ -43,11 +43,23 @@ f64 potential_well(f64 x, f64 L) {
 		return 10.0;
 }
 
+f64 potential_well_smooth(f64 x, f64 L) {
+	return 100*pow(x/(L/2.0), 32);
+}
+
 static inline f64 pob_integrand(f64 x, void* data) {
 	u32* params = data;
 	return
 		ho_eigenfunction((i32[]){params[0]}, &x, 1) *
 		potential_well(x, 1.0) *
+		ho_eigenfunction((i32[]){params[1]}, &x, 1);
+}
+
+static inline f64 pob_integrand_smooth(f64 x, void* data) {
+	u32* params = data;
+	return
+		ho_eigenfunction((i32[]){params[0]}, &x, 1) *
+		potential_well_smooth(x, 1.0) *
 		ho_eigenfunction((i32[]){params[1]}, &x, 1);
 }
 
@@ -122,7 +134,7 @@ describe(particle_in_a_box_1D) {
 
 		u32 params[2];
 		integration_settings settings = {
-			.order = 7,
+			.gk = gk7,
 			.abs_error_tol = 1e-10,
 			.rel_error_tol = 1e-10,
 			.max_evals = 1e4,
@@ -153,11 +165,20 @@ describe(particle_in_a_box_1D) {
 	}
 
 	it ("HO basis hamiltonian -- pob") {
-		hermitian_bandmat T = construct_ho_kinetic_matrix(max_n+2);
+		// Check results
+		//for (u32 n = 0; n < res.num_eigenpairs; ++n) {
+		//	c64_normalize(&res.eigenvectors[n*res.points_per_eigenvector], res.points_per_eigenvector);
+		//	for (u32 i = 0; i < res.points_per_eigenvector; ++i) {
+		//		f64 diff = cabs(res.eigenvectors[n*res.points_per_eigenvector + i]) - fabs(exact_pob_func[n][i]);
+		//		asserteq(fabs(diff) < 0.05, true);
+		//	}
+		//}
+
+		hermitian_bandmat T = construct_ho_kinetic_matrix(max_n + 250);
 
 		u32 params[2];
 		integration_settings settings = {
-			.order = 7,
+			.gk = gk7,
 			.abs_error_tol = 1e-10,
 			.rel_error_tol = 1e-10,
 			.max_evals = 1e4,
@@ -181,13 +202,45 @@ describe(particle_in_a_box_1D) {
 		// Solve eigenvalue problem for hamiltonian
 		eig_result res = eig_sparse_bandmat(T, max_n, EV_SMALLEST_RE);
 
-		// Check results
-		for (u32 n = 0; n < res.num_eigenpairs; ++n) {
-			c64_normalize(&res.eigenvectors[n*res.points_per_eigenvector], res.points_per_eigenvector);
-			for (u32 i = 0; i < res.points_per_eigenvector; ++i) {
-				f64 diff = cabs(res.eigenvectors[n*res.points_per_eigenvector + i]) - fabs(exact_pob_func[n][i]);
-				asserteq(fabs(diff) < 0.05, true);
+		{
+			plot_init(800, 600, "HO - pob");
+			f32 pdata[sample_points];
+			c64 cdata[sample_points];
+			sample_space sp = make_linspace(1, -L/2.0, L/2.0, sample_points);
+
+			for (u32 i = 0; i < sample_points; ++i) {
+				pdata[i] = potential_well_smooth(sp.points[i], L);
 			}
+			push_line_plot(&(plot_push_desc){
+					.space = &sp,
+					.data = pdata,
+					.label = "potential",
+					});
+
+			for (u32 i = 0; i < res.num_eigenpairs; ++i) {
+				memset(cdata, 0, sizeof(cdata));
+				for (u32 j = 0; j < res.points_per_eigenvector; ++j) {
+					c64 coeff = res.eigenvectors[i*res.num_eigenpairs + j];
+
+					// Get the j:th basis function
+					for (u32 k = 0; k < sp.pointcount; ++k) {
+						f64 x = sp.points[k];
+						cdata[k] += coeff*ho_eigenfunction((i32[]){j}, &x, 1);
+					}
+				}
+
+				for (u32 j = 0; j < sp.pointcount; ++j) {
+					pdata[j] = 100*cabs(cdata[j])*cabs(cdata[j]);
+				}
+
+				push_line_plot(&(plot_push_desc){
+						.space = &sp,
+						.data = pdata,
+						.label = plot_snprintf("numerical %d", i),
+						});
+			}
+			plot_update_until_closed();
+			plot_shutdown();
 		}
 	}
 }

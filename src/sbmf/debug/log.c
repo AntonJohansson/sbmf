@@ -21,15 +21,8 @@ static struct {
 };
 
 static void dump_buffer() {
-	u32 res = 0;
 	for (u32 i = 0; i < _log_state.current_log_entry; ++i) {
-		res = fwrite(&_log_state.buffer[i][0], 1, MAX_LOG_LEN, _log_state.fd);
-		fprintf(_log_state.fd, "\n");
-
-		if (!res) {
-			log_error("Unable to dump log buffer to file!");
-			break;
-		}
+		fprintf(_log_state.fd, "%s\n", &_log_state.buffer[i][0]);
 	}
 	_log_state.current_log_entry = 0;
 }
@@ -63,14 +56,18 @@ void log_close_file() {
 }
 
 static void log_impl(enum log_level level, const char* fmt, va_list args) {
-	if (_log_state.current_log_entry >= LOG_BUFFER_LEN) {
-		dump_buffer();
+	if (_log_state.fd != 0) {
+		if (_log_state.current_log_entry >= LOG_BUFFER_LEN) {
+			dump_buffer();
+		}
+	} else {
+		_log_state.current_log_entry = 0;
 	}
 
 	u32 i = _log_state.current_log_entry;
-	static const char* info_str 	= "\033[1;34m[info   ]\033[0m ";
+	static const char* info_str 	= "\033[1;34m[info]\033[0m ";
 	static const char* warning_str 	= "\033[1;33m[warning]\033[0m ";
-	static const char* error_str 	= "\033[1;31m[error  ]\033[0m ";
+	static const char* error_str 	= "\033[1;31m[error]\033[0m ";
 	static const char* unknown_str 	= "\033[1;31m[unknown]\033[0m ";
 
 	const char* level_str = 0;

@@ -17,38 +17,37 @@ static u64 factorial(u32 n) {
 	return res;
 }
 
-static inline f64 hermite_poly(i32 n, f64 x) {
-	f64 H0 = 1;
-	f64 H1 = 2*x;
-
-	if (n == 0)
-		return H0;
-	if (n == 1)
-		return H1;
-
-	f64 HN = 0.0;
-	for (i32 i = 2; i <= n; ++i) {
-		HN = 2*x*H1 - 2*(i-1)*H0;
-		H0 = H1;
-		H1 = HN;
-	}
-
-	return HN;
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 static inline f64 ho_eigenfunction(i32 states[], f64 point[], i32 dims) {
 	f64 prod = 1.0;
+	static const f64 pi_factor = 1.0/pow(M_PI,0.25);
 	for (i32 i = 0; i < dims; ++i) {
-		f64 normalization_factor = 0.0;
-		if (states[i] <= FACTORIAL_MAX_N) {
-			normalization_factor = 1.0/(pow(M_PI,0.25)*sqrt(pow(2,states[i])*factorial(states[i])));
-		} else {
-			f64 fac = sqrt(2*M_PI*states[i]) * pow( states[i]/exp(1), states[i]);
-			normalization_factor = 1.0/(pow(M_PI,0.25)*sqrt(pow(2,states[i])*fac));
+		i32 n = states[i];
+		f64 x = point[i];
+
+		f64 factorial_value = (n <= FACTORIAL_MAX_N) ? factorial(n) : sqrt(M_2_PI*n) * pow(n/exp(1), n);
+		f64 normalization_factor = exp(-x*x/2.0) * pi_factor / sqrt(pow(2,n) * factorial_value);
+
+		{
+			f64 H0 = normalization_factor*1;
+			f64 H1 = normalization_factor*2*x;
+			f64 HN = 0.0;
+
+			if (n == 0) {
+				HN = H0;
+			} else if (n == 1) {
+				HN = H1;
+			} else {
+				for (i32 i = 2; i <= n; ++i) {
+					HN = 2*x*H1 - 2*(i-1)*H0;
+					H0 = H1;
+					H1 = HN;
+				}
+			}
+
+			prod *= HN;
 		}
-		prod *= normalization_factor*exp(-point[i]*point[i]/2.0) * hermite_poly(states[i], point[i]);
 	}
 	return prod;
 }

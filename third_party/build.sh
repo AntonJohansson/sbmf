@@ -5,20 +5,20 @@ basedir=$(pwd)
 
 cd src
 
-# Build fftw
-#tar xvzf $basedir/tars/fftw-3.3.8.tar.gz
-#cd fftw-3.3.8
-#./configure --prefix=$basedir
-#make
-#make install
-#cd ..
-#
-## Build BLAS CBLAS LAPACK LAPACKE
-#git clone https://github.com/xianyi/openblas
-#cd openblas
-#make -j4
-#make install PREFIX=$basedir
-#cd ..
+ Build fftw
+tar xvzf $basedir/tars/fftw-3.3.8.tar.gz
+cd fftw-3.3.8
+./configure --prefix=$basedir
+make
+make install
+cd ..
+
+# Build BLAS CBLAS LAPACK LAPACKE
+git clone https://github.com/xianyi/openblas
+cd openblas
+make -j4
+make install PREFIX=$basedir
+cd ..
 
 # Build arpack
 git clone https://github.com/opencollab/arpack-ng

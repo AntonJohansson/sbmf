@@ -2,9 +2,9 @@ tags
 vgcore.*
 build
 *.log
-third_party/include
-third_party/lib
-third_party/bin
-third_party/share
-third_party/src
+third_party/include/*
+third_party/lib/*
+third_party/bin/*
+third_party/share/*
+third_party/src/*
 third_party/buildlog

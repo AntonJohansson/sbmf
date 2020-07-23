@@ -130,7 +130,7 @@ eig_result eig_sparse_bandmat(hermitian_bandmat bm, u32 num_eigenvalues, which_e
 	// Convergence or error
 	if (info == 0) {
 		i32 select[n]; // not used
-		c64* d = (c64*)sa_push(_sbmf.main_stack, sizeof(c64)*(nev+1));
+		c64* d = (c64*)sa_push(_sbmf.main_stack, sizeof(c64)*nev);
 		c64* z = (c64*)sa_push(_sbmf.main_stack, sizeof(c64)*n*nev);
 		c64 sigma = 0; // not used
 		c64* workev = (c64*)sa_push(_sbmf.main_stack, sizeof(c64)*2*n);
@@ -168,7 +168,7 @@ eig_result eig_sparse_bandmat(hermitian_bandmat bm, u32 num_eigenvalues, which_e
 				.num_eigenpairs = nev,
 				.points_per_eigenvector = bm.size,
 			};
-			memcpy(res.eigenvalues, d, sizeof(c64)*(nev));
+			memcpy(res.eigenvalues, d, sizeof(c64)*nev);
 			memcpy(res.eigenvectors, z, sizeof(c64)*n*nev);
 			return res;
 		}

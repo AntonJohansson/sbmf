@@ -4,6 +4,9 @@
 #include <sbmf/basis/harmonic_oscillator.h>
 #include <plot/plot.h>
 
+#define PLOT_HO_POB 1
+#define PLOT_HO_HO_PERT 0
+
 void f64_normalize(f64* data, u32 size) {
 	f64 sum = 0.0;
 	for (u32 i = 0; i < size; ++i) {
@@ -44,7 +47,10 @@ f64 potential_well(f64 x, f64 L) {
 }
 
 f64 potential_well_smooth(f64 x, f64 L) {
-	return 100*pow(x/(L/2.0), 32);
+	if (fabs(x) < L/2.0)
+		return 10.0*pow(x/(L/2.0), 32);
+	else
+		return 10.0;
 }
 
 static inline f64 pob_integrand(f64 x, void* data) {
@@ -68,6 +74,22 @@ static inline f64 ho_integrand(f64 x, void* data) {
 	return
 		ho_eigenfunction((i32[]){params[0]}, &x, 1) *
 		ho_potential(&x,1,0)*
+		ho_eigenfunction((i32[]){params[1]}, &x, 1);
+}
+
+static inline f64 gaussian(f64 x, f64 mu, f64 sigma) {
+	return 1.0/(sigma*sqrt(M_2_PI)) * exp(-x*x/(2*sigma*sigma));
+}
+
+static inline f64 ho_perturbed_potential(f64* x, i32 n, void* data) {
+	return ho_potential(x,1,0) + gaussian(*x,0,0.2);
+}
+
+static inline f64 ho_perturbed_integrand(f64 x, void* data) {
+	u32* params = data;
+	return
+		ho_eigenfunction((i32[]){params[0]}, &x, 1) *
+		ho_perturbed_potential(&x,1,0) *
 		ho_eigenfunction((i32[]){params[1]}, &x, 1);
 }
 
@@ -165,16 +187,7 @@ describe(particle_in_a_box_1D) {
 	}
 
 	it ("HO basis hamiltonian -- pob") {
-		// Check results
-		//for (u32 n = 0; n < res.num_eigenpairs; ++n) {
-		//	c64_normalize(&res.eigenvectors[n*res.points_per_eigenvector], res.points_per_eigenvector);
-		//	for (u32 i = 0; i < res.points_per_eigenvector; ++i) {
-		//		f64 diff = cabs(res.eigenvectors[n*res.points_per_eigenvector + i]) - fabs(exact_pob_func[n][i]);
-		//		asserteq(fabs(diff) < 0.05, true);
-		//	}
-		//}
-
-		hermitian_bandmat T = construct_ho_kinetic_matrix(max_n + 250);
+		hermitian_bandmat T = construct_ho_kinetic_matrix(max_n + 64);
 
 		u32 params[2];
 		integration_settings settings = {
@@ -189,7 +202,13 @@ describe(particle_in_a_box_1D) {
 			for (u32 c = r; c < T.size; ++c) {
 				params[0] = r;
 				params[1] = c;
-				integration_result res = quadgk(pob_integrand, -INFINITY, INFINITY, settings);
+				integration_result res = quadgk(pob_integrand_smooth, -INFINITY, INFINITY, settings);
+				if (!res.converged) {
+					log_info("r: %d, c: %d", r, c);
+					log_info("Error: %lf", res.error);
+					log_info("Integral: %lf", res.integral);
+					log_info("iterations: %d", res.performed_evals);
+				}
 				asserteq(res.converged, true);
 
 				u32 i = (T.size-1)*(T.size-(c-r)) + r;
@@ -202,6 +221,7 @@ describe(particle_in_a_box_1D) {
 		// Solve eigenvalue problem for hamiltonian
 		eig_result res = eig_sparse_bandmat(T, max_n, EV_SMALLEST_RE);
 
+#if PLOT_HO_POB
 		{
 			plot_init(800, 600, "HO - pob");
 			f32 pdata[sample_points];
@@ -220,7 +240,7 @@ describe(particle_in_a_box_1D) {
 			for (u32 i = 0; i < res.num_eigenpairs; ++i) {
 				memset(cdata, 0, sizeof(cdata));
 				for (u32 j = 0; j < res.points_per_eigenvector; ++j) {
-					c64 coeff = res.eigenvectors[i*res.num_eigenpairs + j];
+					c64 coeff = res.eigenvectors[i*res.points_per_eigenvector + j];
 
 					// Get the j:th basis function
 					for (u32 k = 0; k < sp.pointcount; ++k) {
@@ -229,18 +249,98 @@ describe(particle_in_a_box_1D) {
 					}
 				}
 
+				c64_normalize(cdata, sp.pointcount);
+
 				for (u32 j = 0; j < sp.pointcount; ++j) {
-					pdata[j] = 100*cabs(cdata[j])*cabs(cdata[j]);
+					pdata[j] = cabs(cdata[j])*cabs(cdata[j]);
 				}
 
 				push_line_plot(&(plot_push_desc){
 						.space = &sp,
 						.data = pdata,
 						.label = plot_snprintf("numerical %d", i),
+						.offset = cabs(res.eigenvalues[i]),
 						});
 			}
 			plot_update_until_closed();
 			plot_shutdown();
 		}
+#endif
+	}
+
+	it ("HO basis hamiltonian -- ho perturbed") {
+		hermitian_bandmat T = construct_ho_kinetic_matrix(max_n + 75);
+
+		u32 params[2];
+		integration_settings settings = {
+			.gk = gk7,
+			.abs_error_tol = 1e-10,
+			.rel_error_tol = 1e-10,
+			.max_evals = 1e4,
+			.userdata = params
+		};
+
+		for (u32 r = 0; r < T.size; ++r) {
+			for (u32 c = r; c < T.size; ++c) {
+				params[0] = r;
+				params[1] = c;
+				integration_result res = quadgk(ho_perturbed_integrand, -INFINITY, INFINITY, settings);
+				asserteq(res.converged, true);
+
+				u32 i = (T.size-1)*(T.size-(c-r)) + r;
+				T.base.data[i] += res.integral;
+			}
+		}
+
+		asserteq(mat_is_valid(T.base), true);
+
+		// Solve eigenvalue problem for hamiltonian
+		eig_result res = eig_sparse_bandmat(T, max_n, EV_SMALLEST_RE);
+
+#if PLOT_HO_HO_PERT
+		{
+			plot_init(800, 600, "HO - pob");
+			f32 pdata[sample_points];
+			c64 cdata[sample_points];
+			sample_space sp = make_linspace(1, -4*L, 4*L, sample_points);
+
+			for (u32 i = 0; i < sample_points; ++i) {
+				f64 x = sp.points[i];
+				pdata[i] = (f32) ho_perturbed_potential(&x,1, 0);
+			}
+			push_line_plot(&(plot_push_desc){
+					.space = &sp,
+					.data = pdata,
+					.label = "potential",
+					});
+
+			for (u32 i = 0; i < res.num_eigenpairs; ++i) {
+				memset(cdata, 0, sizeof(cdata));
+				for (u32 j = 0; j < res.points_per_eigenvector; ++j) {
+					c64 coeff = res.eigenvectors[i*res.points_per_eigenvector + j];
+
+					// Get the j:th basis function
+					for (u32 k = 0; k < sp.pointcount; ++k) {
+						f64 x = sp.points[k];
+						cdata[k] += coeff*ho_eigenfunction((i32[]){j}, &x, 1);
+					}
+				}
+				c64_normalize(cdata, sp.pointcount);
+
+				for (u32 j = 0; j < sp.pointcount; ++j) {
+					pdata[j] = cabs(cdata[j])*cabs(cdata[j]);
+				}
+
+				push_line_plot(&(plot_push_desc){
+						.space = &sp,
+						.data = pdata,
+						.label = plot_snprintf("numerical %d", i),
+						.offset = cabs(res.eigenvalues[i]),
+						});
+			}
+			plot_update_until_closed();
+			plot_shutdown();
+		}
+#endif
 	}
 }

@@ -1,6 +1,7 @@
 #include "common.h"
 #include <sbmf/memory/stack_allocator.h>
 #include <sbmf/debug/log.h>
+#include <sbmf/common/profile.h>
 
 sbmf_state _sbmf;
 
@@ -13,4 +14,5 @@ void sbmf_init() {
 void sbmf_shutdown() {
 	log_close_file();
 	sa_destroy(_sbmf.main_stack);
+	profile_print_results();
 }

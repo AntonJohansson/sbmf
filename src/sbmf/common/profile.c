@@ -1,12 +1,17 @@
 #include "profile.h"
+#include <sbmf/debug/log.h>
+#include <errno.h>
+#include <string.h>
 
-size_t profile_used_data = 0;
-profile_data_t profile_data[PROFILE_MAX_DATA] = {0};
+#if PROFILE_ENABLE
+	u32 profile_entry_count = 0;
+	struct profile_entry profile_entries[PROFILE_MAX_ENTRIES] = {0};
+#endif
 
-static inline profile_data_t* profile_find_data_by_name(char const name[]) {
-	for (int i = 0; i < profile_used_data; ++i) {
-		if(strcmp(profile_data[i].name, name) == 0) {
-			return &profile_data[i];
+static inline struct profile_entry* profile_find_entry_by_name(char const name[]) {
+	for (int i = 0; i < profile_entry_count; ++i) {
+		if(strcmp(profile_entries[i].name, name) == 0) {
+			return &profile_entries[i];
 		}
 	}
 
@@ -14,52 +19,58 @@ static inline profile_data_t* profile_find_data_by_name(char const name[]) {
 }
 
 void profile_begin(char const name[]) {
-	profile_data_t* data = profile_find_data_by_name(name);
-	if(!data) {
-		data = &profile_data[profile_used_data];
-		size_t len = strlen(name)+1;
-		size_t size = (len > PROFILE_MAX_NAME_LEN) ? PROFILE_MAX_NAME_LEN : len;
-		memcpy(data->name, name, size);
-		profile_used_data++;
+	struct profile_entry* entry = profile_find_entry_by_name(name);
+	if(!entry) {
+		if (profile_entry_count >= PROFILE_MAX_ENTRIES)
+			return;
+
+		entry = &profile_entries[profile_entry_count];
+		u32 len = strlen(name)+1;
+		u32 size = (len > PROFILE_MAX_NAME_LEN) ? PROFILE_MAX_NAME_LEN : len;
+		memcpy(entry->name, name, size);
+		profile_entry_count++;
 	}
 
-	if(clock_gettime(CLOCK_REALTIME, &data->start) != 0) {
-		fprintf(stderr, "clock_gettime(...): failed in profile_begin(...) [errno: %s]\n", strerror(errno));
-		data->start = (struct timespec){0};
+	if(clock_gettime(CLOCK_REALTIME, &entry->start) != 0) {
+		log_error("clock_gettime(): failed in profile_begin() [errno: %s]", strerror(errno));
+		entry->start = (struct timespec){0};
 	}
 }
 
 void profile_end(char const name[]) {
-	profile_data_t* data = profile_find_data_by_name(name);
-	if(!data) {
-		fprintf(stderr, "profile_end(...) failed, profile data not found.\n");
+	struct profile_entry* entry = profile_find_entry_by_name(name);
+	if(!entry) {
+		log_error("profile_end() failed, entry %s not found", name);
 		return;
 	}
 
-	if(clock_gettime(CLOCK_REALTIME, &data->end) != 0) {
-		fprintf(stderr, "clock_gettime(...) failed in profile_end(...) [errno: %s]\n",
-						strerror(errno));
-		data->end = (struct timespec){0};
+	if(clock_gettime(CLOCK_REALTIME, &entry->end) != 0) {
+		log_error("clock_gettime(): failed in profile_end() [errno: %s]", strerror(errno));
+		entry->end = (struct timespec){0};
 		return;
 	}
 
-	struct timespec* delta = &data->deltas[data->delta_num_samples];
-	delta->tv_sec  = data->end.tv_sec - data->start.tv_sec;
-	delta->tv_nsec = data->end.tv_nsec - data->start.tv_nsec;
-	data->delta_num_samples = (data->delta_num_samples+1) % PROFILE_DATA_SAMPLE_LEN;
+	struct timespec* elapsed = &entry->elapsed[entry->sample_count % PROFILE_MAX_SAMPLE_COUNT];
+	elapsed->tv_sec  = entry->end.tv_sec - entry->start.tv_sec;
+	elapsed->tv_nsec = entry->end.tv_nsec - entry->start.tv_nsec;
+	entry->sample_count++;
 }
 
 void profile_print_results_impl() {
-	printf("Timing results:\n");
-	for (size_t i = 0; i < profile_used_data; ++i) {
-		profile_data_t data = profile_data[i];
+	if (profile_entry_count == 0)
+		return;
+
+	log_info("Timing results:");
+	for (size_t i = 0; i < profile_entry_count; ++i) {
+		struct profile_entry entry = profile_entries[i];
 
 		long avg = 0;
-		for (size_t j = 0; j < PROFILE_DATA_SAMPLE_LEN; ++j) {
-			avg += 1000000000*data.deltas[j].tv_sec + data.deltas[j].tv_nsec;
+		u32 size = fmin(entry.sample_count, PROFILE_MAX_SAMPLE_COUNT);
+		for (size_t j = 0; j < size; ++j) {
+			avg += 1000000000*entry.elapsed[j].tv_sec + entry.elapsed[j].tv_nsec;
 		}
-		avg /= PROFILE_DATA_SAMPLE_LEN;
+		avg /= size;
 
-		printf("%10s -- %ld (ms)\n", data.name, avg/1000000);
+		log_info("%10s -- %ld (ms)", entry.name, avg/1000000);
 	}
 }

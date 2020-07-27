@@ -1,33 +1,31 @@
 #pragma once
 
 #include <time.h>
-#include <string.h>
-#include <stdio.h>
-#include <errno.h>
+#include <sbmf/common/common.h>
 
 #define PROFILE_ENABLE 1
-#define PROFILE_MAX_DATA 100
+#define PROFILE_MAX_ENTRIES 100
 #define PROFILE_MAX_NAME_LEN 100
-#define PROFILE_DATA_SAMPLE_LEN 10
+#define PROFILE_MAX_SAMPLE_COUNT 10
 
-typedef struct profile_data_t {
+struct profile_entry {
 	char name[PROFILE_MAX_NAME_LEN];
-	size_t delta_num_samples;
 
 	struct timespec start;
 	struct timespec end;
-	struct timespec deltas[PROFILE_DATA_SAMPLE_LEN];
-} profile_data_t;
 
-extern size_t profile_used_data;
-extern profile_data_t profile_data[PROFILE_MAX_DATA];
+	struct timespec elapsed[PROFILE_MAX_SAMPLE_COUNT];
+	u32 sample_count;
+};
 
 void profile_begin(char const name[]);
 void profile_end(char const name[]);
-
 void profile_print_results_impl();
 
 #if PROFILE_ENABLE
+	extern u32 profile_entry_count;
+	extern struct profile_entry profile_entries[PROFILE_MAX_ENTRIES];
+
 	#define PROFILE_BEGIN(name)\
 		profile_begin(name)
 	#define PROFILE_END(name)\

@@ -18,8 +18,9 @@
 
 //#include "integration.c"
 //#include "particle_in_a_box.c"
-#include "fdm_ho_comp.c"
+//#include "fdm_ho_comp.c"
 //#include "fdm_solving.c"
 //#include "ho_basis_func.c"
+#include "find_groundstate.c"
 
 snow_main();

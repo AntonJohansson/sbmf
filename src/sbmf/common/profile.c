@@ -53,6 +53,7 @@ void profile_end(char const name[]) {
 	struct timespec* elapsed = &entry->elapsed[entry->sample_count % PROFILE_MAX_SAMPLE_COUNT];
 	elapsed->tv_sec  = entry->end.tv_sec - entry->start.tv_sec;
 	elapsed->tv_nsec = entry->end.tv_nsec - entry->start.tv_nsec;
+	entry->total_ms += (1000000000*elapsed->tv_sec + elapsed->tv_nsec)/(f64)1000000;
 	entry->sample_count++;
 }
 
@@ -61,6 +62,8 @@ void profile_print_results_impl() {
 		return;
 
 	log_info("Timing results:");
+	log_info("%20s | %10s | %15s ", "entry", "avg. (us)", "tot. (ms)");
+	log_info("---------------------+------------+----------------");
 	for (size_t i = 0; i < profile_entry_count; ++i) {
 		struct profile_entry entry = profile_entries[i];
 
@@ -71,6 +74,6 @@ void profile_print_results_impl() {
 		}
 		avg /= size;
 
-		log_info("%10s -- %ld (ms)", entry.name, avg/1000000);
+		log_info("%20s | %10ld | %.5lf", entry.name, avg/1000, entry.total_ms);
 	}
 }

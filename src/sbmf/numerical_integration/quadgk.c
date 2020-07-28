@@ -1,7 +1,7 @@
 #include "quadgk.h"
 #include <sbmf/common/prioqueue.h>
 #include <sbmf/debug/log.h>
-
+#include <sbmf/common/profile.h>
 #include <math.h> // INFINITY and isinf
 
 gk_data gk7 = {
@@ -234,24 +234,30 @@ static inline integration_result hadapt(integrand* f, f64 start, f64 end, integr
 	prioqueue_push(pq, &s);
 
 	while (!should_exit(result, settings)) {
-		segment* largest_error_seg = (segment*)prioqueue_top(pq);
-		prioqueue_pop(pq);
+		PROFILE_BEGIN("hadapt iter");
+			PROFILE_BEGIN("hadapt pq");
+				segment* largest_error_seg = (segment*)prioqueue_top(pq);
+				prioqueue_pop(pq);
+			PROFILE_END("hadapt pq");
 
-		f64 midpoint = 0.5 * (largest_error_seg->start + largest_error_seg->end);
-		eval_result left_eval_res = evaluate_rule(f, largest_error_seg->start, midpoint, settings);
-		eval_result right_eval_res = evaluate_rule(f, midpoint, largest_error_seg->end, settings);
-		if (!left_eval_res.valid || !right_eval_res.valid)
-			return result;
+			f64 midpoint = 0.5 * (largest_error_seg->start + largest_error_seg->end);
+			PROFILE_BEGIN("hadapt eval");
+				eval_result left_eval_res = evaluate_rule(f, largest_error_seg->start, midpoint, settings);
+				eval_result right_eval_res = evaluate_rule(f, midpoint, largest_error_seg->end, settings);
+			PROFILE_END("hadapt eval");
+			if (!left_eval_res.valid || !right_eval_res.valid)
+				return result;
 
-		segment left_seg = left_eval_res.seg;
-		segment right_seg = right_eval_res.seg;
+			segment left_seg = left_eval_res.seg;
+			segment right_seg = right_eval_res.seg;
 
-		result.performed_evals += left_eval_res.func_evals + right_eval_res.func_evals;
-		result.integral = (result.integral - largest_error_seg->integral) + left_seg.integral + right_seg.integral;
-		result.error = (result.error - largest_error_seg->error) + left_seg.error + right_seg.error;
+			result.performed_evals += left_eval_res.func_evals + right_eval_res.func_evals;
+			result.integral = (result.integral - largest_error_seg->integral) + left_seg.integral + right_seg.integral;
+			result.error = (result.error - largest_error_seg->error) + left_seg.error + right_seg.error;
 
-		prioqueue_push(pq, &left_seg);
-		prioqueue_push(pq, &right_seg);
+			prioqueue_push(pq, &left_seg);
+			prioqueue_push(pq, &right_seg);
+		PROFILE_END("hadapt iter");
 	}
 
 	prioqueue_free(pq);

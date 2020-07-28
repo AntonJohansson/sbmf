@@ -6,12 +6,14 @@ BUILDDIR = build
 PROJ_SRCS = \
 	src/sbmf/groundstate_solver/groundstate_solver.c  \
 	src/sbmf/groundstate_solver/item.c \
+	src/sbmf/groundstate_solver/hob.c \
 	src/sbmf/common/profile.c \
 	src/sbmf/common/eigenproblem.c \
 	src/sbmf/common/matrix.c \
 	src/sbmf/debug/log.c \
 	src/sbmf/common/common.c \
 	src/sbmf/numerical_integration/quadgk.c
+
 PROJ_OBJS = $(patsubst %.c, $(BUILDDIR)/%.o, $(PROJ_SRCS))
 
 TEST_SRCS = src/test/main.c
@@ -32,8 +34,10 @@ TEST_LIBS = \
 	-lpthread
 #PROJ_FLAGS = -fsanitize=address -fsanitize=leak -g -fpic -Wall -Werror -Isrc
 #TEST_FLAGS = -fsanitize=address -fsanitize=leak -g -Wall -Werror -Isrc -Isrc/test/plotting/third_party
-PROJ_FLAGS = -c -g -fpic -Wall -Werror -Isrc -Ithird_party/include
-TEST_FLAGS = -g -Isrc -Ithird_party/include -I/home/aj/.local/include
+PROJ_FLAGS = -c -pg -g -fpic -O3 -Wall -Werror -Isrc -Ithird_party/include
+TEST_FLAGS = -pg -g -Isrc -Ithird_party/include -I/home/aj/.local/include
+
+all: tests
 
 $(BUILDDIR):
 	mkdir -p $(shell find src -type d | sed -e "s/^/$(BUILDDIR)\//")

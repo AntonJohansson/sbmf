@@ -86,7 +86,7 @@ static void log_impl(enum log_level level, const char* fmt, va_list args) {
 	};
 
 	u32 level_str_len = strlen(level_str);
-	strncpy(&_log_state.buffer[i][0], level_str, level_str_len);
+	strncpy(&_log_state.buffer[i][0], level_str, MAX_LOG_LEN);
 
 	vsnprintf(&_log_state.buffer[i][level_str_len], MAX_LOG_LEN-level_str_len, fmt, args);
 	//_log_state.buffer[i][bytes] = 0;

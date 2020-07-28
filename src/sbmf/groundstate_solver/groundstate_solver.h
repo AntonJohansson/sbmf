@@ -10,13 +10,20 @@ typedef f64 gss_potential_func(f64* v, i32 n, c64 u);
 typedef c64  gss_guess_func(f64* v, i32 n);
 typedef void gss_debug_callback(grid g, c64* wf);
 
+typedef struct {
+	u32 n[2];
+	c64* coeffs;
+	u32 coeff_count;
+	gss_potential_func* pot;
+} hob_integrand_params;
+
 struct gss_settings {
 	grid g;
 
-	i32 max_iterations;
+	u32 max_iterations;
 	f64 error_tol;
 
-	i32 measure_every;
+	u32 measure_every;
 	gss_debug_callback* dbgcallback;
 
 	f64 dt;
@@ -28,8 +35,9 @@ struct gss_result {
 	c64* wavefunction;
 
 	f64 error;
-	i32 iterations;
+	u32 iterations;
 };
 
 void gss_free_result(gss_result res);
 gss_result item_execute(gss_settings settings, gss_potential_func* potential, gss_guess_func* guess);
+gss_result hob(gss_settings settings, gss_potential_func* potential, gss_guess_func* guess);

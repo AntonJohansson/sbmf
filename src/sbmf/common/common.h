@@ -36,6 +36,7 @@ struct stack_allocator;
 
 typedef struct sbmf_state {
 	struct stack_allocator* main_stack;
+	bool initialized;
 } sbmf_state;
 
 extern sbmf_state _sbmf;

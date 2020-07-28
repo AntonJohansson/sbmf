@@ -1,18 +1,21 @@
 SBMF (Slightly Beyond Mean Field):
-	[ ] SAMPLING WITH PLOT SAMPLE_SPACE YIELDS INCORRECT RESULIT!!!!!!!!!!!!!! ALWAYS USE GRID!!!!!!!!!!!!!1
-	[ ] Unify memory allocation.
+	[ ] Move memory alloc to not interface with stack directly? can add check for  initialization.
 	[ ] Many-body pertrubation theory
 			[ ] How is this different from regular P.T.?
 			[ ] Do I need numerical integration?
 	[ ] Potential speedup for ITEM, adaptive timestep
 			[ ] See papers/item.pdf
-		[ ] particle in a box, maybe rounded corners?
-	[ ] interest is high in radial and toroidal geometry
-	[ ] Basis functions instead of fdm
+
+
+
+
+
+
+
+	[x] Unify memory allocation.
+	[x] Basis functions instead of fdm
 			[x] Quadgk for numerical integration
 					[x] implement own quadrature?
-							[ ] is it possible to find a table of eval points online?
-					[ ] Use QUADPACK?
 	[x] nasty bug
 		the dimension n generate_grid is connected to a stack smashing bug, n = 1 => no smashing, n = 2 => smashing.
 	[x] memory allocation is 8-byte aligned
@@ -35,22 +38,3 @@ SBMF (Slightly Beyond Mean Field):
 		" this is the way moving forward. "
 	[x] cos^2 x gives asymmetric solution
 		" solved but not sure how. "
-
-Testing:
-	[ ] FDM Eigenvalue solver test-cases
-			[x] 1d Harmonic oscillator
-			[x] 2d Harmonic oscillator
-			[ ] 3d Harmonic oscillator
-			[x] 1d Particle in a box
-			[x] 2d Particle in a box
-			[ ] 3d Particle in a box
-	[ ] HO basis functions Eigenvalue solver test-cases
-			[ ] 1d Harmonic oscillator
-			[ ] 2d Harmonic oscillator
-			[ ] 3d Harmonic oscillator
-			[ ] 1d Particle in a box
-			[ ] 2d Particle in a box
-			[ ] 3d Particle in a box
-	[ ] Timing is not accurate, averaging is wrong
-
-	[x] Separate out and test eigenvalue/-vector solving.

@@ -3,6 +3,7 @@
 #include <sbmf/common/common.h>
 #include <sbmf/common/matrix.h>
 #include <sbmf/debug/log.h>
+#include <assert.h>
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 #define FACTORIAL_MAX_N 20
@@ -66,6 +67,14 @@ static inline f64 ho_potential(f64* v, i32 n, c64 u) {
 		temp += v[i]*v[i];
 	}
 	return temp*0.5;
+}
+
+static inline c64 hob_sample(c64* v, u32 n, f64 x) {
+	c64 output = 0;
+	for (u32 i = 0; i < n; ++i) {
+		output += v[i] * ho_eigenfunction((i32[]){i}, &x, 1);
+	}
+	return output;
 }
 
 // <m|H|n> = <m|T|n> + <m|V|n>

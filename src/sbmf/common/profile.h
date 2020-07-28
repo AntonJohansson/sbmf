@@ -16,6 +16,8 @@ struct profile_entry {
 
 	struct timespec elapsed[PROFILE_MAX_SAMPLE_COUNT];
 	u32 sample_count;
+
+	f64 total_ms;
 };
 
 void profile_begin(char const name[]);

@@ -41,3 +41,5 @@ struct gss_result {
 void gss_free_result(gss_result res);
 gss_result item_execute(gss_settings settings, gss_potential_func* potential, gss_guess_func* guess);
 gss_result hob(gss_settings settings, gss_potential_func* potential, gss_guess_func* guess);
+
+void hob_perf_test();

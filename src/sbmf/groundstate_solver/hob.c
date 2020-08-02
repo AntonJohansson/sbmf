@@ -117,3 +117,98 @@ gss_result hob(gss_settings settings, gss_potential_func* potential, gss_guess_f
 
 	return res;
 }
+
+/*
+#define FACTORIAL_MAX_N 20
+
+static u64 factorial(u32 n) {
+	assert(n <= FACTORIAL_MAX_N); // largest factorial supported by u64
+
+	u64 res = 1;
+	while (n > 1)
+		res *= n--;
+
+	return res;
+}
+
+static inline f64 ho_eigenfunction(i32 states[], f64 point[], i32 dims) {
+	f64 prod = 1.0;
+	static const f64 pi_factor = 1.0/pow(M_PI,0.25);
+	for (i32 i = 0; i < dims; ++i) {
+		i32 n = states[i];
+		f64 x = point[i];
+
+		f64 factorial_value = (n <= FACTORIAL_MAX_N) ? factorial(n) : sqrt(M_2_PI*n) * pow(n/exp(1), n);
+		f64 normalization_factor = exp(-x*x/2.0) * pi_factor / sqrt(pow(2,n) * factorial_value);
+
+		{
+			f64 H0 = normalization_factor*1;
+			f64 H1 = normalization_factor*2*x;
+			f64 HN = 0.0;
+
+			if (n == 0) {
+				HN = H0;
+			} else if (n == 1) {
+				HN = H1;
+			} else {
+				for (i32 i = 2; i <= n; ++i) {
+					HN = 2*x*H1 - 2*(i-1)*H0;
+					H0 = H1;
+					H1 = HN;
+				}
+			}
+
+			prod *= HN;
+		}
+	}
+	return prod;
+}
+*/
+
+void hob_perf_test() {
+	f64 x = 1;
+	u64 n0 = 2;
+	//u64 n1 = 5;
+
+	//for(i32 j = 0; j < 1000; ++j) {
+		PROFILE_BEGIN("100");
+		f64 sum1 = 0.0;
+		for (i32 i = 0; i < n0; ++i) {
+			//for (i32 j = 0; j <= n1; ++j) {
+				sum1 += ho_eigenfunction((i32[]){i},&x,1);
+			//}
+		}
+		PROFILE_END("100");
+
+		PROFILE_BEGIN("100 new");
+		f64 sum2 = 0.0;
+		for (i32 i = 0; i < n0; ++i) {
+			//for (i32 j = 0; j <= n1; ++j) {
+				sum2 += ho_eigenfunction_new((i32[]){i},&x,1);
+			//}
+		}
+		PROFILE_END("100 new");
+
+		PROFILE_BEGIN("100 new vec");
+		f64 sum3 = 0.0;
+		f64 out[n0];
+		ho_eigenfunction_new_vec((u32[]){n0,n0}, &x, 2, out);
+		//for (u32 i = 0; i < n0; ++i) {
+		//	sum3 += out[i];
+		//}
+		PROFILE_END("100 new vec");
+
+		log_info("sum1: %lf", sum1);
+		log_info("sum2: %lf", sum2);
+		log_info("sum3: %lf", sum3);
+		assert(f64_compare(sum1,sum2,0.001));
+		assert(f64_compare(sum1,sum3,0.001));
+	//}
+	//log_info("sum1: %lf", sum1);
+	//log_info("sum2: %lf", sum2);
+
+	//PROFILE_END("100 new new");
+	//for (u32 n = 0; n <= 20; ++n) {
+	//	log_info("[%d] = %ld", n, factorial(n));
+	//}
+}

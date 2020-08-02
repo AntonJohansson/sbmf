@@ -6,7 +6,7 @@
 #define PROFILE_ENABLE 1
 #define PROFILE_MAX_ENTRIES 100
 #define PROFILE_MAX_NAME_LEN 100
-#define PROFILE_MAX_SAMPLE_COUNT 10
+#define PROFILE_MAX_SAMPLE_COUNT 100
 
 struct profile_entry {
 	char name[PROFILE_MAX_NAME_LEN];

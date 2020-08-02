@@ -53,6 +53,7 @@ void profile_end(char const name[]) {
 	struct timespec* elapsed = &entry->elapsed[entry->sample_count % PROFILE_MAX_SAMPLE_COUNT];
 	elapsed->tv_sec  = entry->end.tv_sec - entry->start.tv_sec;
 	elapsed->tv_nsec = entry->end.tv_nsec - entry->start.tv_nsec;
+	//log_info("%s: %lu", name, elapsed->tv_nsec);
 	entry->total_ms += (1000000000*elapsed->tv_sec + elapsed->tv_nsec)/(f64)1000000;
 	entry->sample_count++;
 }
@@ -62,18 +63,25 @@ void profile_print_results_impl() {
 		return;
 
 	log_info("Timing results:");
-	log_info("%20s | %10s | %15s ", "entry", "avg. (us)", "tot. (ms)");
-	log_info("---------------------+------------+----------------");
-	for (size_t i = 0; i < profile_entry_count; ++i) {
+	log_info("%40s | %10s | %10s | %10s | %15s ", "entry", "avg. (ns)","min (ns)", "max (ns)", "tot (ms)");
+	log_info("-----------------------------------------+------------+------------+------------+----------------");
+	for (u32 i = 0; i < profile_entry_count; ++i) {
 		struct profile_entry entry = profile_entries[i];
 
-		long avg = 0;
+		u64 avg = 0;
 		u32 size = fmin(entry.sample_count, PROFILE_MAX_SAMPLE_COUNT);
-		for (size_t j = 0; j < size; ++j) {
-			avg += 1000000000*entry.elapsed[j].tv_sec + entry.elapsed[j].tv_nsec;
+		u64 ns_min = -1;
+		u64 ns_max = 0;
+		for (u32 j = 0; j < size; ++j) {
+			u64 ns = 1000000000*entry.elapsed[j].tv_sec + entry.elapsed[j].tv_nsec;
+			if (ns < ns_min)
+				ns_min = ns;
+			else if (ns > ns_max)
+				ns_max = ns;
+			avg += 	ns;
 		}
 		avg /= size;
 
-		log_info("%20s | %10ld | %.5lf", entry.name, avg/1000, entry.total_ms);
+		log_info("%40s | %10ld | %10ld | %10ld | %10.5lf ", entry.name, avg, ns_min, ns_max, entry.total_ms);
 	}
 }

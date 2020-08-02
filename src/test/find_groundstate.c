@@ -34,6 +34,7 @@ f64 pot(f64* v, i32 n, c64 u) {
 
 describe(item) {
 	it ("woo") {
+#if 0
 		sbmf_init();
 		const f64 L = 5.0;
 		const i32 N = 128;
@@ -94,6 +95,13 @@ describe(item) {
 			plot_shutdown();
 		}
 
+		sbmf_shutdown();
+#endif
+	}
+
+	it ("perf test") {
+		sbmf_init();
+		hob_perf_test();
 		sbmf_shutdown();
 	}
 }

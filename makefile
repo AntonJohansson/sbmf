@@ -34,8 +34,8 @@ TEST_LIBS = \
 	-lpthread
 #PROJ_FLAGS = -fsanitize=address -fsanitize=leak -g -fpic -Wall -Werror -Isrc
 #TEST_FLAGS = -fsanitize=address -fsanitize=leak -g -Wall -Werror -Isrc -Isrc/test/plotting/third_party
-PROJ_FLAGS = -c -pg -g -fpic -O3 -Wall -Werror -Isrc -Ithird_party/include
-TEST_FLAGS = -pg -g -Isrc -Ithird_party/include -I/home/aj/.local/include
+PROJ_FLAGS = -c -pg -g -fpic -O0 -Wall -Werror -Isrc -Ithird_party/include
+TEST_FLAGS = -pg -g -O3 -Isrc -Ithird_party/include -I/home/aj/.local/include
 
 all: tests
 

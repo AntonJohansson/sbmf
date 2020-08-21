@@ -18,10 +18,14 @@ typedef int32_t 	i32;
 typedef uint32_t 	u32;
 typedef int64_t 	i64;
 typedef uint64_t 	u64;
+typedef __int128_t  i128;
+typedef __uint128_t u128;
 typedef float 		f32;
 typedef double 		f64;
-typedef float complex 	c32;
-typedef double complex 	c64;
+typedef long double f128;
+typedef float complex 		c32;
+typedef double complex 		c64;
+typedef long double complex c128;
 
 static inline bool f64_compare(f64 a, f64 b, f64 epsilon) {
 	return (fabs(a-b) <= epsilon);

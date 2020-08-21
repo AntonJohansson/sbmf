@@ -8,30 +8,37 @@
 #include <assert.h>
 
 static inline f64 hob_integrand(f64 x, void* data) {
-	PROFILE_BEGIN("integrand");
+	PROFILE_BEGIN("integrand -- total");
 	hob_integrand_params* params = data;
 
-	PROFILE_BEGIN("integrand eigs");
+	PROFILE_BEGIN("integrand -- eigs");
 	f64 eig1 = ho_eigenfunction((i32[]){params->n[0]}, &x, 1);
 	f64 eig2 = ho_eigenfunction((i32[]){params->n[1]}, &x, 1);
-	PROFILE_END("integrand eigs");
+	PROFILE_END("integrand -- eigs");
 
 	//PROFILE_BEGIN("integrand sample");
 	//f64 sample = hob_sample(params->coeffs, params->coeff_count, x);
 	//PROFILE_END("integrand sample");
 	f64 sample = 0;
 
-	PROFILE_BEGIN("integrand pot");
+	PROFILE_BEGIN("integrand -- pot");
 	f64 pot = params->pot(&x,1, sample);
-	PROFILE_END("integrand pot");
+	PROFILE_END("integrand -- pot");
 
 	f64 res = (eig1*eig2)*pot;
-	PROFILE_END("integrand");
+	PROFILE_END("integrand -- total");
+
+	if (isnan(res)) {
+		log_info("eig1: %lf", eig1);
+		log_info("eig2: %lf", eig2);
+		log_info("pot: %lf", pot);
+		log_info("x: %lf", x);
+	}
 	return res;
 }
 
 gss_result hob(gss_settings settings, gss_potential_func* potential, gss_guess_func* guess) {
-	const u32 N = 64;
+	const u32 N = 128;
 
 	gss_result res = {
 		.settings = settings,
@@ -73,6 +80,8 @@ gss_result hob(gss_settings settings, gss_potential_func* potential, gss_guess_f
 					params.n[0] = r;
 					params.n[1] = c;
 					integration_result res = quadgk(hob_integrand, -INFINITY, INFINITY, int_settings);
+					if (!res.converged)
+						log_error("integration failed for %d,%d", r,c);
 					assert(res.converged);
 
 					u32 i = (H.size-1)*(H.size-(c-r)) + r;
@@ -164,51 +173,3 @@ static inline f64 ho_eigenfunction(i32 states[], f64 point[], i32 dims) {
 	return prod;
 }
 */
-
-void hob_perf_test() {
-	f64 x = 1;
-	u64 n0 = 2;
-	//u64 n1 = 5;
-
-	//for(i32 j = 0; j < 1000; ++j) {
-		PROFILE_BEGIN("100");
-		f64 sum1 = 0.0;
-		for (i32 i = 0; i < n0; ++i) {
-			//for (i32 j = 0; j <= n1; ++j) {
-				sum1 += ho_eigenfunction((i32[]){i},&x,1);
-			//}
-		}
-		PROFILE_END("100");
-
-		PROFILE_BEGIN("100 new");
-		f64 sum2 = 0.0;
-		for (i32 i = 0; i < n0; ++i) {
-			//for (i32 j = 0; j <= n1; ++j) {
-				sum2 += ho_eigenfunction_new((i32[]){i},&x,1);
-			//}
-		}
-		PROFILE_END("100 new");
-
-		PROFILE_BEGIN("100 new vec");
-		f64 sum3 = 0.0;
-		f64 out[n0];
-		ho_eigenfunction_new_vec((u32[]){n0,n0}, &x, 2, out);
-		//for (u32 i = 0; i < n0; ++i) {
-		//	sum3 += out[i];
-		//}
-		PROFILE_END("100 new vec");
-
-		log_info("sum1: %lf", sum1);
-		log_info("sum2: %lf", sum2);
-		log_info("sum3: %lf", sum3);
-		assert(f64_compare(sum1,sum2,0.001));
-		assert(f64_compare(sum1,sum3,0.001));
-	//}
-	//log_info("sum1: %lf", sum1);
-	//log_info("sum2: %lf", sum2);
-
-	//PROFILE_END("100 new new");
-	//for (u32 n = 0; n <= 20; ++n) {
-	//	log_info("[%d] = %ld", n, factorial(n));
-	//}
-}

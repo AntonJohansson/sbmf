@@ -3,6 +3,7 @@
 #include <sbmf/common/eigenproblem.h>
 #include <sbmf/basis/harmonic_oscillator.h>
 #include <sbmf/groundstate_solver/groundstate_solver.h>
+#include <sbmf/common/profile.h>
 #include <plot/plot.h>
 
 void c64_normalize(c64* data, u32 size) {
@@ -98,10 +99,49 @@ describe(item) {
 		sbmf_shutdown();
 #endif
 	}
+}
 
-	it ("perf test") {
+describe(hob_eigenfunction_perf) {
+	before_each(){
 		sbmf_init();
-		hob_perf_test();
+	}
+	after_each(){
 		sbmf_shutdown();
+	};
+
+	it ("single x, single n") {
+		f64 x = 1.0;
+
+		PROFILE_BEGIN("cached precomp");
+		hob_precompute_coeffs(CACHE_SIZE);
+		PROFILE_END("cached precomp");
+
+		log_info("Comparing sum vs cached sum hob");
+		for (u32 i = 0; i < 500; ++i) {
+			for (u32 n = 0; n < 200; ++n) {
+				PROFILE_BEGIN("cached sum");
+				f64 s1 = ho_eigenfunction_sumstuff_cached(n,x);
+				PROFILE_END("cached sum");
+
+				PROFILE_BEGIN("sum");
+				f64 s2 = ho_eigenfunction_sumstuff(n,x);
+				PROFILE_END("sum");
+
+				PROFILE_BEGIN("reccurence");
+				f64 s3 = ho_eigenfunction((i32[]){n},&x,1);
+				PROFILE_END("reccurence");
+
+				if (!f64_compare(s1,s2,0.001) || !f64_compare(s1,s3,0.001)) {
+					log_error("n: %d -- %lf, %lf, %lf", n,s1,s2,s3);
+					assert(false);
+				}
+			}
+		}
+	}
+	it ("mutliple x, single n") {
+	}
+	it ("single x, multiple n") {
+	}
+	it ("multiple x, multiple n") {
 	}
 }

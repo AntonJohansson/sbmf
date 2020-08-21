@@ -234,17 +234,17 @@ static inline integration_result hadapt(integrand* f, f64 start, f64 end, integr
 	prioqueue_push(pq, &s);
 
 	while (!should_exit(result, settings)) {
-		PROFILE_BEGIN("hadapt iter");
-			PROFILE_BEGIN("hadapt pq");
+		PROFILE_BEGIN("quadgk -- hadapt iter");
+			PROFILE_BEGIN("quadgk -- hadapt pq");
 				segment* largest_error_seg = (segment*)prioqueue_top(pq);
 				prioqueue_pop(pq);
-			PROFILE_END("hadapt pq");
+			PROFILE_END("quadgk -- hadapt pq");
 
 			f64 midpoint = 0.5 * (largest_error_seg->start + largest_error_seg->end);
-			PROFILE_BEGIN("hadapt eval");
+			PROFILE_BEGIN("quadgk -- hadapt eval");
 				eval_result left_eval_res = evaluate_rule(f, largest_error_seg->start, midpoint, settings);
 				eval_result right_eval_res = evaluate_rule(f, midpoint, largest_error_seg->end, settings);
-			PROFILE_END("hadapt eval");
+			PROFILE_END("quadgk -- hadapt eval");
 			if (!left_eval_res.valid || !right_eval_res.valid)
 				return result;
 
@@ -257,7 +257,7 @@ static inline integration_result hadapt(integrand* f, f64 start, f64 end, integr
 
 			prioqueue_push(pq, &left_seg);
 			prioqueue_push(pq, &right_seg);
-		PROFILE_END("hadapt iter");
+		PROFILE_END("quadgk -- hadapt iter");
 	}
 
 	prioqueue_free(pq);

@@ -1,9 +1,10 @@
 #pragma once
 
-#include "common.h"
+#include <sbmf/types.h>
 
-// TODO: it's kinda ambiguous wheter rows,cols refer to size of entire matrix or just
-// the region in data
+/* TODO: it's kinda ambiguous wheter rows,cols refer to size of entire matrix or just
+ * the region in data
+ */
 
 typedef c64 mat_scalar_t;
 typedef u32 mat_size_t;

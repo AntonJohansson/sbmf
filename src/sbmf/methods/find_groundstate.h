@@ -1,14 +1,14 @@
 #pragma once
 
-#include <sbmf/common/common.h>
-#include <sbmf/common/grid.h>
+#include <sbmf/types.h>
+#include <sbmf/math/grid.h>
 
 typedef struct gss_settings gss_settings;
 typedef struct gss_result gss_result;
 
 typedef f64 gss_potential_func(f64* v, i32 n, c64 u);
 typedef c64  gss_guess_func(f64* v, i32 n);
-typedef void gss_debug_callback(grid g, c64* wf);
+typedef void gss_debug_callback(struct grid g, c64* wf);
 
 typedef struct {
 	u32 n[2];
@@ -18,7 +18,7 @@ typedef struct {
 } hob_integrand_params;
 
 struct gss_settings {
-	grid g;
+	struct grid g;
 
 	u32 max_iterations;
 	f64 error_tol;

@@ -4,15 +4,14 @@ PROJECT = sbmf
 BUILDDIR = build
 
 PROJ_SRCS = \
-	src/sbmf/groundstate_solver/groundstate_solver.c  \
-	src/sbmf/groundstate_solver/item.c \
-	src/sbmf/groundstate_solver/hob.c \
-	src/sbmf/common/profile.c \
-	src/sbmf/common/eigenproblem.c \
-	src/sbmf/common/matrix.c \
-	src/sbmf/debug/log.c \
-	src/sbmf/common/common.c \
-	src/sbmf/numerical_integration/quadgk.c
+	src/sbmf/sbmf.c \
+	src/sbmf/methods/quadgk.c \
+	src/sbmf/methods/item.c \
+	src/sbmf/methods/hob.c \
+	src/sbmf/math/find_eigenpairs.c \
+	src/sbmf/math/matrix.c \
+	src/sbmf/debug/profile.c \
+	src/sbmf/debug/log.c
 
 PROJ_OBJS = $(patsubst %.c, $(BUILDDIR)/%.o, $(PROJ_SRCS))
 
@@ -38,8 +37,8 @@ TEST_LIBS = \
 #PROJ_FLAGS = -c -pg -g -fpic -O0 -Wall -Isrc -Ithird_party/include
 #TEST_FLAGS = -pg -g -Isrc -Ithird_party/include -I/home/aj/.local/include
 
-PROJ_FLAGS = -c -fpic -O3 -Wall -Isrc -Ithird_party/include
-TEST_FLAGS = -O3 -Isrc -Ithird_party/include -I/home/aj/.local/include
+PROJ_FLAGS = -g -c -fpic -O3 -Wall -Isrc -Ithird_party/include
+TEST_FLAGS = -g -O0 -Isrc -Ithird_party/include -I/home/aj/.local/include
 
 all: tests
 

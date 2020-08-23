@@ -1,12 +1,9 @@
 #pragma once
 
-#include "common.h"
-#include <stdlib.h>
-//#include <assert.h>
-#include <stdbool.h>
+#include <sbmf/sbmf.h>
 #include <string.h> // memcpy, memmove
 
-// Returns true if a comes before b
+/* Shall return true if a comes before b */
 typedef bool cmpfunc(void* a, void* b);
 
 typedef struct {
@@ -22,8 +19,7 @@ typedef struct {
 } prioqueue;
 
 static inline prioqueue* prioqueue_new(u32 items, u32 item_size, cmpfunc* cmp) {
-	void* mem = malloc(items*item_size + sizeof(prioqueue));
-	//assert(mem);
+	void* mem = (void*)sbmf_stack_push(items*item_size + sizeof(prioqueue));
 
 	prioqueue* pq = (prioqueue*) mem;
 
@@ -38,10 +34,6 @@ static inline prioqueue* prioqueue_new(u32 items, u32 item_size, cmpfunc* cmp) {
 	pq->cmp = cmp;
 
 	return pq;
-}
-
-static inline void prioqueue_free(prioqueue* pq) {
-	free(pq);
 }
 
 static inline void* prioqueue_get(prioqueue* pq, i32 index) {

@@ -1,4 +1,4 @@
-#include <sbmf/common/common.h>
+#include <sbmf/types.h>
 
 #define MAX_GAUSS_POINTS 7
 typedef struct {

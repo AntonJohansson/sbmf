@@ -1,11 +1,11 @@
-#include "groundstate_solver.h"
-#include <sbmf/common/common.h>
-#include <sbmf/common/eigenproblem.h>
-#include <sbmf/basis/harmonic_oscillator.h>
-#include <sbmf/numerical_integration/quadgk.h>
-#include <sbmf/common/profile.h>
-#include <stdlib.h>
-#include <assert.h>
+#include "find_groundstate.h"
+#include <sbmf/sbmf.h>
+#include <sbmf/math/find_eigenpairs.h>
+#include <sbmf/math/harmonic_oscillator.h>
+#include <sbmf/methods/quadgk.h>
+#include <sbmf/debug/profile.h>
+
+#include <assert.h> /* Not the correct way to handle this */
 
 static inline f64 hob_integrand(f64 x, void* data) {
 	PROFILE_BEGIN("integrand -- total");
@@ -42,9 +42,9 @@ gss_result hob(gss_settings settings, gss_potential_func* potential, gss_guess_f
 
 	gss_result res = {
 		.settings = settings,
-		.wavefunction = (c64*) sa_push(_sbmf.main_stack, N*sizeof(c64)),
+		.wavefunction = (c64*) sbmf_stack_push(N*sizeof(c64)),
 	};
-	c64* old_wavefunction = (c64*)sa_push(_sbmf.main_stack, N*sizeof(c64));
+	c64* old_wavefunction = (c64*) sbmf_stack_push(N*sizeof(c64));
 
 	res.wavefunction[0] = 1;
 	for (u32 i = 1; i < N; ++i) {
@@ -53,7 +53,7 @@ gss_result hob(gss_settings settings, gss_potential_func* potential, gss_guess_f
 
 	hermitian_bandmat T = construct_ho_kinetic_matrix(N);
 	hermitian_bandmat H = T;
-	H.base.data = (c64*) sa_push(_sbmf.main_stack, N*N*sizeof(c64));
+	H.base.data = (c64*) sbmf_stack_push(N*N*sizeof(c64));
 
 	hob_integrand_params params = {
 		.pot = potential,
@@ -94,7 +94,7 @@ gss_result hob(gss_settings settings, gss_potential_func* potential, gss_guess_f
 			assert(mat_is_valid(H.base));
 		}
 		// Solve for first eigenvector (ground state)
-		eig_result eres = eig_sparse_bandmat(H, 1, EV_SMALLEST_RE);
+		struct eigen_result eres = find_eigenpairs_sparse(H, 1, EV_SMALLEST_RE);
 		// Normalize and copy to result
 		{
 			f64 sum = 0.0;

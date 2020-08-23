@@ -1,7 +1,7 @@
 #pragma once
 
+#include <sbmf/types.h>
 #include <sbmf/debug/log.h>
-#include <sbmf/common/common.h>
 
 #include <stdlib.h>
 //#include <assert.h>

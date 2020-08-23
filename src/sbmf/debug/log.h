@@ -25,3 +25,4 @@ void log_close_file();
 void log_info(const char* fmt, ...);
 void log_warning(const char* fmt, ...);
 void log_error(const char* fmt, ...);
+void log_panic(const char* fmt, ...);

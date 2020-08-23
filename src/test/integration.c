@@ -1,5 +1,5 @@
 #include <math.h>
-#include <sbmf/numerical_integration/quadgk.h>
+#include <sbmf/methods/quadgk.h>
 
 f64 x2(f64 x, void* p) {return x*x;}
 f64 expx(f64 x, void* p) {return exp(x);}
@@ -17,6 +17,12 @@ static void check_quadgk_converge(integration_result res, f64 expected) {
 }
 
 describe (quad_gk_numerical_integration){
+	before_each() {
+		sbmf_init();
+	}
+	after_each() {
+		sbmf_shutdown();
+	}
 	integration_settings settings = {
 		.gk = gk7,
 		.abs_error_tol = 1e-10,

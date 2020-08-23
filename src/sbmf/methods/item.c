@@ -1,5 +1,4 @@
-#include "groundstate_solver.h"
-#include <sbmf/common/common.h>
+#include "find_groundstate.h"
 
 #include <fftw3.h>
 
@@ -13,7 +12,7 @@ static inline f64 VK(f64* v, i32 n, c64 u) {
 	return 0.5*value;
 }
 
-static inline void apply_step_op(f64 ds, f64 dt, c64* out, gss_potential_func* potential, grid g, c64* wavefunction) {
+static inline void apply_step_op(f64 ds, f64 dt, c64* out, gss_potential_func* potential, struct grid g, c64* wavefunction) {
 	for (i32 i = 0; i < g.total_pointcount; ++i) {
 		f64 potval = potential(&g.points[g.dimensions*i], g.dimensions, wavefunction[i]);
 		f64 opval  = exp(-potval*dt);
@@ -35,12 +34,12 @@ gss_result item_execute(gss_settings settings, gss_potential_func* potential, gs
 
 	gss_result result = {
 		.settings = settings,
-		.wavefunction = (c64*)sa_push(_sbmf.main_stack, settings.g.total_pointcount*sizeof(c64)),
+		.wavefunction = (c64*) sbmf_stack_push(settings.g.total_pointcount*sizeof(c64)),
 		.error = 0.0,
 		.iterations = 0,
 	};
 
-	grid kgrid = mimic_grid(settings.g);
+	struct grid kgrid = mimic_grid(settings.g);
 
 	// Momentum grid
 	{

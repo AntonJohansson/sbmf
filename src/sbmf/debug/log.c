@@ -1,5 +1,7 @@
 #include "log.h"
-#include <sbmf/common/common.h>
+#include <sbmf/types.h>
+
+#include <assert.h>
 #include <stdio.h>
 #include <stdarg.h>
 #include <errno.h>
@@ -89,7 +91,6 @@ static void log_impl(enum log_level level, const char* fmt, va_list args) {
 	strncpy(&_log_state.buffer[i][0], level_str, MAX_LOG_LEN);
 
 	vsnprintf(&_log_state.buffer[i][level_str_len], MAX_LOG_LEN-level_str_len, fmt, args);
-	//_log_state.buffer[i][bytes] = 0;
 
 	if (_log_state.current_log_level <= level) {
 		printf("%s\n", &_log_state.buffer[i][0]);
@@ -115,4 +116,13 @@ void log_error(const char* fmt, ...) {
 	va_start(args, fmt);
 	log_impl(LOG_LEVEL_ERROR, fmt, args);
 	va_end(args);
+}
+
+void log_panic(const char* fmt, ...) {
+	va_list args;
+	va_start(args, fmt);
+	log_impl(LOG_LEVEL_ERROR, fmt, args);
+	va_end(args);
+
+	assert(0);
 }

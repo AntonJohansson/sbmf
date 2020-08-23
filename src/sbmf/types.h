@@ -34,16 +34,3 @@ static inline bool f64_compare(f64 a, f64 b, f64 epsilon) {
 static inline bool f64_is_valid(f64 f) {
 	return !isinf(f) && !isnan(f);
 }
-
-
-struct stack_allocator;
-
-typedef struct sbmf_state {
-	struct stack_allocator* main_stack;
-	bool initialized;
-} sbmf_state;
-
-extern sbmf_state _sbmf;
-
-void sbmf_init();
-void sbmf_shutdown();

@@ -1,32 +1,11 @@
 #include <math.h>
-#include <sbmf/common/matrix.h>
-#include <sbmf/common/eigenproblem.h>
-#include <sbmf/basis/harmonic_oscillator.h>
+#include <sbmf/math/matrix.h>
+#include <sbmf/math/find_eigenpairs.h>
+#include <sbmf/math/harmonic_oscillator.h>
 #include <plot/plot.h>
 
-#define PLOT_HO_POB 1
+#define PLOT_HO_POB 0
 #define PLOT_HO_HO_PERT 0
-
-void f64_normalize(f64* data, u32 size) {
-	f64 sum = 0.0;
-	for (u32 i = 0; i < size; ++i) {
-		f64 absval = fabs(data[i]);
-		sum += absval*absval;
-	}
-	for (u32 i = 0; i < size; ++i) {
-		data[i] *= (1.0/sqrt(sum));
-	}
-}
-void c64_normalize(c64* data, u32 size) {
-	f64 sum = 0.0;
-	for (u32 i = 0; i < size; ++i) {
-		f64 absval = cabs(data[i]);
-		sum += absval*absval;
-	}
-	for (u32 i = 0; i < size; ++i) {
-		data[i] *= (1.0/sqrt(sum));
-	}
-}
 
 f64 exact_pob_eigval(f64 L, u32 n) {
 	return (n*n*M_PI*M_PI)/(2*L*L);
@@ -69,29 +48,6 @@ static inline f64 pob_integrand_smooth(f64 x, void* data) {
 		ho_eigenfunction((i32[]){params[1]}, &x, 1);
 }
 
-static inline f64 ho_integrand(f64 x, void* data) {
-	u32* params = data;
-	return
-		ho_eigenfunction((i32[]){params[0]}, &x, 1) *
-		ho_potential(&x,1,0)*
-		ho_eigenfunction((i32[]){params[1]}, &x, 1);
-}
-
-static inline f64 gaussian(f64 x, f64 mu, f64 sigma) {
-	return 1.0/(sigma*sqrt(M_2_PI)) * exp(-x*x/(2*sigma*sigma));
-}
-
-static inline f64 ho_perturbed_potential(f64* x, i32 n, void* data) {
-	return ho_potential(x,1,0) + gaussian(*x,0,0.2);
-}
-
-static inline f64 ho_perturbed_integrand(f64 x, void* data) {
-	u32* params = data;
-	return
-		ho_eigenfunction((i32[]){params[0]}, &x, 1) *
-		ho_perturbed_potential(&x,1,0) *
-		ho_eigenfunction((i32[]){params[1]}, &x, 1);
-}
 
 describe(particle_in_a_box_1D) {
 	const f64 L = 1.0;
@@ -100,7 +56,7 @@ describe(particle_in_a_box_1D) {
 	f64 exact_pob_func[max_n][sample_points];
 	f64 exact_pob_energy[max_n];
 
-	grid space;
+	struct grid space;
 
 	before_each() {
 		sbmf_init();
@@ -139,7 +95,7 @@ describe(particle_in_a_box_1D) {
 		asserteq(mat_is_valid(mat.base), true);
 
 		// Solve eigenvalue problem for hamiltonian
-		eig_result res = eig_sparse_bandmat(mat, max_n, EV_SMALLEST_RE);
+		struct eigen_result res = find_eigenpairs_sparse(mat, max_n, EV_SMALLEST_RE);
 
 		// Check results
 		for (u32 n = 0; n < res.num_eigenpairs; ++n) {
@@ -178,7 +134,7 @@ describe(particle_in_a_box_1D) {
 		asserteq(mat_is_valid(T.base), true);
 
 		// Solve eigenvalue problem for hamiltonian
-		eig_result res = eig_sparse_bandmat(T, max_n, EV_SMALLEST_RE);
+		struct eigen_result res = find_eigenpairs_sparse(T, max_n, EV_SMALLEST_RE);
 
 		// Check results
 		for (u32 n = 0; n < res.num_eigenpairs; ++n) {
@@ -219,7 +175,7 @@ describe(particle_in_a_box_1D) {
 		asserteq(mat_is_valid(T.base), true);
 
 		// Solve eigenvalue problem for hamiltonian
-		eig_result res = eig_sparse_bandmat(T, max_n, EV_SMALLEST_RE);
+		struct eigen_result res = find_eigenpairs_sparse(T, max_n, EV_SMALLEST_RE);
 
 #if PLOT_HO_POB
 		{
@@ -295,7 +251,7 @@ describe(particle_in_a_box_1D) {
 		asserteq(mat_is_valid(T.base), true);
 
 		// Solve eigenvalue problem for hamiltonian
-		eig_result res = eig_sparse_bandmat(T, max_n, EV_SMALLEST_RE);
+		struct eigen_result res = find_eigenpairs_sparse(T, max_n, EV_SMALLEST_RE);
 
 #if PLOT_HO_HO_PERT
 		{

@@ -1,75 +1,80 @@
-#include "eigenproblem.h"
+#include "find_eigenpairs.h"
+#include <sbmf/sbmf.h>
+#include <sbmf/debug/log.h>
 
 #include <lapacke.h>
 #include <cblas.h>
 #include <arpack/arpack.h>
-//#include <arpack/debug_c.h>
+/*#include <arpack/debug_c.h>*/
 
 #include <assert.h>
-#include <stdlib.h> // malloc
 #include <string.h> // memcpy, memset
 
-#include <sbmf/memory/stack_allocator.h>
-#include <sbmf/debug/log.h>
+struct eigen_result find_eigenpairs_full(hermitian_bandmat bm) {
+	f64* offdiag_elements = (f64*)sbmf_stack_push((bm.size-1)*sizeof(f64));
+	c64* colmaj_eigvecs = (c64*)sbmf_stack_push(bm.size*bm.size*sizeof(c64));
 
-////////////////////////////////////////////////////////////////////////////////////////////////////
+	struct eigen_result res = {
+		.eigenvalues = (c64*)sbmf_stack_push(bm.size * sizeof(c64)),
+		.eigenvectors = (c64*)sbmf_stack_push(bm.size * bm.size * sizeof(c64)),
+		.num_eigenpairs = bm.size,
+		.points_per_eigenvector = bm.size,
+	};
 
-void eig_dense_symetric_upper_tridiag_bandmat(hermitian_bandmat bm, f64* out_eigvals, c64* out_eigvecs) {
-	f64* offdiag_elements = (f64*)sa_push(_sbmf.main_stack, (bm.size-1)*sizeof(f64));
-	c64* colmaj_eigvecs = (c64*)sa_push(_sbmf.main_stack, bm.size*bm.size*sizeof(c64));
+	f64 temp_eigvals[bm.size];
 
-	i32 res = 0;
-
-	// Start by reducing (complex hermitian) bandmatrix to tri-diagonal mat.
+	/* Start by reducing (complex hermitian) bandmatrix to tri-diagonal mat. */
 	{
-		res = LAPACKE_zhbtrd(LAPACK_ROW_MAJOR, 'V', 'U',
+		i32 err = LAPACKE_zhbtrd(LAPACK_ROW_MAJOR, 'V', 'U',
 				bm.size,
 				bm.bandcount-1,
 				bm.base.data,
 				bm.size,
-				out_eigvals, offdiag_elements, colmaj_eigvecs,
+				temp_eigvals, offdiag_elements, colmaj_eigvecs,
 				bm.size);
 
-		assert(res == 0); // @TODO, handle these errors better
+		assert(err == 0); // @TODO, handle these errors better
 	}
 
-	// Solve eigenvalue problem via QR factorisation of tridiagonal matrix
+	/* Solve eigenvalue problem via QR factorisation of tridiagonal matrix. */
 	{
-		res = LAPACKE_zsteqr(LAPACK_ROW_MAJOR, 'V',
+		i32 err = LAPACKE_zsteqr(LAPACK_ROW_MAJOR, 'V',
 				bm.size,
-				out_eigvals, offdiag_elements, colmaj_eigvecs,
+				temp_eigvals, offdiag_elements, colmaj_eigvecs,
 				bm.size);
 
-		assert(res == 0); // @TODO, handle these errors better
+		assert(err == 0); // @TODO, handle these errors better
 	}
 
-	// Convert eigenvectors to row-major, as we expected them to be.
-	//TODO mat_transpose(out_eigvecs, colmaj_eigvecs, bm.size, bm.size);
-	for (i32 r = 0; r < bm.size; ++r) {
-		for (i32 c = 0; c < bm.size; ++c) {
-			out_eigvecs[r + c*bm.size] = colmaj_eigvecs[c + r*bm.size];
+	/* Convert eigenvectors to row-major, as we expected them to be.
+	 *TODO mat_transpose(out_eigvecs, colmaj_eigvecs, bm.size, bm.size);
+	 */
+	for (u32 r = 0; r < bm.size; ++r) {
+		res.eigenvalues[r] = temp_eigvals[r];
+		for (u32 c = 0; c < bm.size; ++c) {
+			res.eigenvectors[r + c*bm.size] = colmaj_eigvecs[c + r*bm.size];
 		}
 	}
+
+	return res;
 }
 
-////////////////////////////////////////////////////////////////////////////////////////////////////
-
-// Arpack helper funcs
+/* Arpack helper functions to provide more helpful error messages. */
 static const char* arpack_znaupd_error_code_to_string(i32 err);
 static const char* arpack_zneupd_error_code_to_string(i32 err);
-static const char* which_eigenpairs_to_arpack_string(which_eigenpairs which);
+static const char* arpack_which_eigenpairs_to_string(enum which_eigenpairs which);
 
-eig_result eig_sparse_bandmat(hermitian_bandmat bm, u32 num_eigenvalues, which_eigenpairs which_pairs) {
+struct eigen_result find_eigenpairs_sparse(hermitian_bandmat bm, u32 num_eigenvalues, enum which_eigenpairs which) {
 	i32 ido = 0;
 	i32 n = bm.size;
-	const char* which = which_eigenpairs_to_arpack_string(which_pairs);
+	const char* which_str = arpack_which_eigenpairs_to_string(which);
 
 	i32 nev = num_eigenvalues; // number of eigenvalues to find
 	if (2 + nev > n) {
 		log_error("eig_sparse_bandmat(...) failed:");
 		log_error("\t the number of requested eigenvalues nev=%d and the matrix N=%d size must satisfy:", nev, n);
 		log_error("\t\t 2 + nev <= N");
-		return (eig_result){};
+		return (struct eigen_result){};
 	}
 
 	f64 tol = 0.0; // relative error tolerance to achieve.
@@ -80,7 +85,7 @@ eig_result eig_sparse_bandmat(hermitian_bandmat bm, u32 num_eigenvalues, which_e
 	i32 ncv = (2+nev+n)/2;
 	log_info("n: %d, ncv: %d, nev: %d", n, ncv, nev);
 
-	c64* v = (c64*)sa_push(_sbmf.main_stack, sizeof(c64)*n*ncv);
+	c64* v = (c64*)sbmf_stack_push(sizeof(c64)*n*ncv);
 	i32 iparam[11] = {
 		[0] = 1, 		// Exact shift is used
 		[2] = 7000, 	// Max iterations
@@ -89,14 +94,14 @@ eig_result eig_sparse_bandmat(hermitian_bandmat bm, u32 num_eigenvalues, which_e
 	};
 	i32 ipntr[14];
 
-	c64* workd = (c64*)sa_push(_sbmf.main_stack, sizeof(c64)*3*n);
+	c64* workd = (c64*)sbmf_stack_push(sizeof(c64)*3*n);
 	i32 lworkl = 3*ncv*ncv + 5*ncv;
-	c64* workl = (c64*)sa_push(_sbmf.main_stack, sizeof(c64)*lworkl);
+	c64* workl = (c64*)sbmf_stack_push(sizeof(c64)*lworkl);
 	f64 rwork[ncv];
 
 	i32 info = 0;
 
-	c64* data = (c64*)sa_push(_sbmf.main_stack, sizeof(c64)*bm.bandcount*n);
+	c64* data = (c64*)sbmf_stack_push(sizeof(c64)*bm.bandcount*n);
 	hermitian_bandmat input_mat = {
 		.base = {
 			.rows = bm.bandcount,
@@ -114,7 +119,7 @@ eig_result eig_sparse_bandmat(hermitian_bandmat bm, u32 num_eigenvalues, which_e
 	//		3, 3, 3, 3, 3, 3, 3);
 
 	while (ido != 99 && info == 0) {
-		znaupd_c(&ido, "I", n, which, nev, tol, resid, ncv, v, n, iparam, ipntr,
+		znaupd_c(&ido, "I", n, which_str, nev, tol, resid, ncv, v, n, iparam, ipntr,
 				workd, workl, lworkl, rwork, &info);
 
 		if (info != 0) {
@@ -130,13 +135,13 @@ eig_result eig_sparse_bandmat(hermitian_bandmat bm, u32 num_eigenvalues, which_e
 	// Convergence or error
 	if (info == 0) {
 		i32 select[n]; // not used
-		c64* d = (c64*)sa_push(_sbmf.main_stack, sizeof(c64)*nev);
-		c64* z = (c64*)sa_push(_sbmf.main_stack, sizeof(c64)*n*nev);
+		c64* d = (c64*)sbmf_stack_push(sizeof(c64)*nev);
+		c64* z = (c64*)sbmf_stack_push(sizeof(c64)*n*nev);
 		c64 sigma = 0; // not used
-		c64* workev = (c64*)sa_push(_sbmf.main_stack, sizeof(c64)*2*n);
+		c64* workev = (c64*)sbmf_stack_push(sizeof(c64)*2*n);
 
 		zneupd_c(true, "A", select, d, z, n, sigma, workev,
-				"I", n, which, nev, tol, resid, ncv, v, n, iparam, ipntr, workd, workl, lworkl, rwork, &info);
+				"I", n, which_str, nev, tol, resid, ncv, v, n, iparam, ipntr, workd, workl, lworkl, rwork, &info);
 
 		if (info != 0) {
 			log_error("arpack zneupd(...) error: (%d) %s", info, arpack_zneupd_error_code_to_string(info));
@@ -148,7 +153,7 @@ eig_result eig_sparse_bandmat(hermitian_bandmat bm, u32 num_eigenvalues, which_e
 			log_info("\t Number of requested eigenvalues: %d", nev);
 			log_info("\t Number of generated Arnoldi vectors: %d", n);
 			log_info("\t Number of converged Ritz values: %d", nconv);
-			log_info("\t Sought eigenvalues: %s", which);
+			log_info("\t Sought eigenvalues: %s", which_str);
 			log_info("\t Number of iterations: %d", iparam[2]);
 			log_info("\t Number of OP*x: %d", iparam[8]);
 			log_info("\t Convergence tolerance: %lf", tol);
@@ -162,9 +167,9 @@ eig_result eig_sparse_bandmat(hermitian_bandmat bm, u32 num_eigenvalues, which_e
 				log_info("\t\t %lf + %lfi -- %e", creal(d[i]), cimag(d[i]), cblas_dznrm2(n, ax, 1));
 			}
 
-			eig_result res = {
-				.eigenvalues = (c64*)sa_push(_sbmf.main_stack, sizeof(c64)*nev),
-				.eigenvectors = (c64*)sa_push(_sbmf.main_stack, sizeof(c64)*bm.size*nev),
+			struct eigen_result res = {
+				.eigenvalues = (c64*)sbmf_stack_push(sizeof(c64)*nev),
+				.eigenvectors = (c64*)sbmf_stack_push(sizeof(c64)*bm.size*nev),
 				.num_eigenpairs = nev,
 				.points_per_eigenvector = bm.size,
 			};
@@ -174,9 +179,10 @@ eig_result eig_sparse_bandmat(hermitian_bandmat bm, u32 num_eigenvalues, which_e
 		}
 	}
 
-	return (eig_result){0};
+	return (struct eigen_result){0};
 }
 
+/* See znaupd.f for more info */
 static inline const char* arpack_znaupd_error_code_to_string(i32 err) {
 	switch (err) {
 		case 0: return "Normal exit.";
@@ -199,6 +205,8 @@ static inline const char* arpack_znaupd_error_code_to_string(i32 err) {
 		default: return "Unknown error code";
 	}
 }
+
+/* See the zneupd.f for more info */
 static inline const char* arpack_zneupd_error_code_to_string(i32 err) {
 	switch (err) {
 		case 0:  return "Normal exit.";
@@ -219,7 +227,8 @@ static inline const char* arpack_zneupd_error_code_to_string(i32 err) {
 		default: return "Unknown error code";
 	}
 }
-static inline const char* which_eigenpairs_to_arpack_string(which_eigenpairs which) {
+
+static inline const char* arpack_which_eigenpairs_to_string(enum which_eigenpairs which) {
 	switch(which) {
 		case EV_LARGEST_MAG:		return "LM";
 		case EV_SMALLEST_MAG:		return "SM";

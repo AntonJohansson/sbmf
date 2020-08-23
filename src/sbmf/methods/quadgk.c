@@ -1,7 +1,7 @@
 #include "quadgk.h"
-#include <sbmf/common/prioqueue.h>
+#include <sbmf/memory/prioqueue.h>
 #include <sbmf/debug/log.h>
-#include <sbmf/common/profile.h>
+#include <sbmf/debug/profile.h>
 #include <math.h> // INFINITY and isinf
 
 gk_data gk7 = {
@@ -259,8 +259,6 @@ static inline integration_result hadapt(integrand* f, f64 start, f64 end, integr
 			prioqueue_push(pq, &right_seg);
 		PROFILE_END("quadgk -- hadapt iter");
 	}
-
-	prioqueue_free(pq);
 
 	if (result.performed_evals <= settings.max_evals)
 		result.converged = true;

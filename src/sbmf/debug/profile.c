@@ -1,11 +1,30 @@
 #include "profile.h"
-#include <sbmf/debug/log.h>
+#include "log.h"
+#include <sbmf/types.h>
+
+#include <time.h>
 #include <errno.h>
 #include <string.h>
 
 #if PROFILE_ENABLE
-	u32 profile_entry_count = 0;
-	struct profile_entry profile_entries[PROFILE_MAX_ENTRIES] = {0};
+	#define PROFILE_MAX_ENTRIES 100
+	#define PROFILE_MAX_NAME_LEN 100
+	#define PROFILE_MAX_SAMPLE_COUNT 100
+
+	struct profile_entry {
+		char name[PROFILE_MAX_NAME_LEN];
+
+		struct timespec start;
+		struct timespec end;
+
+		struct timespec elapsed[PROFILE_MAX_SAMPLE_COUNT];
+		u32 sample_count;
+
+		f64 total_ms;
+	};
+
+	static u32 profile_entry_count = 0;
+	static struct profile_entry profile_entries[PROFILE_MAX_ENTRIES] = {0};
 #endif
 
 static inline struct profile_entry* profile_find_entry_by_name(char const name[]) {
@@ -18,7 +37,7 @@ static inline struct profile_entry* profile_find_entry_by_name(char const name[]
 	return 0;
 }
 
-void profile_begin(char const name[]) {
+void profile_begin_impl(char const name[]) {
 	struct profile_entry* entry = profile_find_entry_by_name(name);
 	if(!entry) {
 		if (profile_entry_count >= PROFILE_MAX_ENTRIES)
@@ -37,7 +56,7 @@ void profile_begin(char const name[]) {
 	}
 }
 
-void profile_end(char const name[]) {
+void profile_end_impl(char const name[]) {
 	struct profile_entry* entry = profile_find_entry_by_name(name);
 	if(!entry) {
 		log_error("profile_end() failed, entry %s not found", name);

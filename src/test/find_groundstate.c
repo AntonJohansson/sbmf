@@ -1,29 +1,10 @@
 #include <math.h>
-#include <sbmf/common/matrix.h>
-#include <sbmf/common/eigenproblem.h>
-#include <sbmf/basis/harmonic_oscillator.h>
-#include <sbmf/groundstate_solver/groundstate_solver.h>
-#include <sbmf/common/profile.h>
+#include <sbmf/math/matrix.h>
+#include <sbmf/math/find_eigenpairs.h>
+#include <sbmf/math/harmonic_oscillator.h>
+#include <sbmf/methods/find_groundstate.h>
+#include <sbmf/debug/profile.h>
 #include <plot/plot.h>
-
-void c64_normalize(c64* data, u32 size) {
-	f64 sum = 0.0;
-	for (u32 i = 0; i < size; ++i) {
-		f64 absval = cabs(data[i]);
-		sum += absval*absval;
-	}
-	for (u32 i = 0; i < size; ++i) {
-		data[i] *= (1.0/sqrt(sum));
-	}
-}
-
-static inline f64 gaussian(f64 x, f64 mu, f64 sigma) {
-	return 1.0/(sigma*sqrt(M_2_PI)) * exp(-x*x/(2*sigma*sigma));
-}
-
-static inline f64 ho_perturbed_potential(f64* x, i32 n, void* data) {
-	return ho_potential(x,1,0) + gaussian(*x,0,0.2);
-}
 
 c64 guess(f64* v, i32 n) {
 	return gaussian(*v, 0, 0.2);

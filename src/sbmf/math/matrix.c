@@ -1,8 +1,8 @@
 #include "matrix.h"
-#include <cblas.h>
-
-#include <sbmf/memory/stack_allocator.h>
+#include <sbmf/sbmf.h>
 #include <sbmf/debug/log.h>
+
+#include <cblas.h>
 
 #include <assert.h>
 #include <string.h> // memcpy, memset
@@ -13,7 +13,7 @@ mat mat_new(mat_size_t rows, mat_size_t cols) {
 		.is_row_major = true,
 		.rows = rows,
 		.cols = cols,
-		.data = (mat_scalar_t*)sa_push(_sbmf.main_stack, sizeof(mat_scalar_t)*rows*cols)
+		.data = (mat_scalar_t*)sbmf_stack_push(sizeof(mat_scalar_t)*rows*cols)
 	};
 }
 
@@ -57,7 +57,7 @@ void complex_bandmat_mulv(mat_scalar_t* ans_vec, bandmat mat, mat_scalar_t* vec)
 
 void mat_transpose_raw(mat_scalar_t* ans, mat_scalar_t* in, mat_size_t rows, mat_size_t cols) {
 	// TODO: this can be freed
-	mat_scalar_t* temp = (mat_scalar_t*)sa_push(_sbmf.main_stack, sizeof(mat_scalar_t)*rows*cols);
+	mat_scalar_t* temp = (mat_scalar_t*)sbmf_stack_push(sizeof(mat_scalar_t)*rows*cols);
 
 	for (mat_size_t r = 0; r < rows; ++r) {
 		for (mat_size_t c = 0; c < cols; ++c) {

@@ -1,11 +1,12 @@
 #!/bin/sh
 
+# Create all the necessary directories and so on.
 mkdir -p bin share include lib src
 basedir=$(pwd)
 
 cd src
 
- Build fftw
+# Build fftw
 tar xvzf $basedir/tars/fftw-3.3.8.tar.gz
 cd fftw-3.3.8
 ./configure --prefix=$basedir
@@ -13,14 +14,14 @@ make
 make install
 cd ..
 
-# Build BLAS CBLAS LAPACK LAPACKE
+# Build BLAS CBLAS LAPACK LAPACKE from git
 git clone https://github.com/xianyi/openblas
 cd openblas
 make -j4
 make install PREFIX=$basedir
 cd ..
 
-# Build arpack
+# Build arpack-ng from git
 git clone https://github.com/opencollab/arpack-ng
 cd arpack-ng
 ./bootstrap

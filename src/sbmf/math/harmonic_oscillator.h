@@ -16,6 +16,9 @@ static inline f128 factorial_128(u32 n) {
 	return prod;
 }
 
+/* Computed the value of the harmonic oscillator eigenfunction
+ * at the passed in point in space and state-space
+ */
 static f64 ho_eigenfunction(i32 states[], f64 point[], i32 dims) {
 	f64 prod = 1.0;
 	static const f64 pi_factor = 1.0/pow(M_PI,0.25);
@@ -38,165 +41,7 @@ static f64 ho_eigenfunction(i32 states[], f64 point[], i32 dims) {
 	return prod;
 }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-#define CACHE_SIZE 256
-
-struct cache_node {
-	f64* coeffs;
-	bool computed;
-};
-
-static struct cache_node cache[CACHE_SIZE] = {0};
-
-static inline void hob_precompute_coeffs(u32 max_n) {
-	assert(max_n <= CACHE_SIZE);
-	static const f64 pi_factor = 1.0/pow(M_PI,0.25);
-	for (u32 n = 0; n < max_n; ++n) {
-		struct cache_node* node = &cache[n];
-		node->coeffs = (f64*)sbmf_stack_push((n/2+1)*sizeof(f64));
-		node->computed = true;
-
-		f64 coeff = 0.0;
-		for (u32 m = 0; m <= n/2; ++m) {
-			i32 sign = (m % 2 == 0) ? 1 : -1;
-			coeff = pow(2,n-2*m)*sign/(factorial_128(m) * factorial_128(n-2*m));
-			coeff *= factorial_128(n)*pi_factor/sqrt(pow(2,n)*factorial_128(n));
-			node->coeffs[m] = coeff;
-			if (n == 64) {
-				log_info("m: %u -- %lf", m, coeff);
-			}
-		}
-	}
-}
-
-static f64 ho_eigenfunction_sumstuff_cached(u32 n, f64 x) {
-	/* H_n(x) = n! * sum(m=0,floor(n/2)) ((-1)^m / (m!*(n-2m)!)) * (2x)^(n-2m)
-	 * psi_n(x) = (1/sqrt/(2^n * n!)) * (1/pi)^(1/4) * exp(-x*x/2) * H_n(x)
-	 */
-
-	struct cache_node* node = &cache[n];
-
-	/* we have it in cache */
-	f64 sum = 0.0;
-	for (u32 m = 0; m <= n/2; ++m) {
-		sum += node->coeffs[m] * pow(x, n-2*m);
-	}
-	return exp(-x*x/2.0)*sum;
-}
-
-static void ho_eigenfunction_sumstuff_cached_xvec(u32 n, f64* x, f64* out, u32 len) {
-	/* H_n(x) = n! * sum(m=0,floor(n/2)) ((-1)^m / (m!*(n-2m)!)) * (2x)^(n-2m)
-	 * psi_n(x) = (1/sqrt/(2^n * n!)) * (1/pi)^(1/4) * exp(-x*x/2) * H_n(x)
-	 */
-
-	struct cache_node* node = &cache[n];
-
-	/* we have it in cache */
-	for (u32 m = 0; m <= n/2; ++m) {
-		for (u32 i = 0; i < len; ++i) {
-			out[i] += node->coeffs[m] * pow(x[i], n-2*m);
-		}
-	}
-
-	for (u32 i = 0; i < len; ++i) {
-		out[i] = exp(-x[i]*x[i]/2.0)*out[i];
-	}
-}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-static f64 ho_eigenfunction_sumstuff(u32 n, f64 x) {
-	/* H_n(x) = n! * sum(m=0,floor(n/2)) ((-1)^m / (m!*(n-2m)!)) * (2x)^(n-2m)
-	 * psi_n(x) = (1/sqrt/(2^n * n!)) * (1/pi)^(1/4) * exp(-x*x/2) * H_n(x)
-	 */
-
-	/* If we want to be able to cache
-	 * n = [0,N] eg (N+1 terms)
-	 * then each n requires an n/2+1 array for its terms
-	 */
-
-	f64 sum = 0.0;
-	for (u32 m = 0; m <= n/2; ++m) {
-		i32 sign = (m % 2 == 0) ? 1 : -1;
-		sum += (sign/(factorial_128(m) * factorial_128(n-2*m))) * pow(2*x, n-2*m);
-	}
-
-	static const f64 pi_factor = 1.0/pow(M_PI,0.25);
-	f64 normalization_factor = exp(-x*x/2.0) * pi_factor / sqrt(pow(2,n) * factorial_128(n));
-
-	return normalization_factor*factorial_128(n)*sum;
-}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+/* Same as above but computes the eigenfunction for multiple state-values. Might remove. */
 static void ho_eigenfunction_vec(u32 bases_per_dim[], f64 point[], u32 dims, f64* out) {
 	static const f64 pi_factor = 1.0/pow(M_PI,0.25);
 

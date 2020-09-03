@@ -16,7 +16,7 @@ static void inthandler(int dummy) {
 
 void sbmf_init() {
 	signal(SIGINT, inthandler);
-	log_set_level(LOG_LEVEL_WARNING);
+	/*log_set_level(LOG_LEVEL_WARNING);*/
 	log_open_and_clear_file("sbmf.log");
 	_state.main_stack = sa_make(32*1024*1024);
 	_state.initialized = true;
@@ -25,7 +25,6 @@ void sbmf_init() {
 void sbmf_shutdown() {
 	log_close_file();
 	sa_destroy(_state.main_stack);
-	//profile_print_results();
 	_state.initialized = false;
 }
 

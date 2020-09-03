@@ -104,3 +104,7 @@ void profile_print_results_impl() {
 		log_info("%40s | %10ld | %10ld | %10ld | %10.5lf ", entry.name, avg, ns_min, ns_max, entry.total_ms);
 	}
 }
+
+void profile_clear_impl() {
+	profile_entry_count = 0;
+}

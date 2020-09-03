@@ -9,6 +9,7 @@
 void profile_begin_impl(char const name[]);
 void profile_end_impl(char const name[]);
 void profile_print_results_impl();
+void profile_clear_impl();
 
 #if PROFILE_ENABLE
 	#define PROFILE_BEGIN(name)\
@@ -28,10 +29,13 @@ void profile_print_results_impl();
 
 	#define profile_print_results() \
 		profile_print_results_impl()
+	#define profile_clear() \
+		profile_clear_impl()
 #else
 	#define PROFILE_BEGIN(name)
 	#define PROFILE_END(name)
 	#define PROFILE_FUNC(func_call)\
 		func_call
 	#define profile_print_results()
+	#define profile_clear()
 #endif

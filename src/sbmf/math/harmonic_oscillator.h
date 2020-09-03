@@ -82,9 +82,8 @@ static struct cache_node cache[CACHE_SIZE] = {0};
 
 static inline void hob_precompute_coeffs(u32 max_n) {
 	assert(max_n <= CACHE_SIZE);
+	static const f64 pi_factor = 1.0/pow(M_PI,0.25);
 	for (u32 n = 0; n < max_n; ++n) {
-		static const f64 pi_factor = 1.0/pow(M_PI,0.25);
-
 		struct cache_node* node = &cache[n];
 		node->coeffs = (f64*)sbmf_stack_push((n/2+1)*sizeof(f64));
 		node->computed = true;
@@ -95,6 +94,9 @@ static inline void hob_precompute_coeffs(u32 max_n) {
 			coeff = pow(2,n-2*m)*sign/(factorial_128(m) * factorial_128(n-2*m));
 			coeff *= factorial_128(n)*pi_factor/sqrt(pow(2,n)*factorial_128(n));
 			node->coeffs[m] = coeff;
+			if (n == 64) {
+				log_info("m: %u -- %lf", m, coeff);
+			}
 		}
 	}
 }
@@ -104,31 +106,7 @@ static f64 ho_eigenfunction_sumstuff_cached(u32 n, f64 x) {
 	 * psi_n(x) = (1/sqrt/(2^n * n!)) * (1/pi)^(1/4) * exp(-x*x/2) * H_n(x)
 	 */
 
-	/*
-	if (n >= CACHE_SIZE) {
-		log_error("hob: level %d does not fit in %d sized cache!", n, CACHE_SIZE);
-		return 0.0;
-	}
-	*/
-
 	struct cache_node* node = &cache[n];
-
-	/*
-	if (!node->computed) {
-		static const f64 pi_factor = 1.0/pow(M_PI,0.25);
-
-		node->coeffs = (f64*)sa_push(_sbmf.main_stack, (n/2+1)*sizeof(f64));
-		node->computed = true;
-
-		f64 coeff = 0.0;
-		for (u32 m = 0; m <= n/2; ++m) {
-			i32 sign = (m % 2 == 0) ? 1 : -1;
-			coeff = pow(2,n-2*m)*sign/(factorial_128(m) * factorial_128(n-2*m));
-			coeff *= factorial_128(n)*pi_factor/sqrt(pow(2,n)*factorial_128(n));
-			node->coeffs[m] = coeff;
-		}
-	}
-	*/
 
 	/* we have it in cache */
 	f64 sum = 0.0;
@@ -138,58 +116,39 @@ static f64 ho_eigenfunction_sumstuff_cached(u32 n, f64 x) {
 	return exp(-x*x/2.0)*sum;
 }
 
+static void ho_eigenfunction_sumstuff_cached_xvec(u32 n, f64* x, f64* out, u32 len) {
+	/* H_n(x) = n! * sum(m=0,floor(n/2)) ((-1)^m / (m!*(n-2m)!)) * (2x)^(n-2m)
+	 * psi_n(x) = (1/sqrt/(2^n * n!)) * (1/pi)^(1/4) * exp(-x*x/2) * H_n(x)
+	 */
 
+	struct cache_node* node = &cache[n];
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-/*
-static inline f64 ho_eigenfunction(i32 states[], f64 point[], i32 dims) {
-	f128 prod = 1.0;
-	static const f64 pi_factor = 1.0/pow(M_PI,0.25);
-	for (i32 i = 0; i < dims; ++i) {
-		i32 n = states[i];
-		assert(n < 270);
-
-		f128 x = point[i];
-
-		{
-			f128 H0 = 1;
-			f128 H1 = 2*x;
-			f128 HN = 0.0;
-
-			if (n == 0) {
-				HN = H0;
-			} else if (n == 1) {
-				HN = H1;
-			} else {
-				for (i32 i = 2; i <= n; ++i) {
-					HN = 2*x*H1 - 2*(i-1)*H0;
-					if (isnan(HN)) {
-						log_error("isnan for %d", i);
-					}
-					H0 = H1;
-					H1 = HN;
-				}
-			}
-
-			f64 normalization_factor = exp(-x*x/2.0) * pi_factor / sqrt(pow(2,n) * factorial_128(n));
-			prod *= normalization_factor*HN;
+	/* we have it in cache */
+	for (u32 m = 0; m <= n/2; ++m) {
+		for (u32 i = 0; i < len; ++i) {
+			out[i] += node->coeffs[m] * pow(x[i], n-2*m);
 		}
 	}
-	return (f64)prod;
+
+	for (u32 i = 0; i < len; ++i) {
+		out[i] = exp(-x[i]*x[i]/2.0)*out[i];
+	}
 }
-*/
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 static f64 ho_eigenfunction_sumstuff(u32 n, f64 x) {

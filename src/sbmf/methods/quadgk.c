@@ -228,6 +228,8 @@ static inline integration_result hadapt(integrand* f, f64 start, f64 end, integr
 		return result;
 	}
 
+	u32 memory_marker = sbmf_stack_marker();
+
 	// If we get to this point we were not able to exit early and have do to more subdivisions
 	// to get desired error tolerance. yay.
 	prioqueue* pq = prioqueue_new(2*settings.max_evals, sizeof(segment), compare_segments);
@@ -259,6 +261,8 @@ static inline integration_result hadapt(integrand* f, f64 start, f64 end, integr
 			prioqueue_push(pq, &right_seg);
 		PROFILE_END("quadgk -- hadapt iter");
 	}
+
+	sbmf_stack_free_to_marker(memory_marker);
 
 	if (result.performed_evals <= settings.max_evals)
 		result.converged = true;

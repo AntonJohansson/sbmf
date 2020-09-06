@@ -20,7 +20,7 @@ static inline void apply_step_op(f64 ds, f64 dt, c64* out, gss_potential_func* p
 	}
 }
 
-gss_result item_execute(gss_settings settings, gss_potential_func* potential, gss_guess_func* guess) {
+struct gss_result item(struct gss_settings settings, gss_potential_func* potential, gss_guess_func* guess) {
 	// applying fft -> ifft in fftw scales input by N = n0*n1*...*nk.
 	// this is needed to cancel that scaling.
 	const f64 ifft_factor = 1.0/(settings.g.total_pointcount);
@@ -32,7 +32,7 @@ gss_result item_execute(gss_settings settings, gss_potential_func* potential, gs
 		density *= 1.0/(settings.g.maxs[i] - settings.g.mins[i]);
 	}
 
-	gss_result result = {
+	struct gss_result result = {
 		.settings = settings,
 		.wavefunction = (c64*) sbmf_stack_push(settings.g.total_pointcount*sizeof(c64)),
 		.error = 0.0,
@@ -147,7 +147,7 @@ gss_result item_execute(gss_settings settings, gss_potential_func* potential, gs
 				// Note: old_wavefunction has already been used at this point, we can
 				// thus use it as a temporary buffer.
 				apply_step_op(1.0, dt/2.0, old_wavefunction, potential, settings.g, result.wavefunction);
-				settings.dbgcallback(settings.g, old_wavefunction);
+				settings.dbgcallback(settings, old_wavefunction);
 			}
 		}
 

@@ -20,6 +20,11 @@ static inline f128 factorial_128(u32 n) {
  * at the passed in point in space and state-space
  */
 static f64 ho_eigenfunction(i32 states[], f64 point[], i32 dims) {
+	/*
+	 * HN = 2xH_{N-1} - 2(N-1)H_{N-2}
+	 * psiN = 1/sqrt(2^N * N!) * (1/pi^(1/4)) * exp(-x^2/2) * HN
+	 */
+
 	f64 prod = 1.0;
 	static const f64 pi_factor = 1.0/pow(M_PI,0.25);
 	for (i32 i = 0; i < dims; ++i) {
@@ -28,15 +33,20 @@ static f64 ho_eigenfunction(i32 states[], f64 point[], i32 dims) {
 
 		f64 x = point[i];
 
-		f64 H[3] = {1,1,1};
+		f64 normalization_factor = exp(-x*x/2.0) * pi_factor / sqrt(pow(2,n) * factorial_128(n));
+		f64 H[3] = {
+			normalization_factor,
+			normalization_factor,
+			normalization_factor,
+		};
+
 		for (i32 j = 1; j <= n; ++j) {
 			H[2] = 2*(x*H[1] - (j-1)*H[0]);
 			H[0] = H[1];
 			H[1] = H[2];
 		}
 
-		f64 normalization_factor = exp(-x*x/2.0) * pi_factor / sqrt(pow(2,n) * factorial_128(n));
-		prod *= normalization_factor*H[2];
+		prod *= H[2];
 	}
 	return prod;
 }

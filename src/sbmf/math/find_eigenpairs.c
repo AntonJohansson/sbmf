@@ -83,7 +83,6 @@ struct eigen_result find_eigenpairs_sparse(hermitian_bandmat bm, u32 num_eigenva
 	// Needs to satisfy
 	// 		2+nev <= ncv <= n
 	i32 ncv = (2+nev+n)/2;
-	log_info("n: %d, ncv: %d, nev: %d", n, ncv, nev);
 
 	c64* v = (c64*)sbmf_stack_push(sizeof(c64)*n*ncv);
 	i32 iparam[11] = {
@@ -146,7 +145,7 @@ struct eigen_result find_eigenpairs_sparse(hermitian_bandmat bm, u32 num_eigenva
 		if (info != 0) {
 			log_error("arpack zneupd(...) error: (%d) %s", info, arpack_zneupd_error_code_to_string(info));
 		} else {
-			// Print info
+			/*
 			i32 nconv = iparam[4];
 			log_info("arpack znaupd(...) convergence info:");
 			log_info("\t Matrix size: %d", n);
@@ -157,7 +156,6 @@ struct eigen_result find_eigenpairs_sparse(hermitian_bandmat bm, u32 num_eigenva
 			log_info("\t Number of iterations: %d", iparam[2]);
 			log_info("\t Number of OP*x: %d", iparam[8]);
 			log_info("\t Convergence tolerance: %lf", tol);
-
 			log_info("\t Eigenvalue residuals:");
 			for (i32 i = 0; i < nconv; ++i) {
 				c64 ax[n];
@@ -166,6 +164,7 @@ struct eigen_result find_eigenpairs_sparse(hermitian_bandmat bm, u32 num_eigenva
 				cblas_zaxpy(n, &neg_eigenvalue, &z[i*n], 1, ax, 1);
 				log_info("\t\t %lf + %lfi -- %e", creal(d[i]), cimag(d[i]), cblas_dznrm2(n, ax, 1));
 			}
+			*/
 
 			struct eigen_result res = {
 				.eigenvalues = (c64*)sbmf_stack_push(sizeof(c64)*nev),
@@ -178,6 +177,8 @@ struct eigen_result find_eigenpairs_sparse(hermitian_bandmat bm, u32 num_eigenva
 			return res;
 		}
 	}
+
+	log_error("not sure when this is called");
 
 	return (struct eigen_result){0};
 }

@@ -238,8 +238,6 @@ static inline integration_result hadapt(integrand* f, f64 start, f64 end, integr
 		return result;
 	}
 
-	u32 memory_marker = sbmf_stack_marker();
-
 	// If we get to this point we were not able to exit early and have do to more subdivisions
 	// to get desired error tolerance.
 

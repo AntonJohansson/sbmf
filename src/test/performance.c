@@ -6,20 +6,6 @@
 #include <sbmf/debug/profile.h>
 #include <sbmf/debug/log.h>
 
-/*
-Testing: sin, 0 -> pi: [info] sum: -0.000000 -- iters: 51
-[info] Timing results:
-[info]                                    entry |  avg. (ns) |   min (ns) |   max (ns) |        tot (ms)
-[info] -----------------------------------------+------------+------------+------------+----------------
-[info]                                      sin |       1837 |       1818 |       1885 |   32.46966
-[info]                    quadgk -- hadapt iter |       1228 |       1214 |       1267 |   21.70652
-[info]                      quadgk -- hadapt pq |         53 |         51 |         57 |    0.93954
-[info]                    quadgk -- hadapt eval |        988 |        977 |       1029 |   17.47274
-✓ Success: sin, 0 -> pi (33.45ms)
-quadgk_perf: Passed 1/1 tests. (33.58ms)
-*/
-
-//void func(f64* out, f64* xvals, u32 len, void* p) {
 f64 func(f64 x, void* p) {
 	return pow(sin(x)+cos(x),3);
 }

@@ -87,7 +87,6 @@ struct gss_result scim(struct gss_settings settings, gss_potential_func* potenti
 			PROFILE_BEGIN("H");
 			for (u32 r = 0; r < T.size; ++r) {
 				for (u32 c = r; c < T.size; ++c) {
-					PROFILE_BEGIN("H iter");
 					params.n[0] = r;
 					params.n[1] = c;
 					integration_result res = quadgk(scim_integrand, -INFINITY, INFINITY, int_settings);
@@ -97,7 +96,6 @@ struct gss_result scim(struct gss_settings settings, gss_potential_func* potenti
 
 					u32 i = (H.size-1)*(H.size-(c-r)) + r;
 					H.base.data[i] = T.base.data[i] + res.integral;
-					PROFILE_END("H iter");
 				}
 			}
 			PROFILE_END("H");

@@ -6,6 +6,7 @@ BUILDDIR = build
 PROJ_SRCS = \
 	src/sbmf/sbmf.c \
 	src/sbmf/methods/quadgk.c \
+	src/sbmf/methods/quadgk_vec.c \
 	src/sbmf/methods/item.c \
 	src/sbmf/methods/scim.c \
 	src/sbmf/math/find_eigenpairs.c \

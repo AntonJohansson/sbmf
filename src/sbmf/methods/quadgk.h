@@ -13,7 +13,7 @@ struct gk_data {
 
 extern struct gk_data gk7;
 
-typedef void integrand(f64*,f64*,u32,void*);
+typedef f64 integrand(f64,void*);
 typedef struct integration_settings {
 	struct gk_data gk;
 

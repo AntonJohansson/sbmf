@@ -26,6 +26,8 @@ void sbmf_shutdown() {
 	log_close_file();
 	sa_destroy(_state.main_stack);
 	_state.initialized = false;
+
+	//profile_print_results();
 }
 
 u8* sbmf_stack_push(u32 size_in_bytes) {

@@ -11,6 +11,7 @@
  * Currently the following is being tested (in the order they appear in
  * this source file):
  * 	[x] quadgk 1D numerical integration
+ * 	[x] quadgk_vec 1D numerical integration
  * 	[ ] ------ 2D numerical integration
  * 	[ ] ------ 3D numerical integration
  * 	[ ] FDM vs HO hamiltonian solving
@@ -26,6 +27,7 @@
 
 #include <sbmf/sbmf.h>
 #include <sbmf/methods/quadgk.h>
+#include <sbmf/methods/quadgk_vec.h>
 #include <sbmf/methods/find_groundstate.h>
 #include <sbmf/math/functions.h>
 #include <sbmf/math/harmonic_oscillator.h>
@@ -125,6 +127,106 @@ describe (quad_gk_numerical_integration){
 
 	it ("sin, 0 -> pi") {
 		integration_result res = quadgk(sinx, 0, M_PI, settings);
+		check_quadgk_converge(res, 2.0);
+	}
+}
+
+/* quadgk_vec 1D numerical integration */
+
+void x2_vec(f64* out, f64* in, u32 len, void* p) {
+	for (u32 i = 0; i < len; ++i)
+		out[i] = in[i]*in[i];
+}
+void expx_vec(f64* out, f64* in, u32 len, void* p) {
+	for (u32 i = 0; i < len; ++i)
+		out[i] = exp(in[i]);
+}
+void expnx_vec(f64* out, f64* in, u32 len, void* p) {
+	for (u32 i = 0; i < len; ++i)
+		out[i] = exp(-in[i]);
+}
+void expnabsx_vec(f64* out, f64* in, u32 len, void* p) {
+	for (u32 i = 0; i < len; ++i)
+		out[i] = exp(-fabs(in[i]));
+}
+void sinx_vec(f64* out, f64* in, u32 len, void* p) {
+	for (u32 i = 0; i < len; ++i)
+		out[i] = sin(in[i]);
+}
+
+describe (quad_gk_vec_numerical_integration){
+	before_each() { sbmf_init(); }
+	after_each() { sbmf_shutdown(); }
+
+	integration_settings settings = {
+		.gk = gk7,
+		.abs_error_tol = 1e-10,
+		.rel_error_tol = 1e-10,
+		.max_evals = 500,
+	};
+
+	it ("x2, 0 -> 2") {
+		integration_result res = quadgk_vec(x2_vec, 0, 2, settings);
+		check_quadgk_converge(res, 8.0/3.0);
+	}
+
+	it ("x2, 2 -> 0") {
+		integration_result res = quadgk_vec(x2_vec, 2, 0, settings);
+		check_quadgk_converge(res, -8.0/3.0);
+	}
+
+	it ("x2, -2 -> 0") {
+		integration_result res = quadgk_vec(x2_vec, -2, 0, settings);
+		check_quadgk_converge(res, 8.0/3.0);
+	}
+
+	it ("x2, 0 -> -2") {
+		integration_result res = quadgk_vec(x2_vec, 0, -2, settings);
+		check_quadgk_converge(res, -8.0/3.0);
+	}
+
+	it ("x2, -2 -> 2") {
+		integration_result res = quadgk_vec(x2_vec, -2, 2, settings);
+		check_quadgk_converge(res, 2*8.0/3.0);
+	}
+
+	it ("expnx, 0 -> inf") {
+		integration_result res = quadgk_vec(expnx_vec, 0, INFINITY, settings);
+		check_quadgk_converge(res, 1.0);
+	}
+
+	it ("expnx, inf -> 0") {
+		integration_result res = quadgk_vec(expnx_vec, INFINITY, 0, settings);
+		check_quadgk_converge(res, -1.0);
+	}
+
+	it ("expx, -inf -> 0") {
+		integration_result res = quadgk_vec(expx_vec, -INFINITY, 0, settings);
+		check_quadgk_converge(res, 1.0);
+	}
+
+	it ("expx, 0 -> -inf") {
+		integration_result res = quadgk_vec(expx_vec, 0, -INFINITY, settings);
+		check_quadgk_converge(res, -1.0);
+	}
+
+	it ("|expnx|, -inf -> inf") {
+		integration_result res = quadgk_vec(expnabsx_vec, -INFINITY, INFINITY, settings);
+		check_quadgk_converge(res, 2.0);
+	}
+
+	it ("|expnx|, inf -> -inf") {
+		integration_result res = quadgk_vec(expnabsx_vec, INFINITY, -INFINITY, settings);
+		check_quadgk_converge(res, -2.0);
+	}
+
+	it ("sin, 0 -> 2pi") {
+		integration_result res = quadgk_vec(sinx_vec, 0, 2*M_PI, settings);
+		check_quadgk_converge(res, 0.0);
+	}
+
+	it ("sin, 0 -> pi") {
+		integration_result res = quadgk_vec(sinx_vec, 0, M_PI, settings);
 		check_quadgk_converge(res, 2.0);
 	}
 }
@@ -312,7 +414,6 @@ describe(item_vs_scim_groundstate_finding) {
 	}
 
 	it ("non-linear hamiltonian") {
-		/*
 		const f64 L = 10.0;
 		const i32 N = 256;
 		struct grid space = generate_grid(1,
@@ -329,39 +430,10 @@ describe(item_vs_scim_groundstate_finding) {
 		struct gss_result item_res = item(settings, non_linear_hamiltonian_pot, guess);
 		log_info("\nitem:\niterations: %d\nerror: %e", item_res.iterations, item_res.error);
 		c64_normalize(item_res.wavefunction, space.total_pointcount);
-		{
-			plot_init(800, 600, "fdm groundstate");
-			f32 wdata[N];
-			f32 pdata[N];
-			sample_space sp = make_linspace(1, -L/2.0, L/2.0, N);
-
-			for (u32 i = 0; i < N; ++i) {
-				f64 x = sp.points[i];
-				pdata[i] = (f32) non_linear_hamiltonian_pot(&x, 1, item_res.wavefunction[i]);
-				f64 c = cabs(item_res.wavefunction[i]);
-				wdata[i] = 10*c*c;
-			}
-
-			push_line_plot(&(plot_push_desc){
-					.space = &sp,
-					.data = pdata,
-					.label = "potential",
-					});
-
-			push_line_plot(&(plot_push_desc){
-					.space = &sp,
-					.data = wdata,
-					.label = "item groundstate",
-					});
-
-			plot_update_until_closed();
-			plot_shutdown();
-		}
 
 		struct gss_result hob_res = scim(settings, non_linear_hamiltonian_pot, guess);
 		log_info("\nhob:\niterations: %d\nerror: %e", hob_res.iterations, hob_res.error);
 		c64_normalize(hob_res.wavefunction, space.total_pointcount);
-		*/
 
 #if 0
 		{

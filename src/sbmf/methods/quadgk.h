@@ -1,19 +1,21 @@
+#pragma once
+
 #include <sbmf/types.h>
 
 #define MAX_GAUSS_POINTS 7
-typedef struct {
+struct gk_data {
 	f64 kronod_nodes[MAX_GAUSS_POINTS+1];
 	f64 kronod_weights[MAX_GAUSS_POINTS+1];
 	f64 gauss_weights[(MAX_GAUSS_POINTS+1)/2];
 	u32 kronod_size;
 	u32 gauss_size;
-} gk_data;
+};
 
-extern gk_data gk7;
+extern struct gk_data gk7;
 
-typedef f64 integrand(f64, void*);
+typedef void integrand(f64*,f64*,u32,void*);
 typedef struct integration_settings {
-	gk_data gk;
+	struct gk_data gk;
 
 	// Aboslute and relative error tolarences.
 	f64 abs_error_tol;

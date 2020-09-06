@@ -4,7 +4,7 @@
 #include <sbmf/debug/profile.h>
 #include <math.h> // INFINITY and isinf
 
-gk_data gk7 = {
+struct gk_data gk7 = {
 	.kronod_nodes = {
 		9.9145537112081263920685469752598e-01,
 		9.4910791234275852452618968404809e-01,
@@ -54,7 +54,7 @@ typedef struct {
 } eval_result;
 
 eval_result evaluate_rule(integrand* f, f64 start, f64 end, integration_settings settings) {
-	gk_data* gk = &settings.gk;
+	struct gk_data* gk = &settings.gk;
 	f64 mid = 0.5 * (end - start);
 
 	// 	0 -- if even size
@@ -64,34 +64,41 @@ eval_result evaluate_rule(integrand* f, f64 start, f64 end, integration_settings
 	// fg/k - gauss/kronod function eval
 	// Ig/k - gauss/kronod integral estimate
 	// xg/k - gauss/kronod sample nodes
-	f64 fg, fk;
 	f64 Ig = 0, Ik = 0;
-	f64 xg, xk;
 
 	// Size of the gauss weights array (other than the last element if odd order)
-	i32 size = gk->gauss_size - is_order_odd;
-	for (i32 i = 0; i < size; ++i) {
-		xg = gk->kronod_nodes[2*i+1];
-		xk = gk->kronod_nodes[2*i];
+	u32 size = gk->gauss_size - is_order_odd;
+	f64 xvals[4*size + 3];
+	for (u32 i = 0; i < size; ++i) {
+		f64 xg = gk->kronod_nodes[2*i+1];
+		f64 xk = gk->kronod_nodes[2*i];
+		xvals[4*i + 0] = start + (1-xg)*mid;
+		xvals[4*i + 1] = start + (1+xg)*mid;
+		xvals[4*i + 2] = start + (1-xk)*mid;
+		xvals[4*i + 3] = start + (1+xk)*mid;
+	}
+	xvals[4*size + 0] = start+mid;
+	xvals[4*size + 1] = start + (1-gk->kronod_nodes[gk->kronod_size-2])*mid;
+	xvals[4*size + 2] = start + (1+gk->kronod_nodes[gk->kronod_size-2])*mid;
 
-		fg = f(start + (1-xg)*mid, settings.userdata) + f(start + (1+xg)*mid, settings.userdata);
-		fk = f(start + (1-xk)*mid, settings.userdata) + f(start + (1+xk)*mid, settings.userdata);
+	f64 out[4*size+3];
+	f(out, xvals, 4*size+3, settings.userdata);
 
+	for (u32 i = 0; i < size; ++i) {
+		f64 fg = out[4*i + 0] + out[4*i + 1];
+		f64 fk = out[4*i + 2] + out[4*i + 3];
 		Ig += gk->gauss_weights[i] * fg;
 		Ik += gk->kronod_weights[2*i+1] * fg + gk->kronod_weights[2*i] * fk;
 	}
 
 	// In the odd-order case, the last point has to be handled
 	// differently
-	if (is_order_odd  == 0) {
-		Ik += gk->kronod_weights[gk->kronod_size-1] * f(start + mid, settings.userdata);
+	if (is_order_odd == 0) {
+		Ik += gk->kronod_weights[gk->kronod_size-1] * out[4*size + 0];
 	} else {
-		f64 f0 = f(start + mid, settings.userdata);
-		Ig += gk->gauss_weights[gk->gauss_size-1] * f0;
-		Ik += gk->kronod_weights[gk->kronod_size-1] * f0
-			+ gk->kronod_weights[gk->kronod_size-2]
-			* (f(start + (1-gk->kronod_nodes[gk->kronod_size-2])*mid, settings.userdata)
-			+  f(start + (1+gk->kronod_nodes[gk->kronod_size-2])*mid, settings.userdata));
+		Ig += gk->gauss_weights[gk->gauss_size-1] * out[4*size + 0];
+		Ik += gk->kronod_weights[gk->kronod_size-1] * out[4*size + 0]
+			+ gk->kronod_weights[gk->kronod_size-2] * (out[4*size+1] + out[4*size+2]);
 	}
 
 	f64 Ik_s = Ik*mid;
@@ -155,7 +162,8 @@ static inline f64 integrand_both_endpoints_inf(f64 t, void* data) {
 	// to be checked.
 	f64 t2 = t*t;
 	f64 one_minus_t2 = (1.0-t2);
-	return tdata->original_f(t/one_minus_t2, tdata->userdata) * (1.0+t2)/(one_minus_t2*one_minus_t2);
+	//return tdata->original_f(t/one_minus_t2, tdata->userdata) * (1.0+t2)/(one_minus_t2*one_minus_t2);
+	return 0;
 }
 static inline f64 integrand_end_endpoint_inf(f64 t, void* data) {
 	coordinate_transform_data* tdata = data;
@@ -167,7 +175,8 @@ static inline f64 integrand_end_endpoint_inf(f64 t, void* data) {
 	// 				= (1*(1-t) - t*(-1))/(1-t)^2
 	// 				= 1/(1-t)^2
 	f64 one_minus_t = (1.0 - t);
-	return tdata->original_f(tdata->original_start + t/one_minus_t, tdata->userdata) * (1.0/(one_minus_t*one_minus_t));
+	//return tdata->original_f(tdata->original_start + t/one_minus_t, tdata->userdata) * (1.0/(one_minus_t*one_minus_t));
+	return 0;
 }
 static inline f64 integrand_start_endpoint_inf(f64 t, void* data) {
 	coordinate_transform_data* tdata = data;
@@ -180,7 +189,8 @@ static inline f64 integrand_start_endpoint_inf(f64 t, void* data) {
 	// NOTE: when integrating -inf -> b, switch to b -> -inf and then apply
 	// transformation to get 0->1
 	f64 one_minus_t = (1.0 - t);
-	return tdata->original_f(tdata->original_end - t/one_minus_t, tdata->userdata) * (-1.0/(one_minus_t*one_minus_t));
+	//return tdata->original_f(tdata->original_end - t/one_minus_t, tdata->userdata) * (-1.0/(one_minus_t*one_minus_t));
+	return 0;
 }
 
 
@@ -229,7 +239,10 @@ static inline integration_result hadapt(integrand* f, f64 start, f64 end, integr
 	}
 
 	// If we get to this point we were not able to exit early and have do to more subdivisions
-	// to get desired error tolerance. yay.
+	// to get desired error tolerance.
+
+	u32 memory_marker = sbmf_stack_marker();
+
 	prioqueue* pq = prioqueue_new(2*settings.max_evals, sizeof(segment), compare_segments);
 	prioqueue_push(pq, &s);
 
@@ -259,6 +272,8 @@ static inline integration_result hadapt(integrand* f, f64 start, f64 end, integr
 			prioqueue_push(pq, &right_seg);
 		PROFILE_END("quadgk -- hadapt iter");
 	}
+
+	sbmf_stack_free_to_marker(memory_marker);
 
 	if (result.performed_evals <= settings.max_evals)
 		result.converged = true;
@@ -293,11 +308,11 @@ integration_result quadgk(integrand* f, f64 start, f64 end, integration_settings
 		settings.userdata = &tdata;
 
 		if (start_isinf && end_isinf) {
-			res = hadapt(integrand_both_endpoints_inf, -1, 1, settings);
+			//res = hadapt(integrand_both_endpoints_inf, -1, 1, settings);
 		} else if (end_isinf) {
-			res = hadapt(integrand_end_endpoint_inf, 0, 1, settings);
+			//res = hadapt(integrand_end_endpoint_inf, 0, 1, settings);
 		} else if (start_isinf) {
-			res = hadapt(integrand_start_endpoint_inf, 1, 0, settings);
+			//res = hadapt(integrand_start_endpoint_inf, 1, 0, settings);
 		}
 	} else {
 		res = hadapt(f, start, end, settings);

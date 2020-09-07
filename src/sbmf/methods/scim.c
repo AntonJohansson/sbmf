@@ -80,7 +80,7 @@ struct gss_result scim(struct gss_settings settings, gss_potential_vec_func* pot
 
 		log_info("Staring iteration: %d -- error: %lf", res.iterations, res.error);
 
-		// Construct standard hamiltonian
+		/* Construct standard hamiltonian */
 		{
 			PROFILE_BEGIN("H");
 			for (u32 r = 0; r < T.size; ++r) {
@@ -101,10 +101,10 @@ struct gss_result scim(struct gss_settings settings, gss_potential_vec_func* pot
 			assert(mat_is_valid(H.base));
 		}
 
-		// Solve for first eigenvector (ground state)
+		/* Solve for first eigenvector (ground state) */
 		struct eigen_result eres = find_eigenpairs_sparse(H, 1, EV_SMALLEST_RE);
 
-		// Normalize and copy to result
+		/* Normalize and copy to result */
 		{
 			f64 sum = 0.0;
 			for (u32 i = 0; i < N; ++i) {
@@ -119,7 +119,7 @@ struct gss_result scim(struct gss_settings settings, gss_potential_vec_func* pot
 			}
 		}
 
-		// Calculate error
+		/* Calculate error */
 		{
 			f64 sum = 0.0;
 			for (u32 i = 0; i < N; ++i) {
@@ -132,10 +132,13 @@ struct gss_result scim(struct gss_settings settings, gss_potential_vec_func* pot
 				break;
 		}
 
+		/* Call debug callback if requested by user */
 		if (settings.measure_every > 0 && res.iterations % settings.measure_every == 0) {
 			if (settings.dbgcallback) {
-				// Note: old_wavefunction has already been used at this point, we can
-				// thus use it as a temporary buffer.
+				/*
+				 * Note: old_wavefunction has already been used at this point, we can
+				 * thus use it as a temporary buffer.
+				 */
 				settings.dbgcallback(settings, res.wavefunction);
 			}
 		}

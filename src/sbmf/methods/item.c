@@ -2,17 +2,17 @@
 
 #include <fftw3.h>
 
-#include <string.h> // memcpy
+#include <string.h> /* memcpy */
 #include <assert.h>
 
-static inline f64 VK(f64* v, i32 n, c64 u) {
+static f64 VK(f64* v, i32 n, c64 u) {
 	f64 value = 0.0;
 	for (i32 i = 0; i < n; ++i)
 		value += v[i]*v[i];
 	return 0.5*value;
 }
 
-static inline void apply_step_op(f64 ds, f64 dt, c64* out, gss_potential_func* potential, struct grid g, c64* wavefunction) {
+static void apply_step_op(f64 ds, f64 dt, c64* out, gss_potential_func* potential, struct grid g, c64* wavefunction) {
 	for (i32 i = 0; i < g.total_pointcount; ++i) {
 		f64 potval = potential(&g.points[g.dimensions*i], g.dimensions, wavefunction[i]);
 		f64 opval  = exp(-potval*dt);
@@ -21,8 +21,10 @@ static inline void apply_step_op(f64 ds, f64 dt, c64* out, gss_potential_func* p
 }
 
 struct gss_result item(struct gss_settings settings, gss_potential_func* potential, gss_guess_func* guess) {
-	// applying fft -> ifft in fftw scales input by N = n0*n1*...*nk.
-	// this is needed to cancel that scaling.
+	/*
+	 * applying fft -> ifft in fftw scales input by N = n0*n1*...*nk.
+	 * this is needed to cancel that scaling.
+	 */
 	const f64 ifft_factor = 1.0/(settings.g.total_pointcount);
 	const f64 dt = settings.dt;
 	f64 ds = 1.0;
@@ -41,7 +43,7 @@ struct gss_result item(struct gss_settings settings, gss_potential_func* potenti
 
 	struct grid kgrid = mimic_grid(settings.g);
 
-	// Momentum grid
+	/* Momentum grid */
 	{
 		i32 indices[kgrid.dimensions];
 		memset(indices, 0, kgrid.dimensions*sizeof(i32));
@@ -62,10 +64,10 @@ struct gss_result item(struct gss_settings settings, gss_potential_func* potenti
 		}
 	}
 
-	// Variables used in computation
+	/* Variables used in computation */
 	fftw_complex old_wavefunction[settings.g.total_pointcount];
 
-	// FFT def.
+	/* FFT def. */
 	c64* fft_in   = fftw_malloc(sizeof(c64) * settings.g.total_pointcount);
 	c64* fft_out  = fftw_malloc(sizeof(c64) * settings.g.total_pointcount);
 	c64* ifft_in  = fftw_malloc(sizeof(c64) * settings.g.total_pointcount);
@@ -74,7 +76,7 @@ struct gss_result item(struct gss_settings settings, gss_potential_func* potenti
 	fftw_plan fft_plan  = fftw_plan_dft(settings.g.dimensions, settings.g.pointcounts,  fft_in,  fft_out, FFTW_FORWARD,  FFTW_MEASURE);
 	fftw_plan ifft_plan = fftw_plan_dft(settings.g.dimensions, settings.g.pointcounts, ifft_in, ifft_out, FFTW_BACKWARD, FFTW_MEASURE);
 
-	// Spatial grid
+	/* Spatial grid */
 	{
 		for (i32 i = 0; i < settings.g.total_pointcount; ++i) {
 			result.wavefunction[i] = guess(&settings.g.points[settings.g.dimensions*i], settings.g.dimensions);
@@ -105,7 +107,7 @@ struct gss_result item(struct gss_settings settings, gss_potential_func* potenti
 	for (; result.iterations < settings.max_iterations; ++result.iterations)  {
 		memcpy(old_wavefunction, result.wavefunction, settings.g.total_pointcount*sizeof(fftw_complex));
 
-		// Apply operators
+		/* Apply operators */
 		{
 			apply_step_op(1.0, dt, fft_in, potential, settings.g, result.wavefunction);
 			fftw_execute(fft_plan);
@@ -118,7 +120,7 @@ struct gss_result item(struct gss_settings settings, gss_potential_func* potenti
 			}
 		}
 
-		// Normalize wavefunction
+		/* Normalize wavefunction */
 		{
 			f64 sum = 0.0;
 			for (i32 i = 0; i < settings.g.total_pointcount; ++i) {
@@ -132,7 +134,7 @@ struct gss_result item(struct gss_settings settings, gss_potential_func* potenti
 			}
 		}
 
-		// Calculate error
+		/* Calculate error */
 		{
 			f64 sum = 0.0;
 			for (i32 i = 0; i < settings.g.total_pointcount; ++i) {
@@ -144,8 +146,10 @@ struct gss_result item(struct gss_settings settings, gss_potential_func* potenti
 
 		if (settings.measure_every > 0 && result.iterations % settings.measure_every == 0) {
 			if (settings.dbgcallback) {
-				// Note: old_wavefunction has already been used at this point, we can
-				// thus use it as a temporary buffer.
+				/*
+				 * Note: old_wavefunction has already been used at this point, we can
+				 * thus use it as a temporary buffer.
+				 */
 				apply_step_op(1.0, dt/2.0, old_wavefunction, potential, settings.g, result.wavefunction);
 				settings.dbgcallback(settings, old_wavefunction);
 			}
@@ -158,8 +162,10 @@ struct gss_result item(struct gss_settings settings, gss_potential_func* potenti
 
 	apply_step_op(1.0, dt/2.0, result.wavefunction, potential, settings.g, result.wavefunction);
 
-	// Cleanup
-	// This is not handledefasdfasf free_grid(kgrid);
+	/*
+	 * Cleanup
+	 * This is not handledefasdfasf free_grid(kgrid);
+	 */
 	fftw_destroy_plan(fft_plan);
 	fftw_destroy_plan(ifft_plan);
 	fftw_free(fft_in);

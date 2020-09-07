@@ -51,8 +51,49 @@ static f64 ho_eigenfunction(i32 states[], f64 point[], i32 dims) {
 	return prod;
 }
 
+/* Currently doesnt handle 2d/3d/... case */
+static inline void ho_eigenfunction_vec(u32 n, f64* out, f64* in, u32 len) {
+	/*
+	 * HN = 2xH_{N-1} - 2(N-1)H_{N-2}
+	 * psiN = 1/sqrt(2^N * N!) * (1/pi^(1/4)) * exp(-x^2/2) * HN
+	 */
+	assert(n < 270);
+
+	static const f64 pi_factor = 1.0/pow(M_PI,0.25);
+	const f64 normalization_factor = pi_factor / sqrt(pow(2,n) * factorial_128(n));
+
+	for (u32 i = 0; i < len; ++i) {
+		f64 x = in[i];
+
+		f64 init_value = exp(-x*x/2.0) * normalization_factor;
+		f64 H[3] = {
+			init_value,
+			init_value,
+			init_value,
+		};
+
+		for (u32 j = 1; j <= n; ++j) {
+			H[2] = 2*(x*H[1] - (j-1)*H[0]);
+			H[0] = H[1];
+			H[1] = H[2];
+		}
+
+		out[i] = H[2];
+	}
+}
+
+
+
+
+
+
+
+
+
+
+
 /* Same as above but computes the eigenfunction for multiple state-values. Might remove. */
-static void ho_eigenfunction_vec(u32 bases_per_dim[], f64 point[], u32 dims, f64* out) {
+static void ho_eigenfunction_statevec(u32 bases_per_dim[], f64 point[], u32 dims, f64* out) {
 	static const f64 pi_factor = 1.0/pow(M_PI,0.25);
 
 	/* Compute total dimensionality and find maximum states */
@@ -176,12 +217,30 @@ static inline f64 ho_potential(f64* v, i32 n, c64 u) {
 	return temp*0.5;
 }
 
+/* Currently doesnt handle 2d/3d/... case */
+static inline void ho_potential_vec(f64* out, f64* in, u32 len) {
+	for (u32 i = 0; i < len; ++i) {
+		out[i] = 0.5*in[i]*in[i];
+	}
+}
+
 static inline c64 hob_sample(c64* v, u32 n, f64 x) {
 	c64 output = 0;
 	for (u32 i = 0; i < n; ++i) {
 		output += v[i] * ho_eigenfunction((i32[]){i}, &x, 1);
 	}
 	return output;
+}
+
+/* Currently doesnt handle 2d/3d/... case */
+static inline void hob_sample_vec(c64* coeffs, u32 coeff_len, c64* out, f64* in, u32 in_len) {
+	f64 eigfunc_out[in_len];
+	for (u32 i = 0; i < coeff_len; ++i) {
+		ho_eigenfunction_vec(i, eigfunc_out, in, in_len);
+		for (u32 j = 0; j < in_len; ++j) {
+			out[j] += coeffs[i]*eigfunc_out[j];
+		}
+	}
 }
 
 /* <m|H|n> = <m|T|n> + <m|V|n>

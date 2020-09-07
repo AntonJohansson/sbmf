@@ -234,6 +234,9 @@ static inline c64 hob_sample(c64* v, u32 n, f64 x) {
 
 /* Currently doesnt handle 2d/3d/... case */
 static inline void hob_sample_vec(c64* coeffs, u32 coeff_len, c64* out, f64* in, u32 in_len) {
+	for (u32 i = 0; i < in_len; ++i)
+		out[i] = 0;
+
 	f64 eigfunc_out[in_len];
 	for (u32 i = 0; i < coeff_len; ++i) {
 		ho_eigenfunction_vec(i, eigfunc_out, in, in_len);

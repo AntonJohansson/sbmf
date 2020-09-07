@@ -340,8 +340,11 @@ f64 linear_hamiltonian_pot(f64* v, i32 n, c64 u) {
 	return ho_perturbed_potential(v, n, NULL);
 }
 
-f64 non_linear_hamiltonian_pot(f64* v, i32 n, c64 u) {
-	return ho_potential(v, n, 0) + 3*cabs(u)*cabs(u);
+void non_linear_hamiltonian_vec_pot(f64* out, f64* in_x, c64* in_u, u32 len) {
+	ho_potential_vec(out, in_x, len);
+	for (u32 i = 0; i < len; ++i) {
+		out[i] += 3*cabs(in_u[i])*cabs(in_u[i]);
+	}
 }
 
 describe(item_vs_scim_groundstate_finding) {
@@ -427,11 +430,13 @@ describe(item_vs_scim_groundstate_finding) {
 			.dt = 0.001,
 		};
 
+		/*
 		struct gss_result item_res = item(settings, non_linear_hamiltonian_pot, guess);
 		log_info("\nitem:\niterations: %d\nerror: %e", item_res.iterations, item_res.error);
 		c64_normalize(item_res.wavefunction, space.total_pointcount);
+		*/
 
-		struct gss_result hob_res = scim(settings, non_linear_hamiltonian_pot, guess);
+		struct gss_result hob_res = scim(settings, non_linear_hamiltonian_vec_pot, guess);
 		log_info("\nhob:\niterations: %d\nerror: %e", hob_res.iterations, hob_res.error);
 		c64_normalize(hob_res.wavefunction, space.total_pointcount);
 

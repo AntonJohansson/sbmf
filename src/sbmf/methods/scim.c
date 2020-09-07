@@ -2,7 +2,7 @@
 #include <sbmf/sbmf.h>
 #include <sbmf/math/find_eigenpairs.h>
 #include <sbmf/math/harmonic_oscillator.h>
-#include <sbmf/methods/quadgk.h>
+#include <sbmf/methods/quadgk_vec.h>
 #include <sbmf/debug/profile.h>
 
 #include <assert.h> /* Not the correct way to handle this */
@@ -11,29 +11,28 @@ struct integrand_params {
 	u32 n[2];
 	c64* coeffs;
 	u32 coeff_count;
-	gss_potential_func* pot;
+	gss_potential_vec_func* pot;
 };
 
-static inline f64 scim_integrand(f64 x, void* data) {
-	PROFILE_BEGIN("integrand -- total");
-		struct integrand_params* params = data;
+static void scim_integrand(f64* out, f64* in, u32 len, void* data) {
+	struct integrand_params* params = data;
 
-		PROFILE_BEGIN("integrand -- eigs");
-		f64 eig1 = ho_eigenfunction((i32[]){params->n[0]}, &x, 1);
-		f64 eig2 = ho_eigenfunction((i32[]){params->n[1]}, &x, 1);
-		PROFILE_END("integrand -- eigs");
+	f64 eig1[len];
+	f64 eig2[len];
+	ho_eigenfunction_vec(params->n[0], eig1, in, len);
+	ho_eigenfunction_vec(params->n[1], eig2, in, len);
 
-		PROFILE_BEGIN("integrand sample");
-		f64 sample = hob_sample(params->coeffs, params->coeff_count, x);
-		PROFILE_END("integrand sample");
+	c64 sample[len];
+	hob_sample_vec(params->coeffs, params->coeff_count, sample, in, len);
 
-		PROFILE_BEGIN("integrand -- pot");
-		f64 pot = params->pot(&x, 1, sample);
-		PROFILE_END("integrand -- pot");
+	f64 pot[len];
+	params->pot(pot, in, sample, len);
 
-		f64 res = (eig1*eig2)*pot;
-	PROFILE_END("integrand -- total");
+	for (u32 i = 0; i < len; ++i) {
+		out[i] = eig1[i]*eig2[i]*pot[i];
+	}
 
+	/*
 	if (isnan(res)) {
 		log_error("res is nan!");
 		log_error("eig1: %lf", eig1);
@@ -41,11 +40,10 @@ static inline f64 scim_integrand(f64 x, void* data) {
 		log_error("pot: %lf", pot);
 		log_error("x: %lf", x);
 	}
-
-	return res;
+	*/
 }
 
-struct gss_result scim(struct gss_settings settings, gss_potential_func* potential, gss_guess_func* guess) {
+struct gss_result scim(struct gss_settings settings, gss_potential_vec_func* potential, gss_guess_func* guess) {
 	const u32 N = 32;
 
 	struct gss_result res = {
@@ -89,7 +87,7 @@ struct gss_result scim(struct gss_settings settings, gss_potential_func* potenti
 				for (u32 c = r; c < T.size; ++c) {
 					params.n[0] = r;
 					params.n[1] = c;
-					integration_result res = quadgk(scim_integrand, -INFINITY, INFINITY, int_settings);
+					integration_result res = quadgk_vec(scim_integrand, -INFINITY, INFINITY, int_settings);
 					if (!res.converged)
 						log_error("integration failed for %d,%d", r,c);
 					assert(res.converged);

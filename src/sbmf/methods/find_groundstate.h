@@ -7,6 +7,10 @@ struct gss_settings;
 struct gss_result;
 
 typedef f64 gss_potential_func(f64* v, i32 n, c64 u);
+
+/* Does not handle 2D/3D/.. */
+typedef void gss_potential_vec_func(f64* out, f64* in_x, c64* in_u, u32 len);
+
 typedef c64  gss_guess_func(f64* v, i32 n);
 typedef void gss_debug_callback(struct gss_settings, c64*);
 
@@ -32,4 +36,4 @@ struct gss_result {
 };
 
 struct gss_result item(struct gss_settings settings, gss_potential_func* potential, gss_guess_func* guess);
-struct gss_result scim(struct gss_settings settings, gss_potential_func* potential, gss_guess_func* guess);
+struct gss_result scim(struct gss_settings settings, gss_potential_vec_func* potential, gss_guess_func* guess);

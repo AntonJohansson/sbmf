@@ -46,6 +46,7 @@ void sbmf_shutdown() {
 
 u8* sbmf_stack_push(u32 size_in_bytes) {
 	u8* ptr = sa_push(_state.main_stack, size_in_bytes);
+	/* Dump memory usage after allocating */
 	if (_state.memory_log_fd) {
 		fprintf(_state.memory_log_fd, "%u\t%u\n", _state.main_stack->top, _state.main_stack->size);
 	}
@@ -58,6 +59,7 @@ u32 sbmf_stack_marker() {
 
 void sbmf_stack_free_to_marker(u32 marker) {
 	_state.main_stack->top = marker;
+	/* Dump memory usage after freeing */
 	if (_state.memory_log_fd) {
 		fprintf(_state.memory_log_fd, "%u\t%u\n", _state.main_stack->top, _state.main_stack->size);
 	}

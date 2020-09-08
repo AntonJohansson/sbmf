@@ -2,15 +2,15 @@
 #include "snow.h"
 
 #include <sbmf/sbmf.h>
-#include <sbmf/methods/quadgk.h>
 #include <sbmf/methods/quadgk_vec.h>
+#include <sbmf/methods/quadgk_vec_inl.h>
 #include <sbmf/math/harmonic_oscillator.h>
 #include <sbmf/debug/profile.h>
 #include <sbmf/debug/log.h>
 
 f64 func(f64 x, void* p) {
-	f64 eig1 = ho_eigenfunction((i32[]){1}, &x, 1);
-	f64 eig2 = ho_eigenfunction((i32[]){2}, &x, 1);
+	f64 eig1 = ho_eigenfunction((i32[]){3}, &x, 1);
+	f64 eig2 = ho_eigenfunction((i32[]){7}, &x, 1);
 	f64 pot  = ho_potential(&x, 1, 0);
 	return eig1*eig2*pot;
 }
@@ -43,15 +43,6 @@ describe (quadgk_perf) {
 		const u32 repetitions = 10000;
         integration_result res;
 
-        f64 sum = 0.0;
-        for (u32 i = 0; i < repetitions; ++i) {
-            PROFILE_BEGIN("quadgk");
-            res = quadgk(func, -INFINITY, INFINITY, settings);
-            PROFILE_END("quadgk");
-			sum += res.integral;
-		}
-		log_info("sum: %lf -- iters: %d", sum, res.performed_evals);
-
         f64 sum_vec = 0.0;
         for (u32 i = 0; i < repetitions; ++i) {
             PROFILE_BEGIN("quadgk_vec");
@@ -60,6 +51,15 @@ describe (quadgk_perf) {
 			sum_vec += res.integral;
 		}
 		log_info("sum_vec: %lf -- iters: %d", sum_vec, res.performed_evals);
+
+        f64 sum_vec_inl = 0.0;
+        for (u32 i = 0; i < repetitions; ++i) {
+            PROFILE_BEGIN("quadgk_vec_inl");
+            res = quadgk_vec_inl(func_vec, -INFINITY, INFINITY, settings);
+            PROFILE_END("quadgk_vec_inl");
+			sum_vec_inl += res.integral;
+		}
+		log_info("sum_vec_inl: %lf -- iters: %d", sum_vec_inl, res.performed_evals);
 
 		profile_print_results();
 	}

@@ -1,42 +1,11 @@
 #include "quadgk_vec.h"
+
 #include <sbmf/memory/prioqueue.h>
 #include <sbmf/debug/log.h>
 #include <math.h> // INFINITY and isinf
 
 typedef f64 coord_transform_input_func(f64 x, f64 a, f64 b);
 typedef f64 coord_transform_output_func(f64 x);
-
-struct gk_data gk7 = {
-	.kronod_nodes = {
-		9.9145537112081263920685469752598e-01,
-		9.4910791234275852452618968404809e-01,
-		8.6486442335976907278971278864098e-01,
-		7.415311855993944398638647732811e-01,
-		5.8608723546769113029414483825842e-01,
-		4.0584515137739716690660641207707e-01,
-		2.0778495500789846760068940377309e-01,
-		0.0
-	},
-	.kronod_weights = {
-		2.2935322010529224963732008059913e-02,
-		6.3092092629978553290700663189093e-02,
-		1.0479001032225018383987632254189e-01,
-		1.4065325971552591874518959051021e-01,
-		1.6900472663926790282658342659795e-01,
-		1.9035057806478540991325640242055e-01,
-		2.0443294007529889241416199923466e-01,
-		2.0948214108472782801299917489173e-01
-	},
-	.gauss_weights = {
-		1.2948496616886969327061143267787e-01,
-		2.797053914892766679014677714229e-01,
-		3.8183005050511894495036977548818e-01,
-		4.1795918367346938775510204081658e-01
-	},
-	.kronod_size = 8,
-	.gauss_size = 4,
-};
-
 
 struct coordinate_transform {
 	coord_transform_input_func* input;
@@ -63,72 +32,62 @@ typedef struct {
 	bool valid;
 } eval_result;
 
-static eval_result evaluate_rule(integrand_vec* f, f64 start, f64 end,
-		struct coordinate_transform transform,
-		integration_settings settings) {
+static inline void calculate_sample_points_for_interval(integration_settings settings, u32 size, f64 out[size], f64 start, f64 end) {
 	struct gk_data* gk = &settings.gk;
 	f64 mid = 0.5 * (end - start);
 
-	// 	0 -- if even size
-	// 	1 -- if odd size
-	u32 is_order_odd = 1 - (gk->kronod_size & 1);
+	u32 reduced_size = (size-3)/4;
+	for (u32 i = 0; i < reduced_size; ++i) {
+		f64 xg = gk->kronod_nodes[2*i+1];
+		f64 xk = gk->kronod_nodes[2*i];
+
+		out[4*i + 0] = start + (1-xg)*mid;
+		out[4*i + 1] = start + (1+xg)*mid;
+		out[4*i + 2] = start + (1-xk)*mid;
+		out[4*i + 3] = start + (1+xk)*mid;
+	}
+	out[4*reduced_size + 0] = start + mid;
+	out[4*reduced_size + 1] = start + (1-gk->kronod_nodes[gk->kronod_size-2])*mid;
+	out[4*reduced_size + 2] = start + (1+gk->kronod_nodes[gk->kronod_size-2])*mid;
+};
+
+static eval_result evaluate_rule(
+		integration_settings settings,
+		u32 sample_count,
+		f64 sampled_func_vals[sample_count],
+		f64 start, f64 end,
+		u32 is_order_odd
+		) {
+	struct gk_data* gk = &settings.gk;
+
+	f64 mid = 0.5*(end - start);
 
 	// fg/k - gauss/kronod function eval
 	// Ig/k - gauss/kronod integral estimate
 	// xg/k - gauss/kronod sample nodes
 
-	/* Size of the gauss weights array (other than the last element if odd order) */
-	u32 size = gk->gauss_size - is_order_odd;
-
-	/* Compute all sample points */
-	u32 sample_size = 4*size + 3;
-	f64 sample_points[sample_size];
-	f64 transformed_sample_points[sample_size];
-	for (u32 i = 0; i < size; ++i) {
-		f64 xg = gk->kronod_nodes[2*i+1];
-		f64 xk = gk->kronod_nodes[2*i];
-
-		sample_points[4*i + 0] = start + (1-xg)*mid;
-		sample_points[4*i + 1] = start + (1+xg)*mid;
-		sample_points[4*i + 2] = start + (1-xk)*mid;
-		sample_points[4*i + 3] = start + (1+xk)*mid;
-	}
-	sample_points[4*size + 0] = start + mid;
-	sample_points[4*size + 1] = start + (1-gk->kronod_nodes[gk->kronod_size-2])*mid;
-	sample_points[4*size + 2] = start + (1+gk->kronod_nodes[gk->kronod_size-2])*mid;
-
-	/* Apply transform scaling to input */
-	for (u32 i = 0; i < sample_size; ++i) {
-		transformed_sample_points[i] = transform.input(sample_points[i], transform.original_start, transform.original_end);
-	}
-
-	/* Sample the function */
-	f64 output[sample_size];
-	f(output, transformed_sample_points, sample_size, settings.userdata);
-
-	/* Apply transform output scaling */
-	for (u32 i = 0; i < sample_size; ++i) {
-		output[i] *= transform.output(sample_points[i]);
-	}
+	u32 reduced_size = (sample_count - 3)/4;
 
 	/* Compute the integral estimate */
 	f64 Ig = 0, Ik = 0;
-	for (u32 i = 0; i < size; ++i) {
-		f64 fg = output[4*i + 0] + output[4*i + 1];
-		f64 fk = output[4*i + 2] + output[4*i + 3];
+	for (u32 i = 0; i < reduced_size; ++i) {
+		f64 fg = sampled_func_vals[4*i + 0] + sampled_func_vals[4*i + 1];
+		f64 fk = sampled_func_vals[4*i + 2] + sampled_func_vals[4*i + 3];
 
 		Ig += gk->gauss_weights[i] * fg;
 		Ik += gk->kronod_weights[2*i+1] * fg + gk->kronod_weights[2*i] * fk;
 	}
 
-	// In the odd-order case, the last point has to be handled
-	// differently
+	/*
+	 * In the odd-order case, the last point has to be handled
+	 * differently
+	 * */
 	if (is_order_odd  == 0) {
-		Ik += gk->kronod_weights[gk->kronod_size-1] * output[4*size + 0];
+		Ik += gk->kronod_weights[gk->kronod_size-1] * sampled_func_vals[4*reduced_size + 0];
 	} else {
-		Ig += gk->gauss_weights[gk->gauss_size-1] * output[4*size + 0];
-		Ik += gk->kronod_weights[gk->kronod_size-1] * output[4*size + 0]
-			+ gk->kronod_weights[gk->kronod_size-2] * (output[4*size + 1] + output[4*size + 2]);
+		Ig += gk->gauss_weights[gk->gauss_size-1] * sampled_func_vals[4*reduced_size + 0];
+		Ik += gk->kronod_weights[gk->kronod_size-1] * sampled_func_vals[4*reduced_size + 0]
+			+ gk->kronod_weights[gk->kronod_size-2] * (sampled_func_vals[4*reduced_size + 1] + sampled_func_vals[4*reduced_size + 2]);
 	}
 
 	f64 Ik_s = Ik*mid;
@@ -147,7 +106,7 @@ static eval_result evaluate_rule(integrand_vec* f, f64 start, f64 end,
 	};
 }
 
-// Sort segments by error in descending order.
+/* Sort segments by error in descending order. */
 static bool compare_segments(void* a, void* b) {
 	return (((segment*)a)->error > ((segment*)b)->error);
 }
@@ -228,10 +187,36 @@ static inline integration_result hadapt(integrand_vec* f, f64 start, f64 end,
 		.converged = false,
 	};
 
-	// Perform one evaluation of the rule and see if we can
-	// exit early without having to initalize extra memory and
-	// so on.
-	eval_result eval_res = evaluate_rule(f, start, end, transform, settings);
+	u32 is_order_odd = 1 - (settings.gk.kronod_size & 1);
+	u32 sample_size = 4*(settings.gk.gauss_size - is_order_odd) + 3;
+	f64 sample_points[2*sample_size];
+	f64 transformed_sample_points[2*sample_size];
+	f64 sampled_func_vals[2*sample_size];
+
+	calculate_sample_points_for_interval(settings, sample_size, sample_points, start, end);
+
+	{
+		/* Apply transform scaling to input */
+		for (u32 i = 0; i < sample_size; ++i) {
+			transformed_sample_points[i] = transform.input(sample_points[i], transform.original_start, transform.original_end);
+		}
+
+		/* Sample the function */
+		f(sampled_func_vals, transformed_sample_points, sample_size, settings.userdata);
+
+		/* Apply transform output scaling */
+		for (u32 i = 0; i < sample_size; ++i) {
+			sampled_func_vals[i] *= transform.output(sample_points[i]);
+		}
+	}
+
+	/*
+	 * Perform one evaluation of the rule and see if we can
+	 * exit early without having to initalize extra memory and
+	 * so on.
+	 */
+	//eval_result eval_res = evaluate_rule(f, start, end, transform, settings);
+	eval_result eval_res = evaluate_rule(settings, sample_size, sampled_func_vals, start, end, is_order_odd);
 	result.performed_evals += eval_res.func_evals;
 
 	segment s = eval_res.seg;
@@ -244,8 +229,10 @@ static inline integration_result hadapt(integrand_vec* f, f64 start, f64 end,
 		return result;
 	}
 
-	// If we get to this point we were not able to exit early and have do to more subdivisions
-	// to get desired error tolerance.
+	/*
+	 * If we get to this point we were not able to exit early and have do to more subdivisions
+	 * to get desired error tolerance.
+	 */
 
 	u32 memory_marker = sbmf_stack_marker();
 
@@ -257,8 +244,26 @@ static inline integration_result hadapt(integrand_vec* f, f64 start, f64 end,
 		prioqueue_pop(pq);
 
 		f64 midpoint = 0.5 * (largest_error_seg->start + largest_error_seg->end);
-		eval_result left_eval_res = evaluate_rule(f, largest_error_seg->start, midpoint, transform, settings);
-		eval_result right_eval_res = evaluate_rule(f, midpoint, largest_error_seg->end, transform, settings);
+		calculate_sample_points_for_interval(settings, sample_size, sample_points, largest_error_seg->start, midpoint);
+		calculate_sample_points_for_interval(settings, sample_size, &sample_points[sample_size], midpoint, largest_error_seg->end);
+
+		{
+			/* Apply transform scaling to input */
+			for (u32 i = 0; i < 2*sample_size; ++i) {
+				transformed_sample_points[i] = transform.input(sample_points[i], transform.original_start, transform.original_end);
+			}
+
+			/* Sample the function */
+			f(sampled_func_vals, transformed_sample_points, 2*sample_size, settings.userdata);
+
+			/* Apply transform output scaling */
+			for (u32 i = 0; i < 2*sample_size; ++i) {
+				sampled_func_vals[i] *= transform.output(sample_points[i]);
+			}
+		}
+
+		eval_result left_eval_res = evaluate_rule(settings, sample_size, sampled_func_vals, largest_error_seg->start, midpoint, is_order_odd);
+		eval_result right_eval_res = evaluate_rule(settings, sample_size, &sampled_func_vals[sample_size], midpoint, largest_error_seg->end, is_order_odd);
 		if (!left_eval_res.valid || !right_eval_res.valid)
 			return result;
 
@@ -281,7 +286,7 @@ static inline integration_result hadapt(integrand_vec* f, f64 start, f64 end,
 	return result;
 }
 
-integration_result quadgk_vec(integrand_vec* f, f64 start, f64 end, integration_settings settings) {
+integration_result quadgk_vec_inl(integrand_vec* f, f64 start, f64 end, integration_settings settings) {
 	// Make sure the endpoints are ordered start < end
 	f64 output_factor = 1.0;
 	if (start > end) {

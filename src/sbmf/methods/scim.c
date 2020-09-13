@@ -14,6 +14,11 @@ struct integrand_params {
 	gss_potential_vec_func* pot;
 };
 
+struct guess_integrand_params {
+	u32 n;
+	gss_guess_vec_func* guess;
+};
+
 static void scim_integrand(f64* out, f64* in, u32 len, void* data) {
 	struct integrand_params* params = data;
 
@@ -43,19 +48,51 @@ static void scim_integrand(f64* out, f64* in, u32 len, void* data) {
 	*/
 }
 
-struct gss_result scim(struct gss_settings settings, gss_potential_vec_func* potential, gss_guess_func* guess) {
-	const u32 N = 32;
+static void scim_guess_integrand(f64* out, f64* in, u32 len, void* data) {
+	struct guess_integrand_params* params = data;
+
+	f64 eig[len];
+	ho_eigenfunction_vec(params->n, eig, in, len);
+
+	c64 guess[len];
+	params->guess(guess, in, len);
+
+	for (u32 i = 0; i < len; ++i) {
+		out[i] = eig[i]*eig[i]*guess[i];
+	}
+}
+
+struct gss_result scim(struct scim_settings settings, gss_potential_vec_func* potential, gss_guess_vec_func* guess) {
+	const u32 N = settings.num_basis_functions;
 
 	struct gss_result res = {
-		.settings = settings,
 		.wavefunction = (c64*) sbmf_stack_push(N*sizeof(c64)),
 	};
 	c64* old_wavefunction = (c64*) sbmf_stack_push(N*sizeof(c64));
 
+	integration_settings int_settings = {
+		.gk = gk7,
+		.abs_error_tol = 1e-10,
+		.rel_error_tol = 1e-10,
+		.max_evals = 1e4,
+	};
+
 	/* Setup the initial guess */
-	res.wavefunction[0] = 1;
+	/*res.wavefunction[0] = 1;
 	for (u32 i = 1; i < N; ++i) {
 		res.wavefunction[i] = 0;
+	}*/
+	struct guess_integrand_params guess_params = {
+		.guess = guess,
+	};
+	int_settings.userdata = &guess_params;
+	for (u32 i = 0; i < N; ++i) {
+		guess_params.n = i;
+		integration_result ires = quadgk_vec(scim_guess_integrand, -INFINITY, INFINITY, int_settings);
+		if (!ires.converged)
+			log_error("integration failed for %d", i);
+		assert(ires.converged);
+		res.wavefunction[i] = ires.integral;
 	}
 
 	hermitian_bandmat T = construct_ho_kinetic_matrix(N);
@@ -67,13 +104,9 @@ struct gss_result scim(struct gss_settings settings, gss_potential_vec_func* pot
 		.coeff_count = N,
 		.coeffs = res.wavefunction,
 	};
-	integration_settings int_settings = {
-		.gk = gk7,
-		.abs_error_tol = 1e-10,
-		.rel_error_tol = 1e-10,
-		.max_evals = 1e4,
-		.userdata = &params
-	};
+
+	int_settings.userdata = &params;
+
 
 	for (; res.iterations < settings.max_iterations; ++res.iterations) {
 		memcpy(old_wavefunction, res.wavefunction, N*sizeof(c64));
@@ -82,7 +115,7 @@ struct gss_result scim(struct gss_settings settings, gss_potential_vec_func* pot
 
 		/* Construct standard hamiltonian */
 		{
-			PROFILE_BEGIN("H");
+			PROFILE_BEGIN("Constructing H");
 			for (u32 r = 0; r < T.size; ++r) {
 				for (u32 c = r; c < T.size; ++c) {
 					params.n[0] = r;
@@ -96,16 +129,19 @@ struct gss_result scim(struct gss_settings settings, gss_potential_vec_func* pot
 					H.base.data[i] = T.base.data[i] + res.integral;
 				}
 			}
-			PROFILE_END("H");
+			PROFILE_END("Constructing H");
 
 			assert(mat_is_valid(H.base));
 		}
 
 		/* Solve for first eigenvector (ground state) */
+		PROFILE_BEGIN("Eigenproblem solving");
 		struct eigen_result eres = find_eigenpairs_sparse(H, 1, EV_SMALLEST_RE);
+		PROFILE_END("Eigenproblem solving");
 
 		/* Normalize and copy to result */
 		{
+			PROFILE_BEGIN("Normalize+copy");
 			f64 sum = 0.0;
 			for (u32 i = 0; i < N; ++i) {
 				res.wavefunction[i] = eres.eigenvectors[i];
@@ -117,10 +153,12 @@ struct gss_result scim(struct gss_settings settings, gss_potential_vec_func* pot
 			for (u32 i = 0; i < N; ++i) {
 				res.wavefunction[i] *= scaling;
 			}
+			PROFILE_END("Normalize+copy");
 		}
 
 		/* Calculate error */
 		{
+			PROFILE_BEGIN("Calculate error");
 			f64 sum = 0.0;
 			for (u32 i = 0; i < N; ++i) {
 				f64 diff = cabs(res.wavefunction[i]) - cabs(old_wavefunction[i]);
@@ -128,6 +166,7 @@ struct gss_result scim(struct gss_settings settings, gss_potential_vec_func* pot
 			}
 			res.error = sqrt(sum);
 
+			PROFILE_END("Calculate error");
 			if (res.error < settings.error_tol)
 				break;
 		}

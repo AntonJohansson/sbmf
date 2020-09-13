@@ -12,7 +12,8 @@ PROJ_SRCS = \
 	src/sbmf/math/find_eigenpairs.c \
 	src/sbmf/math/matrix.c \
 	src/sbmf/debug/profile.c \
-	src/sbmf/debug/log.c
+	src/sbmf/debug/log.c \
+	src/sbmf/threading/thread_pool.c
 
 PROJ_OBJS = $(patsubst %.c, $(BUILDDIR)/%.o, $(PROJ_SRCS))
 

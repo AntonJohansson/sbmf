@@ -20,7 +20,7 @@ static void apply_step_op(f64 ds, f64 dt, c64* out, gss_potential_func* potentia
 	}
 }
 
-struct gss_result item(struct gss_settings settings, gss_potential_func* potential, gss_guess_func* guess) {
+struct gss_result item(struct item_settings settings, gss_potential_func* potential, gss_guess_func* guess) {
 	/*
 	 * applying fft -> ifft in fftw scales input by N = n0*n1*...*nk.
 	 * this is needed to cancel that scaling.
@@ -35,7 +35,6 @@ struct gss_result item(struct gss_settings settings, gss_potential_func* potenti
 	}
 
 	struct gss_result result = {
-		.settings = settings,
 		.wavefunction = (c64*) sbmf_stack_push(settings.g.total_pointcount*sizeof(c64)),
 		.error = 0.0,
 		.iterations = 0,

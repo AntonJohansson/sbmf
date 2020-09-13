@@ -10,6 +10,7 @@
  *
  * Currently the following is being tested (in the order they appear in
  * this source file):
+ * 	[ ] priority queue
  * 	[x] quadgk 1D numerical integration
  * 	[x] quadgk_vec 1D numerical integration
  * 	[ ] ------ 2D numerical integration
@@ -34,8 +35,49 @@
 #include <sbmf/math/matrix.h>
 #include <sbmf/math/find_eigenpairs.h>
 #include <sbmf/math/grid.h>
+#include <sbmf/memory/prioqueue.h>
 
 #include <plot/plot.h>
+
+#define DISABLE_SLOW_TESTS 0
+
+/* priority queue */
+
+static bool pqcmp(void* a, void* b) {
+	return *((i32*)a) < *((i32*)b);
+}
+
+describe (pq) {
+	before_each() { sbmf_init(); }
+	after_each() { sbmf_shutdown(); }
+
+	it ("pushes and pops") {
+		prioqueue* pq = prioqueue_new(10, sizeof(i32), pqcmp);
+		i32 i = 0;
+
+		i = 10; prioqueue_push(pq, &i);
+		i =  9; prioqueue_push(pq, &i);
+		i =  8; prioqueue_push(pq, &i);
+		i =  7; prioqueue_push(pq, &i);
+		i =  6; prioqueue_push(pq, &i);
+		i =  5; prioqueue_push(pq, &i);
+		i =  4; prioqueue_push(pq, &i);
+		i =  3; prioqueue_push(pq, &i);
+		i =  2; prioqueue_push(pq, &i);
+		i =  1; prioqueue_push(pq, &i);
+
+		asserteq(*(i32*)prioqueue_top(pq), 1 ); prioqueue_pop(pq);
+		asserteq(*(i32*)prioqueue_top(pq), 2 ); prioqueue_pop(pq);
+		asserteq(*(i32*)prioqueue_top(pq), 3 ); prioqueue_pop(pq);
+		asserteq(*(i32*)prioqueue_top(pq), 4 ); prioqueue_pop(pq);
+		asserteq(*(i32*)prioqueue_top(pq), 5 ); prioqueue_pop(pq);
+		asserteq(*(i32*)prioqueue_top(pq), 6 ); prioqueue_pop(pq);
+		asserteq(*(i32*)prioqueue_top(pq), 7 ); prioqueue_pop(pq);
+		asserteq(*(i32*)prioqueue_top(pq), 8 ); prioqueue_pop(pq);
+		asserteq(*(i32*)prioqueue_top(pq), 9 ); prioqueue_pop(pq);
+		asserteq(*(i32*)prioqueue_top(pq), 10); prioqueue_pop(pq);
+	}
+}
 
 /* quadgk 1D numerical integration */
 
@@ -242,10 +284,22 @@ static f64 ho_perturbed_potential(f64* x, i32 n, void* data) {
 	return ho_potential(x,1,0) + gaussian(*x,0,0.2);
 }
 
+static void ho_perturbed_potential_vec(f64* out, f64* in, u32 len, void* data) {
+	for (u32 i = 0; i < len; ++i) {
+		out[i] = ho_potential(&in[i],1,0) + gaussian(in[i],0,0.2);
+	}
+}
+
 typedef f64 pot_func(f64*,i32,void*);
 struct integrand_params {
 	u32 n[2];
 	pot_func* pot;
+};
+
+typedef void pot_func_vec(f64*,f64*,u32,void*);
+struct integrand_params_vec {
+	u32 n[2];
+	pot_func_vec* pot;
 };
 
 static f64 hob_integrand(f64 x, void* data) {
@@ -254,6 +308,20 @@ static f64 hob_integrand(f64 x, void* data) {
 		ho_eigenfunction((i32[]){params->n[0]}, &x, 1) *
 		params->pot(&x,1,NULL) *
 		ho_eigenfunction((i32[]){params->n[1]}, &x, 1);
+}
+
+static void hob_integrand_vec(f64* out, f64* in, u32 len, void* data) {
+	struct integrand_params_vec* params = data;
+
+	f64 eig1[len];
+	f64 eig2[len];
+	f64 pot[len];
+	for (u32 i = 0; i < len; ++i) {
+		ho_eigenfunction_vec(params->n[0], eig1, in, len);
+		ho_eigenfunction_vec(params->n[1], eig2, in, len);
+		params->pot(out, in, len, data);
+		out[i] = eig1[i]*eig2[i]*pot[i];
+	}
 }
 
 static struct eigen_result fdm_solve(pot_func* pot, f64 L, f64 N) {
@@ -280,10 +348,10 @@ static struct eigen_result fdm_solve(pot_func* pot, f64 L, f64 N) {
 	return find_eigenpairs_sparse(mat, 3, EV_SMALLEST_RE);
 }
 
-static struct eigen_result hob_solve(pot_func* pot, f64 N) {
+static struct eigen_result hob_solve(pot_func_vec* pot, f64 N) {
 	hermitian_bandmat T = construct_ho_kinetic_matrix(N);
 
-	struct integrand_params params;
+	struct integrand_params_vec params;
 	integration_settings settings = {
 		.gk = gk7,
 		.abs_error_tol = 1e-10,
@@ -297,7 +365,7 @@ static struct eigen_result hob_solve(pot_func* pot, f64 N) {
 		for (u32 c = r; c < T.size; ++c) {
 			params.n[0] = r;
 			params.n[1] = c;
-			integration_result res;/* = quadgk(hob_integrand, -INFINITY, INFINITY, settings); */
+			integration_result res = quadgk_vec(hob_integrand_vec, -INFINITY, INFINITY, settings);
 			asserteq(res.converged, true);
 
 			u32 i = (T.size-1)*(T.size-(c-r)) + r;
@@ -322,7 +390,7 @@ describe (fdm_vs_hob) {
 		const f64 L = 5.0;
 		const i32 N = 64;
 		struct eigen_result fdm_res = fdm_solve(ho_perturbed_potential, L, N);
-		struct eigen_result hob_res = hob_solve(ho_perturbed_potential, N/2);
+		struct eigen_result hob_res = hob_solve(ho_perturbed_potential_vec, N/2);
 	}
 }
 
@@ -332,8 +400,26 @@ c64 guess(f64* v, i32 n) {
 	return gaussian(*v, 0, 0.2);
 }
 
+
+void guess_vec(c64* out, f64* in, u32 len) {
+	for (u32 i = 0; i < len; ++i) {
+		out[i] = gaussian(in[i],0,0.2);
+	}
+}
+
 f64 linear_hamiltonian_pot(f64* v, i32 n, c64 u) {
 	return ho_perturbed_potential(v, n, NULL);
+}
+
+void linear_hamiltonian_vec_pot(f64* out, f64* in_x, c64* in_u, u32 len) {
+	for (u32 i = 0; i < len; ++i) {
+		out[i] = ho_perturbed_potential(&in_x[i], 1, NULL);
+	}
+}
+
+f64 non_linear_hamiltonian_pot(f64* v, i32 n, c64 u) {
+	/* assuming 1d */
+	return ho_potential(v, n, 0) + 3*cabs(u)*cabs(u);
 }
 
 void non_linear_hamiltonian_vec_pot(f64* out, f64* in_x, c64* in_u, u32 len) {
@@ -348,29 +434,31 @@ describe(item_vs_scim_groundstate_finding) {
 	after_each() { sbmf_shutdown(); }
 
 	it ("perturbed HO potential") {
-		/*
 		const f64 L = 5.0;
 		const i32 N = 128;
 		struct grid space = generate_grid(1,
 				(f64[]){-L/2.0},
 				(f64[]){+L/2.0},
 				(i32[]){N});
-		gss_settings settings = {
+		struct item_settings item_settings = {
 			.g = space,
-			.max_iterations = 1e4,
+			.max_iterations = 1e7,
 			.error_tol = 1e-10,
-			.dt = 0.01,
+			.dt = 0.001,
 		};
-		gss_result item_res = item(settings, linear_hamiltonian_pot, guess);
+		struct scim_settings scim_settings = {
+			.num_basis_functions = 32,
+			.max_iterations = 1e7,
+			.error_tol = 1e-10,
+		};
+
+		struct gss_result item_res = item(item_settings, linear_hamiltonian_pot, guess);
 		log_info("\nitem:\niterations: %d\nerror: %e", item_res.iterations, item_res.error);
 		c64_normalize(item_res.wavefunction, space.total_pointcount);
 
-		gss_result hob_res = scim(settings, linear_hamiltonian_pot, guess);
+		struct gss_result hob_res = scim(scim_settings, linear_hamiltonian_vec_pot, guess_vec);
 		log_info("\nhob:\niterations: %d\nerror: %e", hob_res.iterations, hob_res.error);
-		c64_normalize(hob_res.wavefunction, space.total_pointcount);
-		*/
-
-#if 0
+#if 1
 		{
 			plot_init(800, 600, "fdm groundstate");
 			f32 pdata[N];
@@ -388,7 +476,7 @@ describe(item_vs_scim_groundstate_finding) {
 
 			for (u32 i = 0; i < N; ++i) {
 				c64 c = cabs(item_res.wavefunction[i]);
-				pdata[i] = 10*c*c;
+				pdata[i] = 30*c*c;
 			}
 			push_line_plot(&(plot_push_desc){
 					.space = &sp,
@@ -397,7 +485,7 @@ describe(item_vs_scim_groundstate_finding) {
 					});
 
 			for (u32 i = 0; i < N; ++i) {
-				c64 c = cabs(hob_sample(hob_res.wavefunction, 32, sp.points[i]));
+				c64 c = cabs(hob_sample(hob_res.wavefunction, scim_settings.num_basis_functions, sp.points[i]));
 				pdata[i] = c*c;
 			}
 			push_line_plot(&(plot_push_desc){
@@ -419,24 +507,26 @@ describe(item_vs_scim_groundstate_finding) {
 				(f64[]){-L/2.0},
 				(f64[]){+L/2.0},
 				(i32[]){N});
-		struct gss_settings settings = {
+		struct item_settings item_settings = {
 			.g = space,
 			.max_iterations = 1e7,
 			.error_tol = 1e-10,
 			.dt = 0.001,
 		};
+		struct scim_settings scim_settings = {
+			.num_basis_functions = 64,
+			.max_iterations = 1e7,
+			.error_tol = 1e-10,
+		};
 
-		/*
-		struct gss_result item_res = item(settings, non_linear_hamiltonian_pot, guess);
+		struct gss_result item_res = item(item_settings, non_linear_hamiltonian_pot, guess);
 		log_info("\nitem:\niterations: %d\nerror: %e", item_res.iterations, item_res.error);
 		c64_normalize(item_res.wavefunction, space.total_pointcount);
-		*/
 
-		struct gss_result hob_res = scim(settings, non_linear_hamiltonian_vec_pot, guess);
+		struct gss_result hob_res = scim(scim_settings, non_linear_hamiltonian_vec_pot, guess_vec);
 		log_info("\nhob:\niterations: %d\nerror: %e", hob_res.iterations, hob_res.error);
-		c64_normalize(hob_res.wavefunction, space.total_pointcount);
 
-#if 0
+#if 1
 		{
 			plot_init(800, 600, "fdm groundstate");
 			f32 pdata[N];
@@ -464,8 +554,14 @@ describe(item_vs_scim_groundstate_finding) {
 					.label = "item groundstate",
 					});
 
+			c64 sample_out[N];
+			f64 sample_in[N];
 			for (u32 i = 0; i < N; ++i) {
-				c64 c = cabs(hob_sample(hob_res.wavefunction, 32, sp.points[i]));
+				sample_in[i] = (f64) sp.points[i];
+			}
+			hob_sample_vec(hob_res.wavefunction, scim_settings.num_basis_functions, sample_out, sample_in, N);
+			for (u32 i = 0; i < N; ++i) {
+				f64 c = cabs(sample_out[i]);
 				pdata[i] = c*c;
 			}
 			push_line_plot(&(plot_push_desc){

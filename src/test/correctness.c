@@ -36,6 +36,7 @@
 #include <sbmf/math/find_eigenpairs.h>
 #include <sbmf/math/grid.h>
 #include <sbmf/memory/prioqueue.h>
+#include <sbmf/memory/prioqueue_heap.h>
 
 #include <plot/plot.h>
 
@@ -76,6 +77,39 @@ describe (pq) {
 		asserteq(*(i32*)prioqueue_top(pq), 8 ); prioqueue_pop(pq);
 		asserteq(*(i32*)prioqueue_top(pq), 9 ); prioqueue_pop(pq);
 		asserteq(*(i32*)prioqueue_top(pq), 10); prioqueue_pop(pq);
+	}
+}
+
+describe (pqheap) {
+	before_each() { sbmf_init(); }
+	after_each() { sbmf_shutdown(); }
+
+	it ("pushes and pops") {
+		struct pqheap* pq = pqheap_new(10, sizeof(i32), pqcmp);
+
+		i32 i = 0;
+
+		i = 10; pqheap_push(pq, &i);
+		i =  9; pqheap_push(pq, &i);
+		i =  8; pqheap_push(pq, &i);
+		i =  7; pqheap_push(pq, &i);
+		i =  6; pqheap_push(pq, &i);
+		i =  5; pqheap_push(pq, &i);
+		i =  4; pqheap_push(pq, &i);
+		i =  3; pqheap_push(pq, &i);
+		i =  2; pqheap_push(pq, &i);
+		i =  1; pqheap_push(pq, &i);
+
+		asserteq(*(i32*)pqheap_top(pq), 1 ); pqheap_pop(pq);
+		asserteq(*(i32*)pqheap_top(pq), 2 ); pqheap_pop(pq);
+		asserteq(*(i32*)pqheap_top(pq), 3 ); pqheap_pop(pq);
+		asserteq(*(i32*)pqheap_top(pq), 4 ); pqheap_pop(pq);
+		asserteq(*(i32*)pqheap_top(pq), 5 ); pqheap_pop(pq);
+		asserteq(*(i32*)pqheap_top(pq), 6 ); pqheap_pop(pq);
+		asserteq(*(i32*)pqheap_top(pq), 7 ); pqheap_pop(pq);
+		asserteq(*(i32*)pqheap_top(pq), 8 ); pqheap_pop(pq);
+		asserteq(*(i32*)pqheap_top(pq), 9 ); pqheap_pop(pq);
+		asserteq(*(i32*)pqheap_top(pq), 10); pqheap_pop(pq);
 	}
 }
 

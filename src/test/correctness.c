@@ -316,10 +316,12 @@ static void hob_integrand_vec(f64* out, f64* in, u32 len, void* data) {
 	f64 eig1[len];
 	f64 eig2[len];
 	f64 pot[len];
+
+	ho_eigenfunction_vec(params->n[0], eig1, in, len);
+	ho_eigenfunction_vec(params->n[1], eig2, in, len);
+	params->pot(pot, in, len, data);
+
 	for (u32 i = 0; i < len; ++i) {
-		ho_eigenfunction_vec(params->n[0], eig1, in, len);
-		ho_eigenfunction_vec(params->n[1], eig2, in, len);
-		params->pot(out, in, len, data);
 		out[i] = eig1[i]*eig2[i]*pot[i];
 	}
 }

@@ -12,14 +12,18 @@ struct barray {
 	u32 items_per_bucket;
 	u32 item_size;
 
+	u32 bucket_count;
+
 	struct bucket_header* base;
 };
 
-inline struct bucket_header* barray_add_bucket(struct barray* ba) {
+inline struct bucket_header* barray_new_bucket(struct barray* ba) {
 	struct bucket_header* hdr = (struct bucket_header*)sbmf_stack_push(sizeof(struct bucket_header) + ba->items_per_bucket*ba->item_size);
 
 	hdr->next = 0;
 	hdr->mem = (u8*) (hdr + 1);
+
+	ba->bucket_count++;
 
 	return hdr;
 }
@@ -38,7 +42,7 @@ inline void* barray_get(struct barray* ba, u32 index) {
 	u32 index_in_bucket = index % ba->items_per_bucket;
 
 	/* Appends bucket until it finds the desired bucket. */
-	struct barray* ptr = ba->base;
+	struct bucket_header* ptr = ba->base;
 	while (bucket--) {
 		if (!ptr->next)
 			ptr->next = barray_new_bucket(ba);

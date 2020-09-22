@@ -10,7 +10,9 @@
  *
  * Currently the following is being tested (in the order they appear in
  * this source file):
- * 	[ ] priority queue
+ * 	[x] bucket array
+ * 	[x] priority (heap) queue
+ * 	[x] priority queue
  * 	[x] quadgk 1D numerical integration
  * 	[x] quadgk_vec 1D numerical integration
  * 	[ ] ------ 2D numerical integration
@@ -37,10 +39,41 @@
 #include <sbmf/math/grid.h>
 #include <sbmf/memory/prioqueue.h>
 #include <sbmf/memory/prioqueue_heap.h>
+#include <sbmf/memory/bucketarray.h>
 
 #include <plot/plot.h>
 
 #define DISABLE_SLOW_TESTS 0
+
+/* bucket array */
+
+describe (bucketarray) {
+	before_each() { sbmf_init(); }
+	after_each() { sbmf_shutdown(); }
+	it ("works")  {
+		struct barray* ba = barray_new(2, sizeof(i32));
+		asserteq(ba->bucket_count, 1);
+
+		i32 i = 0;
+
+		i = 10; barray_set(ba, 0, &i);
+		i =  9; barray_set(ba, 1, &i);
+		asserteq(ba->bucket_count, 1);
+
+		i =  8; barray_set(ba, 2, &i);
+		i =  7; barray_set(ba, 3, &i);
+		asserteq(ba->bucket_count, 2);
+
+		i =  6; barray_set(ba, 6, &i);
+		asserteq(ba->bucket_count, 4);
+
+		asserteq(*(i32*)barray_get(ba,0), 10);
+		asserteq(*(i32*)barray_get(ba,1),  9);
+		asserteq(*(i32*)barray_get(ba,2),  8);
+		asserteq(*(i32*)barray_get(ba,3),  7);
+		asserteq(*(i32*)barray_get(ba,6),  6);
+	}
+}
 
 /* priority queue */
 
@@ -112,6 +145,7 @@ describe (pqheap) {
 		asserteq(*(i32*)pqheap_top(pq), 10); pqheap_pop(pq);
 	}
 }
+
 
 /* quadgk 1D numerical integration */
 

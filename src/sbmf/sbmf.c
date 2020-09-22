@@ -18,6 +18,7 @@ static void inthandler(int dummy) {
 
 void sbmf_init() {
 	signal(SIGINT, inthandler);
+	signal(SIGABRT, inthandler);
 	/* log_set_level(LOG_LEVEL_WARNING); */
 	log_open_and_clear_file("sbmf.log");
 
@@ -44,12 +45,14 @@ void sbmf_shutdown() {
 	/* profile_print_results(); */
 }
 
-u8* sbmf_stack_push(u32 size_in_bytes) {
-	u8* ptr = sa_push(_state.main_stack, size_in_bytes);
+u8* sbmf_stack_push_impl(u32 size_in_bytes, const u32 linenumber, const char file[], const char func[]) {
 	/* Dump memory usage after allocating */
 	if (_state.memory_log_fd) {
-		fprintf(_state.memory_log_fd, "%u\t%u\n", _state.main_stack->top, _state.main_stack->size);
+		fprintf(_state.memory_log_fd, "%u\t%u\t[%s:%d in %s()]\n", _state.main_stack->top, _state.main_stack->size,
+				file, linenumber, func);
 	}
+
+	u8* ptr = sa_push(_state.main_stack, size_in_bytes);
 	return ptr;
 }
 

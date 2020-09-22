@@ -17,7 +17,7 @@ struct barray {
 	struct bucket_header* base;
 };
 
-inline struct bucket_header* barray_new_bucket(struct barray* ba) {
+static inline struct bucket_header* barray_new_bucket(struct barray* ba) {
 	struct bucket_header* hdr = (struct bucket_header*)sbmf_stack_push(sizeof(struct bucket_header) + ba->items_per_bucket*ba->item_size);
 
 	hdr->next = 0;
@@ -28,7 +28,7 @@ inline struct bucket_header* barray_new_bucket(struct barray* ba) {
 	return hdr;
 }
 
-inline struct barray* barray_new(u32 items_per_bucket, u32 item_size) {
+static inline struct barray* barray_new(u32 items_per_bucket, u32 item_size) {
 	struct barray* ba = (struct barray*) sbmf_stack_push(sizeof(struct barray));
 	ba->items_per_bucket = items_per_bucket;
 	ba->item_size = item_size;
@@ -37,7 +37,7 @@ inline struct barray* barray_new(u32 items_per_bucket, u32 item_size) {
 	return ba;
 }
 
-inline void* barray_get(struct barray* ba, u32 index) {
+static inline void* barray_get(struct barray* ba, u32 index) {
 	u32 bucket = index / ba->items_per_bucket;
 	u32 index_in_bucket = index % ba->items_per_bucket;
 
@@ -53,7 +53,7 @@ inline void* barray_get(struct barray* ba, u32 index) {
 	return &ptr->mem[index_in_bucket * ba->item_size];
 }
 
-inline void barray_set(struct barray* ba, u32 index, const void* item) {
+static inline void barray_set(struct barray* ba, u32 index, const void* item) {
 	void* ptr = barray_get(ba, index);
 	memcpy(ptr, item, ba->item_size);
 }

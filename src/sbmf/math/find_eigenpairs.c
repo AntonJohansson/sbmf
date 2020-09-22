@@ -65,6 +65,8 @@ static const char* arpack_zneupd_error_code_to_string(i32 err);
 static const char* arpack_which_eigenpairs_to_string(enum which_eigenpairs which);
 
 struct eigen_result find_eigenpairs_sparse(hermitian_bandmat bm, u32 num_eigenvalues, enum which_eigenpairs which) {
+	u32 memory_marker = sbmf_stack_marker();
+
 	i32 ido = 0;
 	i32 n = bm.size;
 	const char* which_str = arpack_which_eigenpairs_to_string(which);
@@ -74,6 +76,8 @@ struct eigen_result find_eigenpairs_sparse(hermitian_bandmat bm, u32 num_eigenva
 		log_error("eig_sparse_bandmat(...) failed:");
 		log_error("\t the number of requested eigenvalues nev=%d and the matrix N=%d size must satisfy:", nev, n);
 		log_error("\t\t 2 + nev <= N");
+
+		sbmf_stack_free_to_marker(memory_marker);
 		return (struct eigen_result){};
 	}
 
@@ -131,6 +135,7 @@ struct eigen_result find_eigenpairs_sparse(hermitian_bandmat bm, u32 num_eigenva
 		}
 	}
 
+
 	// Convergence or error
 	if (info == 0) {
 		i32 select[n]; // not used
@@ -174,11 +179,16 @@ struct eigen_result find_eigenpairs_sparse(hermitian_bandmat bm, u32 num_eigenva
 			};
 			memcpy(res.eigenvalues, d, sizeof(c64)*nev);
 			memcpy(res.eigenvectors, z, sizeof(c64)*n*nev);
+
+			sbmf_stack_free_to_marker(memory_marker);
+
 			return res;
 		}
 	}
 
 	log_error("not sure when this is called");
+
+	sbmf_stack_free_to_marker(memory_marker);
 
 	return (struct eigen_result){0};
 }

@@ -43,7 +43,7 @@ TEST_LIBS = \
 
 RELEASE_FLAGS = -O3
 DEBUG_FLAGS = -g -O0
-MODE_FLAGS = $(RELEASE_FLAGS)
+MODE_FLAGS = $(DEBUG_FLAGS)
 
 PROJ_FLAGS = $(MODE_FLAGS) -c -fpic -Wall -Isrc -Ithird_party/include
 TEST_FLAGS = $(MODE_FLAGS) -Isrc -Ithird_party/include -I/home/aj/.local/include

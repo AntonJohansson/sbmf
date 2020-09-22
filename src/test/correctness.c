@@ -11,7 +11,6 @@
  * Currently the following is being tested (in the order they appear in
  * this source file):
  * 	[x] bucket array
- * 	[x] priority (heap) queue
  * 	[x] priority queue
  * 	[x] quadgk 1D numerical integration
  * 	[x] quadgk_vec 1D numerical integration
@@ -38,7 +37,6 @@
 #include <sbmf/math/find_eigenpairs.h>
 #include <sbmf/math/grid.h>
 #include <sbmf/memory/prioqueue.h>
-#include <sbmf/memory/prioqueue_heap.h>
 #include <sbmf/memory/bucketarray.h>
 
 #include <plot/plot.h>
@@ -50,7 +48,7 @@
 describe (bucketarray) {
 	before_each() { sbmf_init(); }
 	after_each() { sbmf_shutdown(); }
-	it ("works")  {
+	it ("creating, settings and getting values")  {
 		struct barray* ba = barray_new(2, sizeof(i32));
 		asserteq(ba->bucket_count, 1);
 
@@ -77,82 +75,54 @@ describe (bucketarray) {
 
 /* priority queue */
 
-static bool pqcmp(void* a, void* b) {
+static bool pqcmp_des(void* a, void* b) {
 	return *((i32*)a) < *((i32*)b);
+}
+
+static bool pqcmp_asc(void* a, void* b) {
+	return *((i32*)a) > *((i32*)b);
 }
 
 describe (pq) {
 	before_each() { sbmf_init(); }
 	after_each() { sbmf_shutdown(); }
 
-	it ("pushes and pops") {
-		prioqueue* pq = prioqueue_new(10, sizeof(i32), pqcmp);
-		i32 i = 0;
+	it ("pushes and pops (des)") {
+		struct prioqueue* pq = prioqueue_new(4, sizeof(i32), pqcmp_des);
+		for (i32 i = 0; i < 100; ++i) {
+			prioqueue_push(pq, &i);
+		}
 
-		i = 10; prioqueue_push(pq, &i);
-		i =  9; prioqueue_push(pq, &i);
-		i =  8; prioqueue_push(pq, &i);
-		i =  7; prioqueue_push(pq, &i);
-		i =  6; prioqueue_push(pq, &i);
-		i =  5; prioqueue_push(pq, &i);
-		i =  4; prioqueue_push(pq, &i);
-		i =  3; prioqueue_push(pq, &i);
-		i =  2; prioqueue_push(pq, &i);
-		i =  1; prioqueue_push(pq, &i);
+		i32 val;
+		for (i32 i = 0; i < 100; ++i) {
+			prioqueue_pop(pq, &val);
+			asserteq(val, i);
+		}
 
-		asserteq(*(i32*)prioqueue_top(pq), 1 ); prioqueue_pop(pq);
-		asserteq(*(i32*)prioqueue_top(pq), 2 ); prioqueue_pop(pq);
-		asserteq(*(i32*)prioqueue_top(pq), 3 ); prioqueue_pop(pq);
-		asserteq(*(i32*)prioqueue_top(pq), 4 ); prioqueue_pop(pq);
-		asserteq(*(i32*)prioqueue_top(pq), 5 ); prioqueue_pop(pq);
-		asserteq(*(i32*)prioqueue_top(pq), 6 ); prioqueue_pop(pq);
-		asserteq(*(i32*)prioqueue_top(pq), 7 ); prioqueue_pop(pq);
-		asserteq(*(i32*)prioqueue_top(pq), 8 ); prioqueue_pop(pq);
-		asserteq(*(i32*)prioqueue_top(pq), 9 ); prioqueue_pop(pq);
-		asserteq(*(i32*)prioqueue_top(pq), 10); prioqueue_pop(pq);
+		asserteq(pq->mem->bucket_count, 100/4);
+	}
+	it ("pushes and pops (asc)") {
+		struct prioqueue* pq = prioqueue_new(4, sizeof(i32), pqcmp_asc);
+		for (i32 i = 0; i < 100; ++i) {
+			prioqueue_push(pq, &i);
+		}
+
+		i32 val;
+		for (i32 i = 99; i >= 0; --i) {
+			prioqueue_pop(pq, &val);
+			asserteq(val, i);
+		}
+
+		asserteq(pq->mem->bucket_count, 100/4);
 	}
 }
-
-describe (pqheap) {
-	before_each() { sbmf_init(); }
-	after_each() { sbmf_shutdown(); }
-
-	it ("pushes and pops") {
-		struct pqheap* pq = pqheap_new(10, sizeof(i32), pqcmp);
-
-		i32 i = 0;
-
-		i = 10; pqheap_push(pq, &i);
-		i =  9; pqheap_push(pq, &i);
-		i =  8; pqheap_push(pq, &i);
-		i =  7; pqheap_push(pq, &i);
-		i =  6; pqheap_push(pq, &i);
-		i =  5; pqheap_push(pq, &i);
-		i =  4; pqheap_push(pq, &i);
-		i =  3; pqheap_push(pq, &i);
-		i =  2; pqheap_push(pq, &i);
-		i =  1; pqheap_push(pq, &i);
-
-		asserteq(*(i32*)pqheap_top(pq), 1 ); pqheap_pop(pq);
-		asserteq(*(i32*)pqheap_top(pq), 2 ); pqheap_pop(pq);
-		asserteq(*(i32*)pqheap_top(pq), 3 ); pqheap_pop(pq);
-		asserteq(*(i32*)pqheap_top(pq), 4 ); pqheap_pop(pq);
-		asserteq(*(i32*)pqheap_top(pq), 5 ); pqheap_pop(pq);
-		asserteq(*(i32*)pqheap_top(pq), 6 ); pqheap_pop(pq);
-		asserteq(*(i32*)pqheap_top(pq), 7 ); pqheap_pop(pq);
-		asserteq(*(i32*)pqheap_top(pq), 8 ); pqheap_pop(pq);
-		asserteq(*(i32*)pqheap_top(pq), 9 ); pqheap_pop(pq);
-		asserteq(*(i32*)pqheap_top(pq), 10); pqheap_pop(pq);
-	}
-}
-
 
 /* quadgk 1D numerical integration */
 
 static void check_quadgk_converge(integration_result res, f64 expected) {
 	bool correct_ans = f64_compare(res.integral, expected, 1e-9);
 	if (!res.converged || !correct_ans) {
-		printf("Integral failed to converge or got wrong answer:\n\tconverged: %d\n\tintegral: %lf\n\terror: %lf\n\texpected: %lf\n", res.converged, res.integral, res.error, expected);
+		printf("Integral failed to converge or got wrong answer:\n\tconverged: %d\n\tintegral: %lf\n\terror: %lf\n\texpected: %lf\n\tevals: %d\n", res.converged, res.integral, res.error, expected, res.performed_evals);
 	}
 
 	asserteq(correct_ans && res.converged, true);

@@ -1,97 +1,123 @@
 #pragma once
 
 #include <sbmf/sbmf.h>
-#include <string.h> /* memcpy, memmove */
+#include <string.h> /* memcpy, memove */
+#include "bucketarray.h"
+
+#define PQ_PARENT(x) (((i32)x-1)/2)
+#define PQ_LEFT(x)	 (2*(i32)x+1)
+#define PQ_RIGHT(x)  (2*(i32)x+2)
+/*
+ * | 0 |  1 |  2 |  3 |  4 |
+ * | R | L0 | R0 | L1 | R1 | ...
+ *
+ *				 R
+ *              / \
+ *             L0 R0
+ *            /  \
+ *           L1  R1
+ *
+ */
 
 /* Shall return true if a comes before b */
 typedef bool cmpfunc(void* a, void* b);
 
-typedef struct {
-	u32 top;
-	u32 size;
-
-	u32 max_size;
+struct prioqueue {
+	u32 items;
 	u32 item_size;
 
-	u8* mem;
+	struct barray* mem;
 
 	cmpfunc* cmp;
-} prioqueue;
+};
 
-static inline prioqueue* prioqueue_new(u32 items, u32 item_size, cmpfunc* cmp) {
-	void* mem = (void*)sbmf_stack_push(items*item_size + sizeof(prioqueue));
+static void prioqueue_heapify(struct prioqueue* pq, u32 index);
 
-	prioqueue* pq = (prioqueue*) mem;
+static inline void prioqueue_heapify(struct prioqueue* pq, u32 index) {
+	if (pq->items <= 1)
+		return;
 
-	pq->top = 0;
-	pq->size = 0;
+	u32 L = PQ_LEFT(index);
+	u32 R = PQ_RIGHT(index);
+	u32 tmp = index;
 
-	pq->max_size = items;
+	if (L >= pq->items || R >= pq->items)
+		return;
+
+	void* left     = barray_get(pq->mem, L);
+	void* right    = barray_get(pq->mem, R);
+	void* indexptr = barray_get(pq->mem, index);
+
+	if (!pq->cmp(indexptr, left)) {
+		indexptr = left;
+		index = L;
+	}
+
+	if (!pq->cmp(indexptr, right)) {
+		indexptr = right;
+		index = R;
+	}
+
+	if (index != tmp) {
+		u8 tmpbuf[pq->item_size];
+		memcpy(tmpbuf, barray_get(pq->mem, tmp), pq->item_size);
+		memcpy(barray_get(pq->mem, tmp), barray_get(pq->mem, index), pq->item_size);
+		memcpy(barray_get(pq->mem, index), tmpbuf, pq->item_size);
+
+		prioqueue_heapify(pq, index);
+	}
+}
+
+static inline struct prioqueue* prioqueue_new(u32 items_per_bucket, u32 item_size, cmpfunc* cmp) {
+	struct prioqueue* pq = (struct prioqueue*) sbmf_stack_push(sizeof(struct prioqueue));
+	pq->items = 0;
 	pq->item_size = item_size;
-
-	pq->mem = (u8*) (pq + 1);
-
+	pq->mem = barray_new(items_per_bucket, item_size);
 	pq->cmp = cmp;
 
 	return pq;
 }
 
-static inline void* prioqueue_get(prioqueue* pq, u32 index) {
-	return &pq->mem[((pq->top + index) % pq->max_size) * pq->item_size];
+static inline void prioqueue_push(struct prioqueue* pq, const void* data) {
+	/* Copy data to the last slot in the array */
+	u32 i = pq->items;
+	memcpy(barray_get(pq->mem, i), data, pq->item_size);
+	pq->items++;
+
+	void* child  = barray_get(pq->mem, i);
+	void* parent = barray_get(pq->mem, PQ_PARENT(i));
+	u8 tmpbuf[pq->item_size];
+	while (i != 0 && pq->cmp(child, parent)) {
+		/* swap child and parent */
+		memcpy(tmpbuf, child, pq->item_size);
+		memcpy(child, parent, pq->item_size);
+		memcpy(parent, tmpbuf, pq->item_size);
+
+		/* update indices */
+		i = PQ_PARENT(i);
+		child = barray_get(pq->mem, i);
+		parent = barray_get(pq->mem, PQ_PARENT(i));
+	}
 }
 
-static inline void prioqueue_push(prioqueue* pq, void* data) {
-	u32 insert_index = 0;
-	for (; insert_index < pq->size; ++insert_index) {
-		if (pq->cmp(data, prioqueue_get(pq, insert_index)))
-			break;
-	}
-
-	u32 wrapped_index = (pq->top + insert_index) % pq->max_size;
-
-	if (insert_index < pq->size)  {
-		/* 0 1 2 3 4 5 6 7 8 9
-		 * 	   b   t     i
-		 * shift 012 -> 123
-		 * shift 9 -> 0
-		 * shift 78 -> 89
-		 */
-
-		u32 end_index = (pq->top + pq->size) % pq->max_size;
-
-		if (wrapped_index < end_index) {
-			/* 0 1 2 3 4 5 6 7 8 9
-			 * 	   t   i
-			 * shift 456 -> 567
-			 */
-
-			u32 next_index = (wrapped_index + 1) % pq->max_size;
-			memmove(&pq->mem[next_index*pq->item_size], &pq->mem[wrapped_index*pq->item_size], (pq->size - insert_index)*pq->item_size);
-		} else {
-			memmove(&pq->mem[pq->item_size], &pq->mem[0], (end_index)*pq->item_size);
-
-			memmove(&pq->mem[0], &pq->mem[(pq->max_size-1)*pq->item_size], pq->item_size);
-
-			u32 next_index = (wrapped_index + 1) % pq->max_size;
-			memmove(&pq->mem[next_index*pq->item_size], &pq->mem[wrapped_index*pq->item_size], (pq->size - insert_index-1-end_index)*pq->item_size);
-		}
-	}
-
-	memcpy(&pq->mem[wrapped_index*pq->item_size], data, pq->item_size);
-	pq->size++;
+static inline u8* prioqueue_top(struct prioqueue* pq) {
+	return (u8*) barray_get(pq->mem, 0);
 }
 
-static inline u8* prioqueue_top(prioqueue* pq) {
-	return &pq->mem[pq->top * pq->item_size];
-}
+static inline bool prioqueue_pop(struct prioqueue* pq, void* out) {
+	if (pq->items == 0)
+		return false;
 
-static inline bool prioqueue_pop(prioqueue* pq) {
-	if (pq->size > 0) {
-		pq->top = (pq->top + 1) % pq->max_size;
-		pq->size--;
+	memcpy(out, barray_get(pq->mem, 0), pq->item_size);
 
-		return (pq->size > 0);
-	}
+	/* swap first and last element */
+	u8 tmpbuf[pq->item_size];
+	memcpy(tmpbuf, barray_get(pq->mem, 0), pq->item_size);
+	memcpy(barray_get(pq->mem, 0), barray_get(pq->mem, pq->items-1), pq->item_size);
+	memcpy(barray_get(pq->mem, pq->items-1), tmpbuf, pq->item_size);
 
-	return false;
+	pq->items--;
+	prioqueue_heapify(pq, 0);
+
+	return true;
 }

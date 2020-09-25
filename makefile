@@ -21,8 +21,10 @@ TEST_CORRECTNESS_SRCS = src/test/correctness.c
 TEST_PERFORMANCE_SRCS = src/test/performance.c
 
 PROJ_LIBS = \
-	-lm
+	-lm -fopenmp -lgsl
 TEST_LIBS = \
+	-fopenmp \
+	-lgsl \
 	-L . \
 	-l:$(BUILDDIR)/$(PROJECT).a \
 	-l:third_party/lib/libarpack.a \
@@ -43,10 +45,10 @@ TEST_LIBS = \
 
 RELEASE_FLAGS = -O3
 DEBUG_FLAGS = -g -O0
-MODE_FLAGS = $(DEBUG_FLAGS)
+MODE_FLAGS = $(RELEASE_FLAGS)
 
-PROJ_FLAGS = $(MODE_FLAGS) -c -fpic -Wall -Isrc -Ithird_party/include
-TEST_FLAGS = $(MODE_FLAGS) -Isrc -Ithird_party/include -I/home/aj/.local/include
+PROJ_FLAGS = $(MODE_FLAGS) -c -fpic -pedantic -Wall -Isrc -Ithird_party/include
+TEST_FLAGS = $(MODE_FLAGS) -pedantic -Wall -Isrc -Ithird_party/include -I/home/aj/.local/include
 
 all: tests
 

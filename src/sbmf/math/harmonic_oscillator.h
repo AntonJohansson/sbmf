@@ -26,7 +26,7 @@ static f64 ho_eigenfunction(i32 states[], f64 point[], i32 dims) {
 	 */
 
 	f64 prod = 1.0;
-	static const f64 pi_factor = 1.0/pow(M_PI,0.25);
+	const f64 pi_factor = 1.0/pow(M_PI,0.25);
 	for (i32 i = 0; i < dims; ++i) {
 		i32 n = states[i];
 		assert(n < 270);
@@ -59,7 +59,7 @@ static inline void ho_eigenfunction_vec(u32 n, f64* out, f64* in, u32 len) {
 	 */
 	assert(n < 270);
 
-	static const f64 pi_factor = 1.0/pow(M_PI,0.25);
+	const f64 pi_factor = 1.0/pow(M_PI,0.25);
 	const f64 normalization_factor = pi_factor / sqrt(pow(2,n) * factorial_128(n));
 
 	for (u32 i = 0; i < len; ++i) {
@@ -90,7 +90,7 @@ static inline void ho_eigenfunction_vec(u32 n, f64* out, f64* in, u32 len) {
 
 
 
-
+#if 0
 
 /* Same as above but computes the eigenfunction for multiple state-values. Might remove. */
 static void ho_eigenfunction_statevec(u32 bases_per_dim[], f64 point[], u32 dims, f64* out) {
@@ -158,6 +158,7 @@ static void ho_eigenfunction_statevec(u32 bases_per_dim[], f64 point[], u32 dims
 
 }
 
+#endif
 
 
 
@@ -231,6 +232,10 @@ static inline c64 hob_sample(c64* v, u32 n, f64 x) {
 	}
 	return output;
 }
+
+// p = a|0> + b|1>
+// |p|^2 = (<0|a* + <1|b*)(a|0> + b|1>)
+//       = |a|^2 <0|0> + |b|^2 <1|1>
 
 /* Currently doesnt handle 2d/3d/... case */
 static inline void hob_sample_vec(c64* coeffs, u32 coeff_len, c64* out, f64* in, u32 in_len) {

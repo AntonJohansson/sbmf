@@ -7,6 +7,8 @@
 
 #include <assert.h> /* Not the correct way to handle this */
 
+#include <omp.h>
+
 struct integrand_params {
 	u32 n[2];
 	c64* coeffs;
@@ -18,6 +20,13 @@ struct guess_integrand_params {
 	u32 n;
 	gss_guess_vec_func* guess;
 };
+
+static void log_integration_result(integration_result res) {
+	log_info("integral: %e", res.integral);
+	log_info("error: %e", res.error);
+	log_info("performed evals: %d", res.performed_evals);
+	log_info("converged: %s", (res.converged) ? "yes" : "no");
+}
 
 static void scim_integrand(f64* out, f64* in, u32 len, void* data) {
 	struct integrand_params* params = data;
@@ -37,15 +46,15 @@ static void scim_integrand(f64* out, f64* in, u32 len, void* data) {
 		out[i] = eig1[i]*eig2[i]*pot[i];
 	}
 
-	/*
-	if (isnan(res)) {
-		log_error("res is nan!");
-		log_error("eig1: %lf", eig1);
-		log_error("eig2: %lf", eig2);
-		log_error("pot: %lf", pot);
-		log_error("x: %lf", x);
+	for (u32 i = 0; i < len; ++i) {
+		if (isnan(out[i])) {
+			log_error("out[%d] is nan!", i);
+			log_error("eig1: %lf", eig1[i]);
+			log_error("eig2: %lf", eig2[i]);
+			log_error("pot: %lf", pot[i]);
+			log_error("in: %lf", in[i]);
+		}
 	}
-	*/
 }
 
 static void scim_guess_integrand(f64* out, f64* in, u32 len, void* data) {
@@ -62,7 +71,7 @@ static void scim_guess_integrand(f64* out, f64* in, u32 len, void* data) {
 	}
 }
 
-struct gss_result scim(struct scim_settings settings, gss_potential_vec_func* potential, gss_guess_vec_func* guess) {
+struct gss_result ho_scim(struct scim_settings settings, gss_potential_vec_func* potential, gss_guess_vec_func* guess) {
 	const u32 N = settings.num_basis_functions;
 
 	struct gss_result res = {
@@ -74,14 +83,11 @@ struct gss_result scim(struct scim_settings settings, gss_potential_vec_func* po
 		.gk = gk7,
 		.abs_error_tol = 1e-10,
 		.rel_error_tol = 1e-10,
-		.max_evals = 1e4,
+		.max_evals = settings.max_iterations,
 	};
 
-	/* Setup the initial guess */
-	/*res.wavefunction[0] = 1;
-	for (u32 i = 1; i < N; ++i) {
-		res.wavefunction[i] = 0;
-	}*/
+#if 0
+	/* Compute coeffs of the guess function */
 	struct guess_integrand_params guess_params = {
 		.guess = guess,
 	};
@@ -90,14 +96,35 @@ struct gss_result scim(struct scim_settings settings, gss_potential_vec_func* po
 		guess_params.n = i;
 		integration_result ires = quadgk_vec(scim_guess_integrand, -INFINITY, INFINITY, int_settings);
 		if (!ires.converged)
-			log_error("integration failed for %d", i);
+			log_integration_result(ires);
 		assert(ires.converged);
 		res.wavefunction[i] = ires.integral;
 	}
 
-	hermitian_bandmat T = construct_ho_kinetic_matrix(N);
-	hermitian_bandmat H = T;
-	H.base.data = (c64*) sbmf_stack_push(N*N*sizeof(c64));
+	/* Normalize initial guess coeffs */
+	{
+		f64 sum = 0.0;
+		for (u32 i = 0; i < N; ++i) {
+			sum += cabs(res.wavefunction[i])*cabs(res.wavefunction[i]);
+		}
+
+		f64 scale = 1.0/sqrt(sum);
+		for (u32 i = 0; i < N; ++i) {
+			res.wavefunction[i] *= scale;
+		}
+	}
+#else
+	res.wavefunction[0] = 1;
+	for (u32 i = 1; i < N; ++i) {
+		res.wavefunction[i] = 0;
+	}
+#endif
+
+	hermitian_bandmat H = {
+		.base = mat_new_zero(N,N),
+		.bandcount = N,
+		.size = N
+	};
 
 	struct integrand_params params = {
 		.pot = potential,
@@ -107,26 +134,48 @@ struct gss_result scim(struct scim_settings settings, gss_potential_vec_func* po
 
 	int_settings.userdata = &params;
 
-
 	for (; res.iterations < settings.max_iterations; ++res.iterations) {
+		/* Call debug callback if requested by user */
+		if (settings.measure_every > 0 && res.iterations % settings.measure_every == 0) {
+			if (settings.dbgcallback) {
+				settings.dbgcallback(settings, res.wavefunction);
+			}
+		}
+
 		memcpy(old_wavefunction, res.wavefunction, N*sizeof(c64));
 
-		log_info("Staring iteration: %d -- error: %lf", res.iterations, res.error);
+		log_info("Starting iteration: %d", res.iterations);
 
+		log_info("-- Constructing hamiltonian");
 		/* Construct standard hamiltonian */
 		{
 			PROFILE_BEGIN("Constructing H");
-			for (u32 r = 0; r < T.size; ++r) {
-				for (u32 c = r; c < T.size; ++c) {
+			//#pragma omp parallel for
+			for (u32 r = 0; r < H.size; ++r) {
+				for (u32 c = r; c < H.size; ++c) {
 					params.n[0] = r;
 					params.n[1] = c;
+
+					//gsl_integration_qags(&gslf, -INFINITY, INFINITY, 0, 1e-7, 1e9, gsl_w, &gsl_result, &gsl_error);
+					//log_info("gsl integral value: %lf", gsl_result);
+
 					integration_result res = quadgk_vec(scim_integrand, -INFINITY, INFINITY, int_settings);
-					if (!res.converged)
+
+					if (!res.converged) {
 						log_error("integration failed for %d,%d", r,c);
+						log_integration_result(res);
+					}
 					assert(res.converged);
 
+					if (fabs(res.integral) < res.error) {
+						res.integral = 0;
+						assert(false);
+					}
+
 					u32 i = (H.size-1)*(H.size-(c-r)) + r;
-					H.base.data[i] = T.base.data[i] + res.integral;
+					H.base.data[i] = res.integral;
+					if (r == c)
+						H.base.data[i] += ho_eigenvalue((i32[]){r},1);
 				}
 			}
 			PROFILE_END("Constructing H");
@@ -134,11 +183,13 @@ struct gss_result scim(struct scim_settings settings, gss_potential_vec_func* po
 			assert(mat_is_valid(H.base));
 		}
 
+		log_info("-- Solving eigenvec problem");
 		/* Solve for first eigenvector (ground state) */
 		PROFILE_BEGIN("Eigenproblem solving");
 		struct eigen_result eres = find_eigenpairs_sparse(H, 1, EV_SMALLEST_RE);
 		PROFILE_END("Eigenproblem solving");
 
+		log_info("-- Normalize and copy result");
 		/* Normalize and copy to result */
 		{
 			PROFILE_BEGIN("Normalize+copy");
@@ -156,6 +207,7 @@ struct gss_result scim(struct scim_settings settings, gss_potential_vec_func* po
 			PROFILE_END("Normalize+copy");
 		}
 
+		log_info("-- Calculating error");
 		/* Calculate error */
 		{
 			PROFILE_BEGIN("Calculate error");
@@ -166,21 +218,13 @@ struct gss_result scim(struct scim_settings settings, gss_potential_vec_func* po
 			}
 			res.error = sqrt(sum);
 
+			log_info("Finished iteration with error %e", res.error);
+
 			PROFILE_END("Calculate error");
 			if (res.error < settings.error_tol)
 				break;
 		}
 
-		/* Call debug callback if requested by user */
-		if (settings.measure_every > 0 && res.iterations % settings.measure_every == 0) {
-			if (settings.dbgcallback) {
-				/*
-				 * Note: old_wavefunction has already been used at this point, we can
-				 * thus use it as a temporary buffer.
-				 */
-				settings.dbgcallback(settings, res.wavefunction);
-			}
-		}
 	}
 
 	return res;

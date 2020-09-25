@@ -2,6 +2,7 @@
 #include <sbmf/memory/prioqueue.h>
 #include <sbmf/debug/log.h>
 #include <math.h> // INFINITY and isinf
+#include <stdio.h>
 
 typedef f64 coord_transform_input_func(f64 x, f64 a, f64 b);
 typedef f64 coord_transform_output_func(f64 x);
@@ -249,7 +250,10 @@ static inline integration_result hadapt(integrand_vec* f, f64 start, f64 end,
 
 	u32 memory_marker = sbmf_stack_marker();
 
-	struct prioqueue* pq = prioqueue_new(2*settings.max_evals, sizeof(segment), compare_segments);
+	/*
+	 * struct prioqueue* pq = prioqueue_new(2*settings.max_evals, sizeof(segment), compare_segments);
+	 */
+	struct prioqueue* pq = prioqueue_new(64, sizeof(segment), compare_segments);
 	prioqueue_push(pq, &s);
 
 	segment largest_error_seg;
@@ -296,7 +300,7 @@ integration_result quadgk_vec(integrand_vec* f, f64 start, f64 end, integration_
 	i32 start_isinf = isinf(start);
 	i32 end_isinf = isinf(end);
 
-	integration_result res;
+	integration_result res = {0};
 	struct coordinate_transform transform = {
 		.input = coord_transform_input_identity,
 		.output = coord_transform_output_identity,

@@ -49,7 +49,7 @@ static inline void calculate_sample_points_for_interval(integration_settings set
 	out[4*reduced_size + 0] = start + mid;
 	out[4*reduced_size + 1] = start + (1-gk->kronod_nodes[gk->kronod_size-2])*mid;
 	out[4*reduced_size + 2] = start + (1+gk->kronod_nodes[gk->kronod_size-2])*mid;
-};
+}
 
 static eval_result evaluate_rule(
 		integration_settings settings,
@@ -301,7 +301,7 @@ integration_result quadgk_vec_inl(integrand_vec* f, f64 start, f64 end, integrat
 	i32 start_isinf = isinf(start);
 	i32 end_isinf = isinf(end);
 
-	integration_result res;
+	integration_result res = {0};
 	struct coordinate_transform transform = {
 		.input = coord_transform_input_identity,
 		.output = coord_transform_output_identity,

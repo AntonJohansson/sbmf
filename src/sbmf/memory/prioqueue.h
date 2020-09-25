@@ -108,7 +108,8 @@ static inline bool prioqueue_pop(struct prioqueue* pq, void* out) {
 	if (pq->items == 0)
 		return false;
 
-	memcpy(out, barray_get(pq->mem, 0), pq->item_size);
+	if (out)
+		memcpy(out, barray_get(pq->mem, 0), pq->item_size);
 
 	/* swap first and last element */
 	u8 tmpbuf[pq->item_size];

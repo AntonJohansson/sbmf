@@ -49,4 +49,4 @@ struct gss_result {
 
 
 struct gss_result item(struct item_settings settings, gss_potential_func* potential, gss_guess_func* guess);
-struct gss_result scim(struct scim_settings settings, gss_potential_vec_func* potential, gss_guess_vec_func* guess);
+struct gss_result ho_scim(struct scim_settings settings, gss_potential_vec_func* potential, gss_guess_vec_func* guess);

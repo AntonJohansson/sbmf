@@ -78,7 +78,7 @@ struct eigen_result find_eigenpairs_sparse(hermitian_bandmat bm, u32 num_eigenva
 		log_error("\t\t 2 + nev <= N");
 
 		sbmf_stack_free_to_marker(memory_marker);
-		return (struct eigen_result){};
+		return (struct eigen_result){0};
 	}
 
 	f64 tol = 0.0; // relative error tolerance to achieve.

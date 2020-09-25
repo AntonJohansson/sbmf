@@ -12,6 +12,7 @@
  * this source file):
  * 	[x] bucket array
  * 	[x] priority queue
+ * 	[ ] HO function sampling
  * 	[x] quadgk 1D numerical integration
  * 	[x] quadgk_vec 1D numerical integration
  * 	[ ] ------ 2D numerical integration
@@ -40,6 +41,8 @@
 #include <sbmf/memory/bucketarray.h>
 
 #include <plot/plot.h>
+
+#include <stdio.h>
 
 #define DISABLE_SLOW_TESTS 0
 
@@ -103,18 +106,24 @@ describe (pq) {
 	}
 	it ("pushes and pops (asc)") {
 		struct prioqueue* pq = prioqueue_new(4, sizeof(i32), pqcmp_asc);
-		for (i32 i = 0; i < 100; ++i) {
+		for (i32 i = 0; i < 1000; ++i) {
 			prioqueue_push(pq, &i);
+			prioqueue_push(pq, &i);
+			prioqueue_pop(pq, NULL);
 		}
 
 		i32 val;
-		for (i32 i = 99; i >= 0; --i) {
+		for (i32 i = 999; i >= 0; --i) {
 			prioqueue_pop(pq, &val);
 			asserteq(val, i);
 		}
 
-		asserteq(pq->mem->bucket_count, 100/4);
+		//asserteq(pq->mem->bucket_count, 100/4);
 	}
+}
+
+/* HO function sampling */
+describe (hofunctionsampling) {
 }
 
 /* quadgk 1D numerical integration */
@@ -340,14 +349,6 @@ struct integrand_params_vec {
 	pot_func_vec* pot;
 };
 
-static f64 hob_integrand(f64 x, void* data) {
-	struct integrand_params* params = data;
-	return
-		ho_eigenfunction((i32[]){params->n[0]}, &x, 1) *
-		params->pot(&x,1,NULL) *
-		ho_eigenfunction((i32[]){params->n[1]}, &x, 1);
-}
-
 static void hob_integrand_vec(f64* out, f64* in, u32 len, void* data) {
 	struct integrand_params_vec* params = data;
 
@@ -431,6 +432,8 @@ describe (fdm_vs_hob) {
 		const i32 N = 64;
 		struct eigen_result fdm_res = fdm_solve(ho_perturbed_potential, L, N);
 		struct eigen_result hob_res = hob_solve(ho_perturbed_potential_vec, N/2);
+		(void)fdm_res;
+		(void)hob_res;
 	}
 }
 
@@ -453,7 +456,7 @@ f64 linear_hamiltonian_pot(f64* v, i32 n, c64 u) {
 
 void linear_hamiltonian_vec_pot(f64* out, f64* in_x, c64* in_u, u32 len) {
 	for (u32 i = 0; i < len; ++i) {
-		out[i] = ho_perturbed_potential(&in_x[i], 1, NULL);
+		out[i] = gaussian(in_x[i],0,0.2);
 	}
 }
 
@@ -463,10 +466,58 @@ f64 non_linear_hamiltonian_pot(f64* v, i32 n, c64 u) {
 }
 
 void non_linear_hamiltonian_vec_pot(f64* out, f64* in_x, c64* in_u, u32 len) {
-	ho_potential_vec(out, in_x, len);
+	//ho_potential_vec(out, in_x, len);
 	for (u32 i = 0; i < len; ++i) {
-		out[i] += 3*cabs(in_u[i])*cabs(in_u[i]);
+		out[i] = 3*cabs(in_u[i])*cabs(in_u[i]);
 	}
+}
+
+void debug_callback(struct scim_settings settings, c64* wavefunction) {
+	plot_init(800, 600, "scim debug");
+	const i32 N = 128;
+	const f64 L = 5.0;
+	f32 pdata[N];
+	f32 wdata[N];
+	f32 rewdata[N];
+	f32 imwdata[N];
+	sample_space sp = make_linspace(1, -L/2.0, L/2.0, N);
+
+	for (u32 i = 0; i < N; ++i) {
+		c64 sample = hob_sample(wavefunction, settings.num_basis_functions, sp.points[i]);
+
+		f64 pdataout;
+		f64 x = sp.points[i];
+		non_linear_hamiltonian_vec_pot(&pdataout, &x, &sample, 1);
+		pdata[i] = (f32)pdataout;
+
+		c64 c = cabs(sample);
+		wdata[i] = c*c;
+		rewdata[i] = creal(sample);
+		imwdata[i] = cimag(sample);
+	}
+	push_line_plot(&(plot_push_desc){
+			.space = &sp,
+			.data = pdata,
+			.label = "potential",
+			});
+	push_line_plot(&(plot_push_desc){
+			.space = &sp,
+			.data = wdata,
+			.label = "abs",
+			});
+
+	push_line_plot(&(plot_push_desc){
+			.space = &sp,
+			.data = rewdata,
+			.label = "re",
+			});
+	push_line_plot(&(plot_push_desc){
+			.space = &sp,
+			.data = imwdata,
+			.label = "im",
+			});
+	plot_update_until_closed();
+	plot_shutdown();
 }
 
 describe(item_vs_scim_groundstate_finding) {
@@ -474,8 +525,8 @@ describe(item_vs_scim_groundstate_finding) {
 	after_each() { sbmf_shutdown(); }
 
 	it ("perturbed HO potential") {
-		const f64 L = 5.0;
-		const i32 N = 128;
+		const f64 L = 10.0;
+		const i32 N = 256;
 		struct grid space = generate_grid(1,
 				(f64[]){-L/2.0},
 				(f64[]){+L/2.0},
@@ -496,7 +547,7 @@ describe(item_vs_scim_groundstate_finding) {
 		log_info("\nitem:\niterations: %d\nerror: %e", item_res.iterations, item_res.error);
 		c64_normalize(item_res.wavefunction, space.total_pointcount);
 
-		struct gss_result hob_res = scim(scim_settings, linear_hamiltonian_vec_pot, guess_vec);
+		struct gss_result hob_res = ho_scim(scim_settings, linear_hamiltonian_vec_pot, guess_vec);
 		log_info("\nhob:\niterations: %d\nerror: %e", hob_res.iterations, hob_res.error);
 #if 1
 		{
@@ -542,28 +593,30 @@ describe(item_vs_scim_groundstate_finding) {
 
 	it ("non-linear hamiltonian") {
 		const f64 L = 10.0;
-		const i32 N = 256;
+		const i32 N = 512;
 		struct grid space = generate_grid(1,
 				(f64[]){-L/2.0},
 				(f64[]){+L/2.0},
 				(i32[]){N});
 		struct item_settings item_settings = {
 			.g = space,
-			.max_iterations = 1e7,
-			.error_tol = 1e-10,
-			.dt = 0.001,
+			.max_iterations = 1e9,
+			.error_tol = 1e-9,
+			.dt = 0.0001,
 		};
 		struct scim_settings scim_settings = {
-			.num_basis_functions = 64,
-			.max_iterations = 1e7,
-			.error_tol = 1e-10,
+			.num_basis_functions = 32,
+			.max_iterations = 1e9,
+			.error_tol = 1e-7,
+			.measure_every = 10,
+			.dbgcallback = debug_callback,
 		};
 
 		struct gss_result item_res = item(item_settings, non_linear_hamiltonian_pot, guess);
 		log_info("\nitem:\niterations: %d\nerror: %e", item_res.iterations, item_res.error);
 		c64_normalize(item_res.wavefunction, space.total_pointcount);
 
-		struct gss_result hob_res = scim(scim_settings, non_linear_hamiltonian_vec_pot, guess_vec);
+		struct gss_result hob_res = ho_scim(scim_settings, non_linear_hamiltonian_vec_pot, guess_vec);
 		log_info("\nhob:\niterations: %d\nerror: %e", hob_res.iterations, hob_res.error);
 
 #if 1

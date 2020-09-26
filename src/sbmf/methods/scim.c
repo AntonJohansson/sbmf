@@ -71,6 +71,7 @@ static void scim_guess_integrand(f64* out, f64* in, u32 len, void* data) {
 	}
 }
 
+
 struct gss_result ho_scim(struct scim_settings settings, gss_potential_vec_func* potential, gss_guess_vec_func* guess) {
 	const u32 N = settings.num_basis_functions;
 
@@ -135,13 +136,6 @@ struct gss_result ho_scim(struct scim_settings settings, gss_potential_vec_func*
 	int_settings.userdata = &params;
 
 	for (; res.iterations < settings.max_iterations; ++res.iterations) {
-		/* Call debug callback if requested by user */
-		if (settings.measure_every > 0 && res.iterations % settings.measure_every == 0) {
-			if (settings.dbgcallback) {
-				settings.dbgcallback(settings, res.wavefunction);
-			}
-		}
-
 		memcpy(old_wavefunction, res.wavefunction, N*sizeof(c64));
 
 		log_info("Starting iteration: %d", res.iterations);
@@ -167,11 +161,6 @@ struct gss_result ho_scim(struct scim_settings settings, gss_potential_vec_func*
 					}
 					assert(res.converged);
 
-					if (fabs(res.integral) < res.error) {
-						res.integral = 0;
-						assert(false);
-					}
-
 					u32 i = (H.size-1)*(H.size-(c-r)) + r;
 					H.base.data[i] = res.integral;
 					if (r == c)
@@ -182,6 +171,7 @@ struct gss_result ho_scim(struct scim_settings settings, gss_potential_vec_func*
 
 			assert(mat_is_valid(H.base));
 		}
+
 
 		log_info("-- Solving eigenvec problem");
 		/* Solve for first eigenvector (ground state) */
@@ -225,6 +215,12 @@ struct gss_result ho_scim(struct scim_settings settings, gss_potential_vec_func*
 				break;
 		}
 
+		/* Call debug callback if requested by user */
+		if (settings.measure_every > 0 && res.iterations % settings.measure_every == 0) {
+			if (settings.dbgcallback) {
+				settings.dbgcallback(settings, res.wavefunction);
+			}
+		}
 	}
 
 	return res;

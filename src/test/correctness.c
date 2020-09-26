@@ -462,13 +462,13 @@ void linear_hamiltonian_vec_pot(f64* out, f64* in_x, c64* in_u, u32 len) {
 
 f64 non_linear_hamiltonian_pot(f64* v, i32 n, c64 u) {
 	/* assuming 1d */
-	return ho_potential(v, n, 0) + 3*cabs(u)*cabs(u);
+	return ho_potential(v, n, 0) + cabs(u)*cabs(u);
 }
 
 void non_linear_hamiltonian_vec_pot(f64* out, f64* in_x, c64* in_u, u32 len) {
 	//ho_potential_vec(out, in_x, len);
 	for (u32 i = 0; i < len; ++i) {
-		out[i] = 3*cabs(in_u[i])*cabs(in_u[i]);
+		out[i] = cabs(in_u[i])*cabs(in_u[i]);
 	}
 }
 
@@ -605,10 +605,10 @@ describe(item_vs_scim_groundstate_finding) {
 			.dt = 0.0001,
 		};
 		struct scim_settings scim_settings = {
-			.num_basis_functions = 32,
+			.num_basis_functions = 64,
 			.max_iterations = 1e9,
 			.error_tol = 1e-7,
-			.measure_every = 10,
+			.measure_every = 40,
 			.dbgcallback = debug_callback,
 		};
 
@@ -639,7 +639,7 @@ describe(item_vs_scim_groundstate_finding) {
 
 			for (u32 i = 0; i < N; ++i) {
 				c64 c = cabs(item_res.wavefunction[i]);
-				pdata[i] = 10*c*c;
+				pdata[i] = 50*c*c;
 			}
 			push_line_plot(&(plot_push_desc){
 					.space = &sp,

@@ -9,6 +9,8 @@
 #include <sbmf/debug/log.h>
 
 f64 func(f64 x, void* p) {
+	SBMF_UNUSED(p);
+
 	f64 eig1 = ho_eigenfunction((i32[]){3}, &x, 1);
 	f64 eig2 = ho_eigenfunction((i32[]){7}, &x, 1);
 	f64 pot  = ho_potential(&x, 1, 0);
@@ -16,6 +18,8 @@ f64 func(f64 x, void* p) {
 }
 
 void func_vec(f64* out, f64* in, u32 len, void* p) {
+	SBMF_UNUSED(p);
+
 	f64 eigs1[len];
 	f64 eigs2[len];
 	f64 pots[len];

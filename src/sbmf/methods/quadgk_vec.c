@@ -169,13 +169,18 @@ static inline bool should_exit(integration_result result, integration_settings s
 
 
 static f64 coord_transform_input_identity(f64 t, f64 a, f64 b) {
+	SBMF_UNUSED(a);
+	SBMF_UNUSED(b);
 	return t;
 }
 static f64 coord_transform_output_identity(f64 t) {
+	SBMF_UNUSED(t);
 	return 1.0;
 }
 
 static f64 coord_transform_input_both_inf(f64 t, f64 a, f64 b) {
+	SBMF_UNUSED(a);
+	SBMF_UNUSED(b);
 	return t/(1.0 - t*t);
 }
 static f64 coord_transform_output_both_inf(f64 t) {
@@ -184,6 +189,7 @@ static f64 coord_transform_output_both_inf(f64 t) {
 }
 
 static f64 coord_transform_input_start_inf(f64 t, f64 a, f64 b) {
+	SBMF_UNUSED(a);
 	return b - t/(1.0 - t);
 }
 static f64 coord_transform_output_start_inf(f64 t) {
@@ -192,6 +198,7 @@ static f64 coord_transform_output_start_inf(f64 t) {
 }
 
 static f64 coord_transform_input_end_inf(f64 t, f64 a, f64 b) {
+	SBMF_UNUSED(b);
 	return a + t/(1.0 - t);
 }
 static f64 coord_transform_output_end_inf(f64 t) {

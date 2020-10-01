@@ -211,6 +211,8 @@ static inline f64 ho_eigenvalue(i32 states[], i32 dims) {
 }
 
 static inline f64 ho_potential(f64* v, i32 n, c64 u) {
+	SBMF_UNUSED(u);
+
 	f64 temp = 0.0;
 	for (i32 i = 0; i < n; ++i) {
 		temp += v[i]*v[i];
@@ -307,9 +309,10 @@ static inline hermitian_bandmat construct_ho_kinetic_matrix(u32 size) {
 	 *		(0,0) (1,1) (2,2) (3,3)		12	13	14	15
 	 */
 
-	for (i32 r = 0; r < size; ++r) {
-		for (i32 c = r; c < size; ++c) {
+	for (u32 r = 0; r < size; ++r) {
+		for (u32 c = r; c < size; ++c) {
 			u32 i = (size-1)*(size-(c-r)) + r;
+
 			if (r == c) {
 				T.base.data[i] = (2*c + 1)/4.0;
 			} else if (r == c - 2) {

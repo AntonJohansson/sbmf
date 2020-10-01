@@ -140,22 +140,27 @@ static void check_quadgk_converge(integration_result res, f64 expected) {
 /* quadgk_vec 1D numerical integration */
 
 void x2_vec(f64* out, f64* in, u32 len, void* p) {
+	SBMF_UNUSED(p);
 	for (u32 i = 0; i < len; ++i)
 		out[i] = in[i]*in[i];
 }
 void expx_vec(f64* out, f64* in, u32 len, void* p) {
+	SBMF_UNUSED(p);
 	for (u32 i = 0; i < len; ++i)
 		out[i] = exp(in[i]);
 }
 void expnx_vec(f64* out, f64* in, u32 len, void* p) {
+	SBMF_UNUSED(p);
 	for (u32 i = 0; i < len; ++i)
 		out[i] = exp(-in[i]);
 }
 void expnabsx_vec(f64* out, f64* in, u32 len, void* p) {
+	SBMF_UNUSED(p);
 	for (u32 i = 0; i < len; ++i)
 		out[i] = exp(-fabs(in[i]));
 }
 void sinx_vec(f64* out, f64* in, u32 len, void* p) {
+	SBMF_UNUSED(p);
 	for (u32 i = 0; i < len; ++i)
 		out[i] = sin(in[i]);
 }
@@ -328,10 +333,13 @@ describe (fdm_vs_hob_particle_in_a_box) {
 /* FDM vs HOB perturbed harmonic oscillator */
 
 static f64 ho_perturbed_potential(f64* x, i32 n, void* data) {
+	SBMF_UNUSED(n);
+	SBMF_UNUSED(data);
 	return ho_potential(x,1,0) + gaussian(*x,0,0.2);
 }
 
 static void ho_perturbed_potential_vec(f64* out, f64* in, u32 len, void* data) {
+	SBMF_UNUSED(data);
 	for (u32 i = 0; i < len; ++i) {
 		out[i] = ho_potential(&in[i],1,0) + gaussian(in[i],0,0.2);
 	}
@@ -440,9 +448,9 @@ describe (fdm_vs_hob) {
 /* ITEM vs SCIM groundstate finding */
 
 c64 guess(f64* v, i32 n) {
+	SBMF_UNUSED(n);
 	return gaussian(*v, 0, 0.2);
 }
-
 
 void guess_vec(c64* out, f64* in, u32 len) {
 	for (u32 i = 0; i < len; ++i) {
@@ -451,10 +459,12 @@ void guess_vec(c64* out, f64* in, u32 len) {
 }
 
 f64 linear_hamiltonian_pot(f64* v, i32 n, c64 u) {
+	SBMF_UNUSED(u);
 	return ho_perturbed_potential(v, n, NULL);
 }
 
 void linear_hamiltonian_vec_pot(f64* out, f64* in_x, c64* in_u, u32 len) {
+	SBMF_UNUSED(in_u);
 	for (u32 i = 0; i < len; ++i) {
 		out[i] = gaussian(in_x[i],0,0.2);
 	}
@@ -466,7 +476,7 @@ f64 non_linear_hamiltonian_pot(f64* v, i32 n, c64 u) {
 }
 
 void non_linear_hamiltonian_vec_pot(f64* out, f64* in_x, c64* in_u, u32 len) {
-	//ho_potential_vec(out, in_x, len);
+	SBMF_UNUSED(in_x);
 	for (u32 i = 0; i < len; ++i) {
 		out[i] = cabs(in_u[i])*cabs(in_u[i]);
 	}
@@ -474,7 +484,7 @@ void non_linear_hamiltonian_vec_pot(f64* out, f64* in_x, c64* in_u, u32 len) {
 
 void debug_callback(struct scim_settings settings, c64* wavefunction) {
 	plot_init(800, 600, "scim debug");
-	const i32 N = 128;
+	const u32 N = 128;
 	const f64 L = 5.0;
 	f32 pdata[N];
 	f32 wdata[N];
@@ -526,7 +536,7 @@ describe(item_vs_scim_groundstate_finding) {
 
 	it ("perturbed HO potential") {
 		const f64 L = 10.0;
-		const i32 N = 256;
+		const u32 N = 256;
 		struct grid space = generate_grid(1,
 				(f64[]){-L/2.0},
 				(f64[]){+L/2.0},
@@ -593,7 +603,7 @@ describe(item_vs_scim_groundstate_finding) {
 
 	it ("non-linear hamiltonian") {
 		const f64 L = 10.0;
-		const i32 N = 512;
+		const u32 N = 512;
 		struct grid space = generate_grid(1,
 				(f64[]){-L/2.0},
 				(f64[]){+L/2.0},

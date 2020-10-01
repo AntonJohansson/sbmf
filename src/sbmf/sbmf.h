@@ -2,6 +2,9 @@
 
 #include "types.h"
 
+#define SBMF_UNUSED(x) \
+	(void)x
+
 void sbmf_init();
 void sbmf_shutdown();
 

@@ -57,6 +57,7 @@ static void scim_integrand(f64* out, f64* in, u32 len, void* data) {
 	}
 }
 
+/*
 static void scim_guess_integrand(f64* out, f64* in, u32 len, void* data) {
 	struct guess_integrand_params* params = data;
 
@@ -70,9 +71,12 @@ static void scim_guess_integrand(f64* out, f64* in, u32 len, void* data) {
 		out[i] = eig[i]*eig[i]*guess[i];
 	}
 }
+*/
 
 
 struct gss_result ho_scim(struct scim_settings settings, gss_potential_vec_func* potential, gss_guess_vec_func* guess) {
+	SBMF_UNUSED(guess);
+
 	const u32 N = settings.num_basis_functions;
 
 	struct gss_result res = {

@@ -6,6 +6,7 @@
 #include <assert.h>
 
 static f64 VK(f64* v, i32 n, c64 u) {
+	SBMF_UNUSED(u);
 	f64 value = 0.0;
 	for (i32 i = 0; i < n; ++i)
 		value += v[i]*v[i];

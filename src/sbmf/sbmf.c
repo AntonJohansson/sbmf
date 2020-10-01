@@ -16,6 +16,7 @@ static struct {
 } _state;
 
 static void inthandler(int dummy) {
+	SBMF_UNUSED(dummy);
 	sbmf_shutdown();
 	exit(1);
 }

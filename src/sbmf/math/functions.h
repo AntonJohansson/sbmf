@@ -4,7 +4,7 @@
 #include <math.h>
 
 static inline f64 gaussian(f64 x, f64 mu, f64 sigma) {
-	return 1.0/(sigma*sqrt(M_2_PI)) * exp(-x*x/(2*sigma*sigma));
+	return 1.0/(sigma*sqrt(M_2_PI)) * exp(-(x-mu)*(x-mu)/(2*sigma*sigma));
 }
 
 static inline void f64_normalize(f64* data, u32 size) {

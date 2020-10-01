@@ -27,7 +27,7 @@
 	static struct profile_entry profile_entries[PROFILE_MAX_ENTRIES] = {0};
 
 	static inline struct profile_entry* profile_find_entry_by_name(char const name[]) {
-		for (int i = 0; i < profile_entry_count; ++i) {
+		for (unsigned int i = 0; i < profile_entry_count; ++i) {
 			if(strcmp(profile_entries[i].name, name) == 0) {
 				return &profile_entries[i];
 			}

@@ -21,10 +21,14 @@ TEST_CORRECTNESS_SRCS = src/test/correctness.c
 TEST_PERFORMANCE_SRCS = src/test/performance.c
 
 PROJ_LIBS = \
-	-lm -fopenmp -lgsl
+	-lm -fopenmp \
+	-l:$(BUILDDIR)/$(PROJECT).a \
+	-l:third_party/lib/libarpack.a \
+	-l:third_party/lib/libopenblas.a \
+	-l:third_party/lib/libfftw3.a \
+	-lgfortran
 TEST_LIBS = \
 	-fopenmp \
-	-lgsl \
 	-L . \
 	-l:$(BUILDDIR)/$(PROJECT).a \
 	-l:third_party/lib/libarpack.a \
@@ -37,18 +41,20 @@ TEST_LIBS = \
 	-lm \
 	-lpthread
 
-#PROJ_FLAGS = -fsanitize=address -fsanitize=leak -g -fpic -Wall -Werror -Isrc
-#TEST_FLAGS = -fsanitize=address -fsanitize=leak -g -Wall -Werror -Isrc -Isrc/test/plotting/third_party
-
-#PROJ_FLAGS = -c -pg -g -fpic -O0 -Wall -Isrc -Ithird_party/include
-#TEST_FLAGS = -pg -g -Isrc -Ithird_party/include -I/home/aj/.local/include
-
 RELEASE_FLAGS = -O3
-DEBUG_FLAGS = -g -O0
-MODE_FLAGS = $(RELEASE_FLAGS)
+DEBUG_FLAGS = -g \
+			  -fsanitize=address \
+			  -fsanitize=leak \
+			  #-fsanitize=thread \#
+			  -fsanitize=undefined \
+			  -fsanitize=bool \
+			  -fsanitize=enum \
+			  -fsanitize=float-cast-overflow \
+			  -fsanitize=signed-integer-overflow
 
-PROJ_FLAGS = $(MODE_FLAGS) -c -fpic -pedantic -Wall -Isrc -Ithird_party/include
-TEST_FLAGS = $(MODE_FLAGS) -pedantic -Wall -Isrc -Ithird_party/include -I/home/aj/.local/include
+MODE_FLAGS = $(DEBUG_FLAGS)
+PROJ_FLAGS = $(MODE_FLAGS) -c -fpic -pedantic -Wall -Wextra -Isrc -Ithird_party/include
+TEST_FLAGS = $(MODE_FLAGS)          -pedantic -Wall -Wextra -Isrc -Ithird_party/include -I/home/aj/.local/include
 
 all: tests
 
@@ -75,3 +81,4 @@ tests: $(BUILDDIR)/test_performance $(BUILDDIR)/test_correctness
 
 .PHONY: clean
 clean:
+	rm -rf $(BUILDDIR)

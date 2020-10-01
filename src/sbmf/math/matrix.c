@@ -83,8 +83,8 @@ void mat_transpose(mat* ans_mat, mat m) {
 }
 
 hermitian_bandmat construct_finite_diff_mat(u32 samples_per_dimension, u32 dimensions, f64* deltas) {
-	i32 size = pow(samples_per_dimension, dimensions);
-	i32 bands = pow(samples_per_dimension, dimensions-1);
+	u32 size = pow(samples_per_dimension, dimensions);
+	u32 bands = pow(samples_per_dimension, dimensions-1);
 	hermitian_bandmat m = {
 		.base = mat_new_zero(bands+1,size),
 		.bandcount = bands+1,
@@ -92,15 +92,15 @@ hermitian_bandmat construct_finite_diff_mat(u32 samples_per_dimension, u32 dimen
 	};
 
 	// Setup main diagonal
-	i32 main_diag_value = pow(2, dimensions);
-	for (i32 i = (m.bandcount-1)*size; i < (m.bandcount)*size; ++i) {
+	u32 main_diag_value = pow(2, dimensions);
+	for (u32 i = (m.bandcount-1)*size; i < (m.bandcount)*size; ++i) {
 		m.base.data[i] = -main_diag_value/(deltas[0]*deltas[0]);
 	}
 
 	// Setup off-diagonal elements
-	for (i32 i = 1; i <= dimensions; ++i) {
-		i32 bandindex = pow(samples_per_dimension, i-1);
-		for (i32 j = 0; j < size; ++j) {
+	for (u32 i = 1; i <= dimensions; ++i) {
+		u32 bandindex = pow(samples_per_dimension, i-1);
+		for (u32 j = 0; j < size; ++j) {
 			m.base.data[j + (m.bandcount-1 - bandindex)*size] = 1/(deltas[i-1]*deltas[i-1]);
 		}
 	}

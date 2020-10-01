@@ -555,7 +555,6 @@ describe(item_vs_scim_groundstate_finding) {
 
 		struct gss_result item_res = item(item_settings, linear_hamiltonian_pot, guess);
 		log_info("\nitem:\niterations: %d\nerror: %e", item_res.iterations, item_res.error);
-		c64_normalize(item_res.wavefunction, space.total_pointcount);
 
 		struct gss_result hob_res = ho_scim(scim_settings, linear_hamiltonian_vec_pot, guess_vec);
 		log_info("\nhob:\niterations: %d\nerror: %e", hob_res.iterations, hob_res.error);
@@ -577,7 +576,7 @@ describe(item_vs_scim_groundstate_finding) {
 
 			for (u32 i = 0; i < N; ++i) {
 				c64 c = cabs(item_res.wavefunction[i]);
-				pdata[i] = 30*c*c;
+				pdata[i] = c*c;
 			}
 			push_line_plot(&(plot_push_desc){
 					.space = &sp,
@@ -615,7 +614,7 @@ describe(item_vs_scim_groundstate_finding) {
 			.dt = 0.0001,
 		};
 		struct scim_settings scim_settings = {
-			.num_basis_functions = 64,
+			.num_basis_functions = 32,
 			.max_iterations = 1e9,
 			.error_tol = 1e-7,
 			.measure_every = 40,
@@ -624,7 +623,6 @@ describe(item_vs_scim_groundstate_finding) {
 
 		struct gss_result item_res = item(item_settings, non_linear_hamiltonian_pot, guess);
 		log_info("\nitem:\niterations: %d\nerror: %e", item_res.iterations, item_res.error);
-		c64_normalize(item_res.wavefunction, space.total_pointcount);
 
 		struct gss_result hob_res = ho_scim(scim_settings, non_linear_hamiltonian_vec_pot, guess_vec);
 		log_info("\nhob:\niterations: %d\nerror: %e", hob_res.iterations, hob_res.error);
@@ -649,7 +647,7 @@ describe(item_vs_scim_groundstate_finding) {
 
 			for (u32 i = 0; i < N; ++i) {
 				c64 c = cabs(item_res.wavefunction[i]);
-				pdata[i] = 50*c*c;
+				pdata[i] = c*c;
 			}
 			push_line_plot(&(plot_push_desc){
 					.space = &sp,

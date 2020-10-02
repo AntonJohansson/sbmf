@@ -286,7 +286,7 @@ static inline void hob_sample_vec(c64* coeffs, u32 coeff_len, c64* out, f64* in,
  * and <m|V|n> will be calculated numerically.
  */
 
-static inline hermitian_bandmat construct_ho_kinetic_matrix(u32 size) {
+static inline struct complex_hermitian_bandmat construct_ho_kinetic_matrix(u32 size) {
 	/* We only really need 2 bands for this matrix:
 	 * the main diagonal + one off-diagonal band, since
 	 * it is symmetric.
@@ -295,31 +295,18 @@ static inline hermitian_bandmat construct_ho_kinetic_matrix(u32 size) {
 	 * since we'll add <m|V|n> terms to the diagonals later on
 	 * anyway.
 	 */
-	hermitian_bandmat T = {
-		.base = mat_new(size,size),
-		.bandcount = size,
-		.size = size,
-	};
+	struct complex_hermitian_bandmat T = complex_hermitian_bandmat_new(size,size);
 
-	/* How do we compute the position in band storage?
-	 *
-	 *		(x,x) (x,x) (x,x) (0,3)		0	1	2	3
-	 *		(x,x) (x,x) (0,2) (1,3)		4	5	6	7
-	 *		(x,x) (0,1) (1,2) (2,3)		8	9	10	11
-	 *		(0,0) (1,1) (2,2) (3,3)		12	13	14	15
-	 */
 
-	for (u32 r = 0; r < size; ++r) {
-		for (u32 c = r; c < size; ++c) {
-			u32 i = (size-1)*(size-(c-r)) + r;
+	COMPLEX_HERMITIAN_BANDMAT_FOREACH(T, r,c) {
+		u32 i = complex_hermitian_bandmat_index(T, r,c);
 
-			if (r == c) {
-				T.base.data[i] = (2*c + 1)/4.0;
-			} else if (r == c - 2) {
-				T.base.data[i] = -sqrt(c*(c-1))/4.0;
-			} else {
-				T.base.data[i] = 0;
-			}
+		if (r == c) {
+			T.data[i] = (2.0*(f64)c + 1.0)/4.0;
+		} else if (r == c - 2) {
+			T.data[i] = -sqrt((f64)c*((f64)c-1.0))/4.0;
+		} else {
+			T.data[i] = 0.0;
 		}
 	}
 

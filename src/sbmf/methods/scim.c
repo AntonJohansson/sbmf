@@ -125,11 +125,7 @@ struct gss_result ho_scim(struct scim_settings settings, gss_potential_vec_func*
 	}
 #endif
 
-	hermitian_bandmat H = {
-		.base = mat_new_zero(N,N),
-		.bandcount = N,
-		.size = N
-	};
+	struct complex_hermitian_bandmat H = complex_hermitian_bandmat_new_zero(N,N);
 
 	struct integrand_params params = {
 		.pot = potential,
@@ -146,29 +142,27 @@ struct gss_result ho_scim(struct scim_settings settings, gss_potential_vec_func*
 		{
 			PROFILE_BEGIN("Constructing H");
 			#pragma omp parallel for firstprivate(params, int_settings) shared(H)
-			for (u32 r = 0; r < H.size; ++r) {
-				for (u32 c = r; c < H.size; ++c) {
-					int_settings.userdata = &params;
-					params.n[0] = r;
-					params.n[1] = c;
+			COMPLEX_HERMITIAN_BANDMAT_FOREACH(H, r,c) {
+				int_settings.userdata = &params;
+				params.n[0] = r;
+				params.n[1] = c;
 
-					integration_result res = quadgk_vec(scim_integrand, -INFINITY, INFINITY, int_settings);
+				integration_result res = quadgk_vec(scim_integrand, -INFINITY, INFINITY, int_settings);
 
-					if (!res.converged) {
-						log_error("integration failed for %d,%d", r,c);
-						log_integration_result(res);
-					}
-					assert(res.converged);
-
-					u32 i = (H.size-1)*(H.size-(c-r)) + r;
-					H.base.data[i] = res.integral;
-					if (r == c)
-						H.base.data[i] += ho_eigenvalue((i32[]){r},1);
+				if (!res.converged) {
+					log_error("integration failed for %d,%d", r,c);
+					log_integration_result(res);
 				}
+				assert(res.converged);
+
+				u32 i = complex_hermitian_bandmat_index(H, r,c);
+				H.data[i] = res.integral;
+				if (r == c)
+					H.data[i] += ho_eigenvalue((i32[]){r},1);
 			}
 			PROFILE_END("Constructing H");
 
-			assert(mat_is_valid(H.base));
+			assert(complex_hermitian_bandmat_is_valid(H));
 		}
 
 

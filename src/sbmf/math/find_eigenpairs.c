@@ -10,7 +10,7 @@
 #include <assert.h>
 #include <string.h> // memcpy, memset
 
-struct eigen_result find_eigenpairs_full(hermitian_bandmat bm) {
+struct eigen_result find_eigenpairs_full(struct complex_hermitian_bandmat bm) {
 	f64* offdiag_elements = (f64*)sbmf_stack_push((bm.size-1)*sizeof(f64));
 	c64* colmaj_eigvecs = (c64*)sbmf_stack_push(bm.size*bm.size*sizeof(c64));
 
@@ -28,7 +28,7 @@ struct eigen_result find_eigenpairs_full(hermitian_bandmat bm) {
 		i32 err = LAPACKE_zhbtrd(LAPACK_ROW_MAJOR, 'V', 'U',
 				bm.size,
 				bm.bandcount-1,
-				bm.base.data,
+				bm.data,
 				bm.size,
 				temp_eigvals, offdiag_elements, colmaj_eigvecs,
 				bm.size);
@@ -64,7 +64,7 @@ static const char* arpack_znaupd_error_code_to_string(i32 err);
 static const char* arpack_zneupd_error_code_to_string(i32 err);
 static const char* arpack_which_eigenpairs_to_string(enum which_eigenpairs which);
 
-struct eigen_result find_eigenpairs_sparse(hermitian_bandmat bm, u32 num_eigenvalues, enum which_eigenpairs which) {
+struct eigen_result find_eigenpairs_sparse(struct complex_hermitian_bandmat bm, u32 num_eigenvalues, enum which_eigenpairs which) {
 	u32 memory_marker = sbmf_stack_marker();
 
 	i32 ido = 0;
@@ -104,17 +104,15 @@ struct eigen_result find_eigenpairs_sparse(hermitian_bandmat bm, u32 num_eigenva
 
 	i32 info = 0;
 
-	c64* data = (c64*)sbmf_stack_push(sizeof(c64)*bm.bandcount*n);
-	hermitian_bandmat input_mat = {
-		.base = {
-			.rows = bm.bandcount,
-			.cols = n,
-			.data = data,
-		},
-		.bandcount = bm.bandcount,
-		.size = bm.size,
-	};
-	mat_transpose(&input_mat.base, bm.base);
+	struct complex_hermitian_bandmat input_mat = bm;
+	//c64* data = (c64*)sbmf_stack_push(sizeof(c64)*bm.bandcount*n);
+	//struct complex_hermitian_bandmat input_mat = {
+	//	.data = data,
+	//	.bandcount = bm.bandcount,
+	//	.size = bm.size,
+	//	.is_row_major = true,
+	//};
+	//mat_transpose_raw(&input_mat.base, bm.data, bm.size, bm.bandcount);
 
 	//debug_c(6, -3, 3,
 	//		3, 3, 3, 3, 3, 3, 3,
@@ -171,6 +169,8 @@ struct eigen_result find_eigenpairs_sparse(hermitian_bandmat bm, u32 num_eigenva
 			}
 			*/
 
+			sbmf_stack_free_to_marker(memory_marker);
+
 			struct eigen_result res = {
 				.eigenvalues = (c64*)sbmf_stack_push(sizeof(c64)*nev),
 				.eigenvectors = (c64*)sbmf_stack_push(sizeof(c64)*bm.size*nev),
@@ -179,8 +179,6 @@ struct eigen_result find_eigenpairs_sparse(hermitian_bandmat bm, u32 num_eigenva
 			};
 			memcpy(res.eigenvalues, d, sizeof(c64)*nev);
 			memcpy(res.eigenvectors, z, sizeof(c64)*n*nev);
-
-			sbmf_stack_free_to_marker(memory_marker);
 
 			return res;
 		}

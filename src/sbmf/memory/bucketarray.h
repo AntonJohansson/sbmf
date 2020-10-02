@@ -32,6 +32,7 @@ static inline struct barray* barray_new(u32 items_per_bucket, u32 item_size) {
 	struct barray* ba = (struct barray*) sbmf_stack_push(sizeof(struct barray));
 	ba->items_per_bucket = items_per_bucket;
 	ba->item_size = item_size;
+	ba->bucket_count = 0;
 	ba->base = barray_new_bucket(ba);
 
 	return ba;

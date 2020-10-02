@@ -52,7 +52,7 @@ void sbmf_init() {
 	}
 
 	for (u32 i = 0; i < THREAD_COUNT; ++i) {
-		_state.stacks[i] = sa_make(512*1024);
+		_state.stacks[i] = sa_make(32*1024*1024);
 	}
 
 	if (clock_gettime(CLOCK_REALTIME, &_state.start_time) != 0) {

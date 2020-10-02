@@ -12,6 +12,7 @@
  * this source file):
  * 	[x] bucket array
  * 	[x] priority queue
+ * 	[ ] complex hermitian bandmat vector multiplication
  * 	[ ] HO function sampling
  * 	[x] quadgk 1D numerical integration
  * 	[x] quadgk_vec 1D numerical integration
@@ -64,34 +65,36 @@ describe(random) {
 		//					--		1,1		1,2
 		//					--		--		2,2
 		//
+		//
+		//					u32 i = (H.size-1)*(H.size-(c-r)) + r;
+		//
+		//
+		//					(0) 0,0		(1)0,1		(3)0,2
+		//					--			(2)1,1		(4)1,2
+		//					--			--			(5)2,2
+		//
 		//					total number of unique combinations in a n*n grid
 		//					is given by the arithmetic series
 		//						1 + 2 + 3 + ... + n = n(n+1)/2
 		//
-		//					i  |  j,k		i  |  j,k
-		//					---+-----       ---+-----
-		//					0  |  0,0       0  |  0,0
-		//					1  |  0,1       1  |  0,1
-		//					2  |  0,2       2  |  1,1
-		//					3  |  1,1       3  |  0,2
-		//					4  |  1,2       4  |  1,2
-		//					5  |  2,2       5  |  2,2
+		//					i  |  r,c
+		//					---+-----
+		//					0  |  0,0
+		//					1  |  0,1
+		//					2  |  0,2
+		//					3  |  1,1
+		//					4  |  1,2
+		//					5  |  2,2
 		//
 		//
-		//					i = 3 we have 3 = 2*(2+1)/2
-		//					3 = n(n+1)/2
-		//					6 = n(n+1) = n^2 + n
-		//					6 = (n + 1/2)^2 - 1/4
-		//					n = -1/2 +- sqrt(6 + 1/4) =
+		//					i = (n-1)*(n - (c-r)) + r
 		//
-		//					i/N, i
-		//						0 -> 0,0
-		//						1 -> 0,1
-		//						2 -> 0,2
-		//						3 -> 1,3
-		//						4 -> 1,4
-		//						5 -> 1,5
-		//
+		//					0,0 -> 2*(3-(0-0))+0 = 6
+		//					0,1 -> 2*(3-(1-0))+0 = 4
+		//					0,2 -> 2*(3-(2-0))+0 = 2
+		//					1,1 -> 2*(3-(1-1))+1 = 7
+		//					1,2 -> 2*(3-(2-1))+1 = 5
+		//					2,2 -> 2*(3-(2-2))+2 = 8
 		//
 
 	}
@@ -172,6 +175,99 @@ describe (pq) {
 	}
 }
 
+/* complex hermitian bandmat vector multiplication */
+describe (complex_hermitian_bandmat) {
+	before_each() { sbmf_init(); }
+	after_each()  { sbmf_shutdown(); }
+
+	it ("identity vector mult.") {
+		const u32 N = 10;
+
+		struct complex_hermitian_bandmat identity = complex_hermitian_bandmat_new(1,N);
+		for (u32 r = 0; r < identity.size; ++r) {
+			u32 i = complex_hermitian_bandmat_index(identity, r,r);
+			identity.data[i] = 1.0;
+		}
+
+		c64 in[N];
+		c64 out[N];
+		for (u32 i = 0; i < N; ++i)
+			in[i] = i;
+
+		complex_hermitian_bandmat_mulv(out, identity, in);
+
+		for (u32 i = 0; i < N; ++i) {
+			asserteq(out[i], in[i]);
+		}
+	}
+
+	it ("more complicated mat. vector mult.") {
+		const u32 N = 5;
+
+		struct complex_hermitian_bandmat bm = complex_hermitian_bandmat_new_zero(2,N);
+		COMPLEX_HERMITIAN_BANDMAT_FOREACH(bm, r,c) {
+			u32 i = complex_hermitian_bandmat_index(bm, r,c);
+			bm.data[i] = (f64)r + (f64)((i32)r-(i32)c)*I;
+		}
+
+		c64 in[N];
+		c64 out[N];
+		c64 expected[N];
+		expected[0] = 0-1*I;
+		expected[1] = 3-2*I;
+		expected[2] = 11-2*I;
+		expected[3] = 25-2*I;
+		expected[4] = 25+3*I;
+
+		for (u32 i = 0; i < N; ++i)
+			in[i] = (f64)i;
+
+		complex_hermitian_bandmat_mulv(out, bm, in);
+
+		for (u32 i = 0; i < N; ++i) {
+			asserteq(out[i], expected[i]);
+		}
+	}
+
+	it ("full mat. vector mult.") {
+		const u32 N = 3;
+
+		struct complex_hermitian_bandmat bm = complex_hermitian_bandmat_new_zero(N,N);
+		COMPLEX_HERMITIAN_BANDMAT_FOREACH(bm, r,c) {
+			u32 i = complex_hermitian_bandmat_index(bm, r,c);
+			bm.data[i] = (f64)r + (f64)((i32)r-(i32)c)*I;
+		}
+
+		/*
+		 *			 0		-I		-2I
+		 *			+I		1		1-I
+		 *			+2I		1+I		2
+		 *
+		 *
+		 *			-I-4I		-5I
+		 *			1+2-2I = 	3-2I
+		 *			1+I+4		5+I
+		 *
+		 */
+
+		c64 in[N];
+		c64 out[N];
+		c64 expected[N];
+		expected[0] = 0-5*I;
+		expected[1] = 3-2*I;
+		expected[2] = 5+I;
+
+		for (u32 i = 0; i < N; ++i)
+			in[i] = (f64)i;
+
+		complex_hermitian_bandmat_mulv(out, bm, in);
+
+		for (u32 i = 0; i < N; ++i) {
+			asserteq(out[i], expected[i]);
+		}
+	}
+}
+
 /* HO function sampling */
 describe (hofunctionsampling) {
 }
@@ -184,7 +280,7 @@ static void check_quadgk_converge(integration_result res, f64 expected) {
 		printf("Integral failed to converge or got wrong answer:\n\tconverged: %d\n\tintegral: %lf\n\terror: %lf\n\texpected: %lf\n\tevals: %d\n", res.converged, res.integral, res.error, expected, res.performed_evals);
 	}
 
-	asserteq(correct_ans && res.converged, true);
+asserteq(correct_ans && res.converged, true);
 }
 
 /* quadgk_vec 1D numerical integration */
@@ -388,13 +484,6 @@ static f64 ho_perturbed_potential(f64* x, i32 n, void* data) {
 	return ho_potential(x,1,0) + gaussian(*x,0,0.2);
 }
 
-static void ho_perturbed_potential_vec(f64* out, f64* in, u32 len, void* data) {
-	SBMF_UNUSED(data);
-	for (u32 i = 0; i < len; ++i) {
-		out[i] = ho_potential(&in[i],1,0) + gaussian(in[i],0,0.2);
-	}
-}
-
 typedef f64 pot_func(f64*,i32,void*);
 struct integrand_params {
 	u32 n[2];
@@ -406,94 +495,6 @@ struct integrand_params_vec {
 	u32 n[2];
 	pot_func_vec* pot;
 };
-
-static void hob_integrand_vec(f64* out, f64* in, u32 len, void* data) {
-	struct integrand_params_vec* params = data;
-
-	f64 eig1[len];
-	f64 eig2[len];
-	f64 pot[len];
-
-	ho_eigenfunction_vec(params->n[0], eig1, in, len);
-	ho_eigenfunction_vec(params->n[1], eig2, in, len);
-	params->pot(pot, in, len, data);
-
-	for (u32 i = 0; i < len; ++i) {
-		out[i] = eig1[i]*eig2[i]*pot[i];
-	}
-}
-
-static struct eigen_result fdm_solve(pot_func* pot, f64 L, f64 N) {
-	struct grid space = generate_grid(1,
-			(f64[]){-L/2.0},
-			(f64[]){+L/2.0},
-			(i32[]){N});
-	hermitian_bandmat mat = construct_finite_diff_mat(space.pointcounts[0], space.dimensions, space.deltas);
-
-	// Invert and scale matrix to kinetic energy term
-	for (mat_size_t i = 0; i < mat.base.rows*mat.base.cols; ++i) {
-		mat.base.data[i] = -0.5 * mat.base.data[i];
-	}
-
-	// Loop through main diagonal and add potential energy term
-	for (mat_size_t i = 0; i < mat.size; ++i) {
-		mat_size_t index = mat.size*(mat.bandcount-1) + i;
-		mat.base.data[index] += pot(&space.points[i], space.dimensions, NULL);
-	}
-
-	asserteq(mat_is_valid(mat.base), true);
-
-	// Solve eigenvalue problem for hamiltonian
-	return find_eigenpairs_sparse(mat, 3, EV_SMALLEST_RE);
-}
-
-static struct eigen_result hob_solve(pot_func_vec* pot, f64 N) {
-	hermitian_bandmat T = construct_ho_kinetic_matrix(N);
-
-	struct integrand_params_vec params;
-	integration_settings settings = {
-		.gk = gk7,
-		.abs_error_tol = 1e-10,
-		.rel_error_tol = 1e-10,
-		.max_evals = 1e4,
-		.userdata = &params
-	};
-
-	params.pot = pot;
-	for (u32 r = 0; r < T.size; ++r) {
-		for (u32 c = r; c < T.size; ++c) {
-			params.n[0] = r;
-			params.n[1] = c;
-			integration_result res = quadgk_vec(hob_integrand_vec, -INFINITY, INFINITY, settings);
-			asserteq(res.converged, true);
-
-			u32 i = (T.size-1)*(T.size-(c-r)) + r;
-			T.base.data[i] += res.integral;
-		}
-	}
-
-	asserteq(mat_is_valid(T.base), true);
-
-	// Solve eigenvalue problem for hamiltonian and return
-	return find_eigenpairs_sparse(T, 3, EV_SMALLEST_RE);
-}
-
-describe (fdm_vs_hob) {
-	before_each() { sbmf_init(); }
-	after_each() { sbmf_shutdown(); }
-
-	it ("particle in a box") {
-	}
-
-	it ("perturbed harmonic oscillator") {
-		const f64 L = 5.0;
-		const i32 N = 64;
-		struct eigen_result fdm_res = fdm_solve(ho_perturbed_potential, L, N);
-		struct eigen_result hob_res = hob_solve(ho_perturbed_potential_vec, N/2);
-		(void)fdm_res;
-		(void)hob_res;
-	}
-}
 
 /* ITEM vs SCIM groundstate finding */
 

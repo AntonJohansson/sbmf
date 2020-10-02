@@ -22,9 +22,9 @@ struct eigen_result {
 /* Find _all_ eigenpairs for a dense, symmetric,
  * upper tridiagonal matrix.
  */
-struct eigen_result find_eigenpairs_full(hermitian_bandmat bm);
+struct eigen_result find_eigenpairs_full(struct complex_hermitian_bandmat bm);
 
 /* Find _some_ eigenpairs (specified by the enum which_eigenpairs)
  * for a dense, upper tridiagonal matrix.
  */
-struct eigen_result find_eigenpairs_sparse(hermitian_bandmat bm, u32 num_eigenvalues, enum which_eigenpairs which);
+struct eigen_result find_eigenpairs_sparse(struct complex_hermitian_bandmat bm, u32 num_eigenvalues, enum which_eigenpairs which);

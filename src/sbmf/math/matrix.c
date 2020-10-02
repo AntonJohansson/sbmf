@@ -8,114 +8,42 @@
 #include <string.h> // memcpy, memset
 #include <stdio.h> // sprintf
 
-mat mat_new(mat_size_t rows, mat_size_t cols) {
-	return (mat){
-		.is_row_major = true,
-		.rows = rows,
-		.cols = cols,
-		.data = (mat_scalar_t*)sbmf_stack_push(sizeof(mat_scalar_t)*rows*cols)
-	};
-}
+void complex_hermitian_bandmat_mulv(c64* ans_vec, struct complex_hermitian_bandmat bm, c64* vec) {
+	static const c64 one = 1, zero = 0;
 
-mat mat_new_zero(mat_size_t rows, mat_size_t cols) {
-	mat m = mat_new(rows, cols);
-	memset(m.data, 0, mat_size(m));
-	return m;
-}
+	const u32 num_super_diags = bm.bandcount-1;
 
-mat mat_duplicate(mat m) {
-	mat n = mat_new(m.rows, m.cols);
-	n.is_row_major = m.is_row_major;
-	return n;
-}
-
-void complex_hermitian_bandmat_mulv(mat_scalar_t* ans_vec, hermitian_bandmat bmat, mat_scalar_t* vec) {
-	static const mat_scalar_t one = 1, zero = 0;
-	const mat_size_t num_super_diags = bmat.bandcount-1;
-	// TODO: Passing data with is_row_major doesnt produce correct result ://
-	// manually transpose?
-	if (bmat.base.is_row_major) {
-		mat tmp = mat_duplicate(bmat.base);
-		mat_transpose(&tmp, bmat.base);
-		cblas_zhbmv(CblasColMajor, CblasUpper,
-				bmat.size, num_super_diags,
-				&one, tmp.data, bmat.bandcount, vec, 1, &zero, ans_vec, 1);
-	} else {
-		cblas_zhbmv(CblasColMajor, CblasUpper,
-				bmat.size, num_super_diags,
-				&one, bmat.base.data, bmat.bandcount, vec, 1, &zero, ans_vec, 1);
-	}
-
-}
-
-void complex_bandmat_mulv(mat_scalar_t* ans_vec, bandmat mat, mat_scalar_t* vec) {
-	static const mat_scalar_t one = 1, zero = 0;
-	cblas_zgbmv((mat.base.is_row_major) ? CblasRowMajor : CblasColMajor, CblasNoTrans,
-			mat.base.rows, mat.base.cols, mat.sub_diags, mat.super_diags,
-			&one, mat.base.data, mat.base.rows, vec, 1, &zero, ans_vec, 1);
-}
-
-void mat_transpose_raw(mat_scalar_t* ans, mat_scalar_t* in, mat_size_t rows, mat_size_t cols) {
-	// TODO: this can be freed
-	mat_scalar_t* temp = (mat_scalar_t*)sbmf_stack_push(sizeof(mat_scalar_t)*rows*cols);
-
-	for (mat_size_t r = 0; r < rows; ++r) {
-		for (mat_size_t c = 0; c < cols; ++c) {
-			temp[r + c*(rows)] = in[c + r*(cols)];
+	c64 bmtrans[bm.size*bm.bandcount];
+	for (u32 r = 0; r < bm.bandcount; ++r) {
+		for (u32 c = 0; c < bm.size; ++c) {
+			bmtrans[c*bm.bandcount + r] = bm.data[r*bm.size + c];
 		}
 	}
 
-	// rows-1 + (cols-1)*rows
-	// rows-1 + cols*rows - rows
-	// cols*rows-1
+	cblas_zhbmv(CblasColMajor, CblasUpper,
+			bm.size, num_super_diags,
+			&one, bmtrans, bm.bandcount, vec, 1, &zero, ans_vec, 1);
 
-	memcpy(ans, temp, sizeof(mat_scalar_t)*rows*cols);
 }
 
-void mat_transpose(mat* ans_mat, mat m) {
-	assert(m.rows*m.cols == ans_mat->rows*ans_mat->cols);
-	mat_transpose_raw(ans_mat->data, m.data, m.rows, m.cols);
-
-	ans_mat->is_row_major = !m.is_row_major;
-	mat_size_t swap_temp = m.rows;
-	ans_mat->rows = m.cols;
-	ans_mat->cols = swap_temp;
-}
-
-hermitian_bandmat construct_finite_diff_mat(u32 samples_per_dimension, u32 dimensions, f64* deltas) {
+struct complex_hermitian_bandmat construct_finite_diff_mat(u32 samples_per_dimension, u32 dimensions, f64* deltas) {
 	u32 size = pow(samples_per_dimension, dimensions);
 	u32 bands = pow(samples_per_dimension, dimensions-1);
-	hermitian_bandmat m = {
-		.base = mat_new_zero(bands+1,size),
-		.bandcount = bands+1,
-		.size = size,
-	};
+	struct complex_hermitian_bandmat m = complex_hermitian_bandmat_new_zero(bands+1, size);
 
 	// Setup main diagonal
-	u32 main_diag_value = pow(2, dimensions);
+	f64 main_diag_value = pow(2, dimensions);
 	for (u32 i = (m.bandcount-1)*size; i < (m.bandcount)*size; ++i) {
-		m.base.data[i] = -main_diag_value/(deltas[0]*deltas[0]);
+		m.data[i] = -main_diag_value/(deltas[0]*deltas[0]);
 	}
 
 	// Setup off-diagonal elements
 	for (u32 i = 1; i <= dimensions; ++i) {
 		u32 bandindex = pow(samples_per_dimension, i-1);
 		for (u32 j = 0; j < size; ++j) {
-			m.base.data[j + (m.bandcount-1 - bandindex)*size] = 1/(deltas[i-1]*deltas[i-1]);
+			m.data[j + (m.bandcount-1 - bandindex)*size] = 1.0/(deltas[i-1]*deltas[i-1]);
 		}
 	}
 
 	return m;
-}
-
-void mat_print(mat m, const char* label) {
-	log_info("matrix %s", label);
-	char buf[1024];
-	for (mat_size_t r = 0; r < m.rows; ++r) {
-		i32 offset = 0;
-		for (mat_size_t c = 0; c < m.cols; ++c) {
-			offset += sprintf(&buf[offset], "%.1lf+%.1lfi\t", creal(m.data[r*m.cols + c]), cimag(m.data[r*m.cols + c]));
-		}
-		log_info("%s", buf);
-	}
 }

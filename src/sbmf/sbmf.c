@@ -74,7 +74,7 @@ void sbmf_shutdown() {
 
 	_state.initialized = false;
 
-	/* profile_print_results(); */
+	profile_print_results();
 }
 
 u8* sbmf_stack_push_impl(u32 size_in_bytes, const u32 linenumber, const char file[], const char func[]) {

@@ -137,25 +137,20 @@ struct gss_result ho_scim(struct scim_settings settings, gss_potential_vec_func*
 		.coeffs = res.wavefunction,
 	};
 
-	int_settings.userdata = &params;
+	//int_settings.userdata = &params;
 
 	for (; res.iterations < settings.max_iterations; ++res.iterations) {
 		memcpy(old_wavefunction, res.wavefunction, N*sizeof(c64));
 
-		log_info("Starting iteration: %d", res.iterations);
-
-		log_info("-- Constructing hamiltonian");
 		/* Construct standard hamiltonian */
 		{
 			PROFILE_BEGIN("Constructing H");
-			//#pragma omp parallel for
+			#pragma omp parallel for firstprivate(params, int_settings) shared(H)
 			for (u32 r = 0; r < H.size; ++r) {
 				for (u32 c = r; c < H.size; ++c) {
+					int_settings.userdata = &params;
 					params.n[0] = r;
 					params.n[1] = c;
-
-					//gsl_integration_qags(&gslf, -INFINITY, INFINITY, 0, 1e-7, 1e9, gsl_w, &gsl_result, &gsl_error);
-					//log_info("gsl integral value: %lf", gsl_result);
 
 					integration_result res = quadgk_vec(scim_integrand, -INFINITY, INFINITY, int_settings);
 
@@ -177,13 +172,11 @@ struct gss_result ho_scim(struct scim_settings settings, gss_potential_vec_func*
 		}
 
 
-		log_info("-- Solving eigenvec problem");
 		/* Solve for first eigenvector (ground state) */
 		PROFILE_BEGIN("Eigenproblem solving");
 		struct eigen_result eres = find_eigenpairs_sparse(H, 1, EV_SMALLEST_RE);
 		PROFILE_END("Eigenproblem solving");
 
-		log_info("-- Normalize and copy result");
 		/* Normalize and copy to result */
 		{
 			PROFILE_BEGIN("Normalize+copy");
@@ -201,7 +194,6 @@ struct gss_result ho_scim(struct scim_settings settings, gss_potential_vec_func*
 			PROFILE_END("Normalize+copy");
 		}
 
-		log_info("-- Calculating error");
 		/* Calculate error */
 		{
 			PROFILE_BEGIN("Calculate error");
@@ -211,13 +203,13 @@ struct gss_result ho_scim(struct scim_settings settings, gss_potential_vec_func*
 				sum += diff*diff;
 			}
 			res.error = sqrt(sum);
-
-			log_info("Finished iteration with error %e", res.error);
-
 			PROFILE_END("Calculate error");
-			if (res.error < settings.error_tol)
-				break;
 		}
+
+		/* Break condition */
+		log_info("Finished iteration: %d with an error of %e", res.iterations, res.error);
+		if (res.error < settings.error_tol)
+			break;
 
 		/* Call debug callback if requested by user */
 		if (settings.measure_every > 0 && res.iterations % settings.measure_every == 0) {

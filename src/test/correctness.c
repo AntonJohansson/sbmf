@@ -23,11 +23,6 @@
  * 	[ ] ITEM vs SCIM groundstate finding
  */
 
-#define SNOW_ENABLED
-#include "snow.h"
-
-#include <math.h>
-
 #include <sbmf/sbmf.h>
 #include <sbmf/methods/quadgk_vec.h>
 #include <sbmf/methods/quadgk_vec_inl.h>
@@ -39,15 +34,70 @@
 #include <sbmf/math/grid.h>
 #include <sbmf/memory/prioqueue.h>
 #include <sbmf/memory/bucketarray.h>
+#include <sbmf/debug/profile.h>
 
+#include <omp.h>
 #include <plot/plot.h>
+#define SNOW_ENABLED
+#include "snow.h"
 
+#include <math.h>
 #include <stdio.h>
 
 #define DISABLE_SLOW_TESTS 0
 
-/* bucket array */
+describe(random) {
+	it ("works") {
+		const u32 N = 5;
+		for (u32 i = 0; i < N; ++i) {
+			for (u32 j = i; j < N; ++j) {
+				log_info("%u,%u", i,j);
+			}
+		}
+		log_info("next one");
+		for (u32 i = 0; i < (N*(N+1))/2; ++i) {
+			log_info("%u", i);
+		}
 
+		//
+		//					0,0		0,1		0,2
+		//					--		1,1		1,2
+		//					--		--		2,2
+		//
+		//					total number of unique combinations in a n*n grid
+		//					is given by the arithmetic series
+		//						1 + 2 + 3 + ... + n = n(n+1)/2
+		//
+		//					i  |  j,k		i  |  j,k
+		//					---+-----       ---+-----
+		//					0  |  0,0       0  |  0,0
+		//					1  |  0,1       1  |  0,1
+		//					2  |  0,2       2  |  1,1
+		//					3  |  1,1       3  |  0,2
+		//					4  |  1,2       4  |  1,2
+		//					5  |  2,2       5  |  2,2
+		//
+		//
+		//					i = 3 we have 3 = 2*(2+1)/2
+		//					3 = n(n+1)/2
+		//					6 = n(n+1) = n^2 + n
+		//					6 = (n + 1/2)^2 - 1/4
+		//					n = -1/2 +- sqrt(6 + 1/4) =
+		//
+		//					i/N, i
+		//						0 -> 0,0
+		//						1 -> 0,1
+		//						2 -> 0,2
+		//						3 -> 1,3
+		//						4 -> 1,4
+		//						5 -> 1,5
+		//
+		//
+
+	}
+}
+
+/* bucket array */
 describe (bucketarray) {
 	before_each() { sbmf_init(); }
 	after_each() { sbmf_shutdown(); }
@@ -88,7 +138,7 @@ static bool pqcmp_asc(void* a, void* b) {
 
 describe (pq) {
 	before_each() { sbmf_init(); }
-	after_each() { sbmf_shutdown(); }
+	after_each()  { sbmf_shutdown(); }
 
 	it ("pushes and pops (des)") {
 		struct prioqueue* pq = prioqueue_new(4, sizeof(i32), pqcmp_des);
@@ -558,7 +608,7 @@ describe(item_vs_scim_groundstate_finding) {
 
 		struct gss_result hob_res = ho_scim(scim_settings, linear_hamiltonian_vec_pot, guess_vec);
 		log_info("\nhob:\niterations: %d\nerror: %e", hob_res.iterations, hob_res.error);
-#if 1
+#if 0
 		{
 			plot_init(800, 600, "fdm groundstate");
 			f32 pdata[N];
@@ -617,17 +667,21 @@ describe(item_vs_scim_groundstate_finding) {
 			.num_basis_functions = 32,
 			.max_iterations = 1e9,
 			.error_tol = 1e-7,
-			.measure_every = 40,
-			.dbgcallback = debug_callback,
+			//.measure_every = 40,
+			//.dbgcallback = debug_callback,
 		};
 
+		PROFILE_BEGIN("entire item");
 		struct gss_result item_res = item(item_settings, non_linear_hamiltonian_pot, guess);
+		PROFILE_END("entire item");
 		log_info("\nitem:\niterations: %d\nerror: %e", item_res.iterations, item_res.error);
 
+		PROFILE_BEGIN("entire ho_scim");
 		struct gss_result hob_res = ho_scim(scim_settings, non_linear_hamiltonian_vec_pot, guess_vec);
+		PROFILE_END("entire ho_scim");
 		log_info("\nhob:\niterations: %d\nerror: %e", hob_res.iterations, hob_res.error);
 
-#if 1
+#if 0
 		{
 			plot_init(800, 600, "fdm groundstate");
 			f32 pdata[N];

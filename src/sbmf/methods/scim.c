@@ -58,6 +58,8 @@ static void scim_integrand(f64* out, f64* in, u32 len, void* data) {
 }
 
 /*
+ * Keep this, we  probably need to add supoort for non-eigenstate based guessses
+ *
 static void scim_guess_integrand(f64* out, f64* in, u32 len, void* data) {
 	struct guess_integrand_params* params = data;
 
@@ -72,7 +74,6 @@ static void scim_guess_integrand(f64* out, f64* in, u32 len, void* data) {
 	}
 }
 */
-
 
 struct gss_result ho_scim(struct scim_settings settings, gss_potential_vec_func* potential, gss_guess_vec_func* guess) {
 	SBMF_UNUSED(guess);
@@ -92,6 +93,8 @@ struct gss_result ho_scim(struct scim_settings settings, gss_potential_vec_func*
 	};
 
 #if 0
+	/* Keep this for the same reason as previously */
+
 	/* Compute coeffs of the guess function */
 	struct guess_integrand_params guess_params = {
 		.guess = guess,
@@ -119,6 +122,7 @@ struct gss_result ho_scim(struct scim_settings settings, gss_potential_vec_func*
 		}
 	}
 #else
+	/* Set initial guess to the ho groundstate */
 	res.wavefunction[0] = 1;
 	for (u32 i = 1; i < N; ++i) {
 		res.wavefunction[i] = 0;
@@ -132,8 +136,6 @@ struct gss_result ho_scim(struct scim_settings settings, gss_potential_vec_func*
 		.coeff_count = N,
 		.coeffs = res.wavefunction,
 	};
-
-	//int_settings.userdata = &params;
 
 	for (; res.iterations < settings.max_iterations; ++res.iterations) {
 		memcpy(old_wavefunction, res.wavefunction, N*sizeof(c64));

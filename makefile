@@ -9,6 +9,7 @@ PROJ_SRCS = \
 	src/sbmf/methods/quadgk_vec_inl.c \
 	src/sbmf/methods/item.c \
 	src/sbmf/methods/scim.c \
+	src/sbmf/methods/gp2c.c \
 	src/sbmf/math/find_eigenpairs.c \
 	src/sbmf/math/matrix.c \
 	src/sbmf/debug/profile.c \
@@ -61,6 +62,9 @@ all: tests
 $(BUILDDIR):
 	mkdir -p $(shell find src -type d | sed -e "s/^/$(BUILDDIR)\//")
 
+third_party/lib:
+	cd third_party && sh build.sh
+
 $(BUILDDIR)/%.o: %.c
 	$(CC) -o $@ $^ -static $(PROJ_FLAGS) $(PROJ_LIBS)
 
@@ -72,6 +76,7 @@ $(BUILDDIR)/test_correctness: $(TEST_CORRECTNESS_SRCS) $(BUILDDIR)/$(PROJECT).a
 
 $(BUILDDIR)/test_performance: $(TEST_PERFORMANCE_SRCS) $(BUILDDIR)/$(PROJECT).a
 	$(CC) $(TEST_PERFORMANCE_SRCS) -o $@ $(TEST_FLAGS) $(TEST_LIBS)
+
 
 .PHONY: lib
 lib: $(BUILDDIR)/$(PROJECT).a

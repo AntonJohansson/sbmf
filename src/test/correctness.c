@@ -22,6 +22,7 @@
  * 		[ ] particle in a box
  * 		[ ] perturbed HO potential
  * 	[ ] ITEM vs SCIM groundstate finding
+ * 	[ ] 2 component GP solving
  */
 
 #include <sbmf/sbmf.h>
@@ -724,6 +725,85 @@ describe(item_vs_scim_groundstate_finding) {
 					.space = &sp,
 					.data = pdata,
 					.label = "hob groundstate",
+					});
+
+			plot_update_until_closed();
+			plot_shutdown();
+		}
+#endif
+	}
+}
+
+void gp2c_op_a(f64* out, f64* in_x, c64* in_a, c64* in_b, u32 len) {
+	#pragma omp simd
+	for (u32 i = 0; i < len; ++i) {
+		f64 ca = cabs(in_a[i]);
+		f64 cb = cabs(in_b[i]);
+		out[i] = -ca*ca + 2*cb*cb;
+	}
+}
+
+void gp2c_op_b(f64* out, f64* in_x, c64* in_a, c64* in_b, u32 len) {
+	#pragma omp simd
+	for (u32 i = 0; i < len; ++i) {
+		f64 ca = cabs(in_a[i]);
+		f64 cb = cabs(in_b[i]);
+		out[i] = -cb*cb + 2*ca*ca;
+	}
+}
+
+describe (2comp_scim) {
+	before_each(){sbmf_init();}
+	after_each(){sbmf_shutdown();}
+
+	it ("reproduces 1 component solutions") {
+		struct gp2c_settings settings = {
+			.num_basis_functions = 64,
+			.max_iterations = 1e7,
+			.error_tol = 1e-10,
+		};
+		struct gp2c_result res = gp2c(settings, gp2c_op_a, gp2c_op_b);
+
+#if 1
+		{
+			const u32 N = 256;
+			plot_init(800, 600, "gp2c");
+			f32 potdata[N], adata[N], bdata[N];
+			sample_space sp = make_linspace(1, -5, 5.0, N);
+
+			for (u32 i = 0; i < N; ++i) {
+				f64 x = sp.points[i];
+				potdata[i] = (f32) ho_perturbed_potential(&x, 1, NULL);
+			}
+			push_line_plot(&(plot_push_desc){
+					.space = &sp,
+					.data = potdata,
+					.label = "potential",
+					});
+
+			c64 sample_out_a[N];
+			c64 sample_out_b[N];
+			f64 sample_in[N];
+			for (u32 i = 0; i < N; ++i) {
+				sample_in[i] = (f64) sp.points[i];
+			}
+			hob_sample_vec(res.coeff_a, settings.num_basis_functions, sample_out_a, sample_in, N);
+			hob_sample_vec(res.coeff_b, settings.num_basis_functions, sample_out_b, sample_in, N);
+			for (u32 i = 0; i < N; ++i) {
+				f64 ca = cabs(sample_out_a[i]);
+				f64 cb = cabs(sample_out_b[i]);
+				adata[i] = ca*ca;
+				bdata[i] = cb*cb;
+			}
+			push_line_plot(&(plot_push_desc){
+					.space = &sp,
+					.data = adata,
+					.label = "a",
+					});
+			push_line_plot(&(plot_push_desc){
+					.space = &sp,
+					.data = bdata,
+					.label = "b",
 					});
 
 			plot_update_until_closed();

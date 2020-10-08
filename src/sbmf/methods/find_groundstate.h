@@ -49,4 +49,37 @@ struct gss_result {
 
 
 struct gss_result item(struct item_settings settings, gss_potential_func* potential, gss_guess_func* guess);
+
 struct gss_result ho_scim(struct scim_settings settings, gss_potential_vec_func* potential, gss_guess_vec_func* guess);
+
+/* What would a two component GP-system look like?
+ * 		Call components a,b
+ *			T(a) + V(a) + g_a|a|^2 + g_ab|b|^2
+ *			T(b) + V(b) + g_b|b|^2 + g_ba|a|^2
+ *		where only really g_a,g_b,g_ab,g_ba are variables
+ *		needed to be passed to the solver. All other things can
+ *		be inlined for performance.
+ */
+
+typedef void gp2c_operator_func(f64* out, f64* in_x, c64* in_a, c64* in_b, u32 len);
+
+struct gp2c_settings {
+	u32 num_basis_functions;
+
+	u32 max_iterations;
+	f64 error_tol;
+
+	u32 measure_every;
+	scim_debug_callback* dbgcallback;
+};
+
+struct gp2c_result {
+	c64* coeff_a;
+	c64* coeff_b;
+
+	f64 error_a;
+	f64 error_b;
+	u32 iterations;
+};
+
+struct gp2c_result gp2c(struct gp2c_settings, gp2c_operator_func* op_a, gp2c_operator_func* op_b);

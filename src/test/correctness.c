@@ -934,7 +934,7 @@ describe (2comp_scim) {
 							- (PARTICLE_COUNT-2)*eres_a.eigenvalues[0]
 							- eres_a.eigenvalues[m]
 							- eres_a.eigenvalues[n];
-						coeffs[index] = inner_product/energy_diff;
+						coeffs[index] = \sqrt{2}*inner_product/energy_diff;
 					} else {
 						states[index] = (struct manybody_state) {
 							.indices[0] = {

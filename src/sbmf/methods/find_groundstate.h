@@ -2,6 +2,7 @@
 
 #include <sbmf/types.h>
 #include <sbmf/math/grid.h>
+#include <sbmf/math/matrix.h>
 
 struct item_settings;
 struct scim_settings;
@@ -80,6 +81,12 @@ struct gp2c_result {
 	f64 error_a;
 	f64 error_b;
 	u32 iterations;
+
+	f64 energy_a;
+	f64 energy_b;
+
+	struct complex_hermitian_bandmat hamiltonian_a;
+	struct complex_hermitian_bandmat hamiltonian_b;
 };
 
 struct gp2c_result gp2c(struct gp2c_settings, gp2c_operator_func* op_a, gp2c_operator_func* op_b);

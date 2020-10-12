@@ -4,10 +4,6 @@
 #include <sbmf/types.h>
 #include <string.h>
 
-/* TODO: it's kinda ambiguous wheter rows,cols refer to size of entire matrix or just
- * the region in data
- */
-
 struct complex_hermitian_bandmat {
 	c64* data;
 	u32 bandcount; /* rows */
@@ -54,6 +50,8 @@ static inline struct complex_hermitian_bandmat complex_hermitian_bandmat_new_zer
 		for (u32 c = r; c < U32MIN(bm.size, r+bm.bandcount); ++c)
 
 /* How do we compute the position in band storage?
+ *
+ * 		(r,c) satisfies (c-r) = diagonal
  *
  * 			bandcount == size == 4
  *

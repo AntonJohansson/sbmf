@@ -734,12 +734,58 @@ describe(item_vs_scim_groundstate_finding) {
 	}
 }
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+#define PARTICLE_COUNT 10
+#define GAA	-0.25
+#define GBB	-0.25
+#define GAB 0.5
+
 void gp2c_op_a(f64* out, f64* in_x, c64* in_a, c64* in_b, u32 len) {
 	#pragma omp simd
 	for (u32 i = 0; i < len; ++i) {
 		f64 ca = cabs(in_a[i]);
 		f64 cb = cabs(in_b[i]);
-		out[i] = -ca*ca + 2*cb*cb;
+		out[i] = gaussian(in_x[i],0,0.2) + GAA*(PARTICLE_COUNT-1)*ca*ca + GAB*(PARTICLE_COUNT-1)*cb*cb;
 	}
 }
 
@@ -748,7 +794,32 @@ void gp2c_op_b(f64* out, f64* in_x, c64* in_a, c64* in_b, u32 len) {
 	for (u32 i = 0; i < len; ++i) {
 		f64 ca = cabs(in_a[i]);
 		f64 cb = cabs(in_b[i]);
-		out[i] = -cb*cb + 2*ca*ca;
+		out[i] = gaussian(in_x[i],0,0.2) + GBB*(PARTICLE_COUNT-1)*cb*cb + GAB*(PARTICLE_COUNT-1)*ca*ca;
+	}
+}
+
+struct Vijkl_params {
+	u32 i, j;
+	c64* coeff_i;
+	c64* coeff_j;
+	c64* coeff_0;
+	u32 coeff_count;
+};
+
+static void Vijkl_integrand(f64* out, f64* in, u32 len, void* data) {
+	struct Vijkl_params* params = data;
+
+	c64 sample_i[len];
+	hob_sample_vec(params->coeff_i, params->coeff_count, sample_i, in, len);
+
+	c64 sample_j[len];
+	hob_sample_vec(params->coeff_j, params->coeff_count, sample_j, in, len);
+
+	c64 sample_0[len];
+	hob_sample_vec(params->coeff_0, params->coeff_count, sample_0, in, len);
+
+	for (u32 i = 0; i < len; ++i) {
+		out[i] = creal(conj(sample_i[i]) * conj(sample_j[i]) * sample_0[i] * sample_0[i]);
 	}
 }
 
@@ -758,11 +829,224 @@ describe (2comp_scim) {
 
 	it ("reproduces 1 component solutions") {
 		struct gp2c_settings settings = {
-			.num_basis_functions = 64,
+			.num_basis_functions = 8,
 			.max_iterations = 1e7,
-			.error_tol = 1e-10,
+			.error_tol = 1e-8,
 		};
 		struct gp2c_result res = gp2c(settings, gp2c_op_a, gp2c_op_b);
+
+#if 1
+		const u32 states_to_include = 5;
+		/* First order correction of the many-body wavefunction */
+		{
+			struct eigen_result eres_a = find_eigenpairs_sparse(res.hamiltonian_a, states_to_include, EV_SMALLEST_RE);
+
+			struct Vijkl_params params = {
+				.coeff_count = settings.num_basis_functions,
+			};
+
+			integration_settings int_settings = {
+				.gk = gk7,
+				.abs_error_tol = 1e-10,
+				.rel_error_tol = 1e-10,
+				.max_evals = 1e7,
+				.userdata = &params,
+			};
+
+			/*
+			 * |0> = |N,0,...>
+			 * |mn> = |N-2,0,...,0,1,0,...,0,1,0,...>
+			 * 					   ^-_ m:th  ^-_ n:th
+			 * |> = c0|...> + c1|...> + ...
+			 * <x|> = c0<x|...> + c1<x|...> + ...
+			 * <x|abc...> = phi_a(x)phi_b(x)phi_c(x)...
+			 */
+			struct manybody_state {
+				struct {
+					u32 particles_in_state;
+					u32 state_index;
+				} indices[3];
+				u32 index_count;
+			};
+
+			/*
+			 *
+			 *		x x x x
+			 *		x x x x
+			 *		x x x x
+			 *		x x x x
+			 *		1 + 2 + 3 + 4 = 10
+			 */
+			const u32 state_count = 1 + (states_to_include-1)*(states_to_include-1+1)/2;
+			u32 index = 0;
+			struct manybody_state states[state_count];
+			f64 coeffs[state_count];
+
+			states[0] = (struct manybody_state) {
+				.indices[0] = {
+					.particles_in_state = PARTICLE_COUNT,
+					.state_index = 0
+				},
+				.index_count = 1,
+			};
+			coeffs[0] = 1;
+			index++;
+
+			/* We know the inner product of single subst. and the groundstate is zero.
+			 * Only have to account for double substitutions
+			 */
+
+			/* m,n here denotes the location of the excited orbitals */
+			for (u32 m = 1; m < states_to_include; ++m) {
+				for (u32 n = m; n < states_to_include; ++n) {
+					/* Currently disregarding double counting. */
+
+					params.i = m;
+
+					params.j = n;
+					params.coeff_i = &eres_a.eigenvectors[m * eres_a.num_eigenpairs];
+					params.coeff_j = &eres_a.eigenvectors[n * eres_a.num_eigenpairs];
+					params.coeff_0 = &eres_a.eigenvectors[0];
+
+					integration_result int_res = quadgk_vec(Vijkl_integrand, -INFINITY, INFINITY, int_settings);
+
+					assert(int_res.converged);
+					f64 Vmn00 = int_res.integral;
+
+					f64 inner_product = GAA * sqrt(PARTICLE_COUNT*(PARTICLE_COUNT-1)) * Vmn00;
+
+					printf("%u -- (%u,%u)\n", index,m,n);
+					if (m == n) {
+						states[index] = (struct manybody_state) {
+							.indices[0] = {
+								.particles_in_state = PARTICLE_COUNT-2,
+								.state_index = 0
+							},
+							.indices[1] = {
+								.particles_in_state = 2,
+								.state_index = m,
+							},
+							.index_count = 2,
+						};
+
+						f64 energy_diff =
+							PARTICLE_COUNT*eres_a.eigenvalues[0]
+							- (PARTICLE_COUNT-2)*eres_a.eigenvalues[0]
+							- eres_a.eigenvalues[m]
+							- eres_a.eigenvalues[n];
+						coeffs[index] = inner_product/energy_diff;
+					} else {
+						states[index] = (struct manybody_state) {
+							.indices[0] = {
+								.particles_in_state = PARTICLE_COUNT-2,
+								.state_index = 0
+							},
+							.indices[1] = {
+								.particles_in_state = 1,
+								.state_index = m,
+							},
+							.indices[2] = {
+								.particles_in_state = 1,
+								.state_index = n,
+							},
+							.index_count = 3,
+						};
+						f64 energy_diff =
+							PARTICLE_COUNT*eres_a.eigenvalues[0]
+							- (PARTICLE_COUNT-2)*eres_a.eigenvalues[0]
+							- eres_a.eigenvalues[m]
+							- eres_a.eigenvalues[n];
+						coeffs[index] = inner_product/energy_diff;
+					}
+
+					index++;
+				}
+			}
+
+			for (u32 i = 0; i < state_count; ++i) {
+				printf("%.2lf -- ", coeffs[i]);
+				for (u32 j = 0; j < states[i].index_count; ++j) {
+					printf("(%u,%u)",
+							states[i].indices[j].state_index,
+							states[i].indices[j].particles_in_state
+							);
+				}
+				printf("\n");
+			}
+
+			printf("-------------------------------\n");
+
+			const u32 N = 256;
+			plot_init(800, 600, "gp2c");
+			f32 potdata[N], adata[N];
+			memset(adata, 0, sizeof(adata[0])*N);
+			sample_space sp = make_linspace(1, -5, 5.0, N);
+
+			for (u32 i = 0; i < N; ++i) {
+				f64 x = sp.points[i];
+				potdata[i] = (f32) ho_perturbed_potential(&x, 1, NULL);
+			}
+			push_line_plot(&(plot_push_desc){
+					.space = &sp,
+					.data = potdata,
+					.label = "potential",
+					});
+
+			f64 sample_in[N];
+			for (u32 i = 0; i < N; ++i) {
+				sample_in[i] = (f64) sp.points[i];
+			}
+
+			c64 out[N];
+			for (u32 i = 0; i < N; ++i) {
+				out[i] = 0;
+			}
+			for (u32 i = 1; i < state_count; ++i) {
+
+				c64 mp_out[N];
+				for (u32 j = 0; j < N; ++j) {
+					mp_out[j] = 1.0;
+				}
+
+				for (u32 j = 0; j < states[i].index_count; ++j) {
+					c64 sample_out[N];
+					hob_sample_vec(
+							&eres_a.eigenvectors[states[i].indices[j].state_index * eres_a.num_eigenpairs],
+							settings.num_basis_functions,
+							sample_out,
+							sample_in,
+							N);
+
+					for (u32 k = 0; k < N; ++k) {
+						mp_out[k] *= cpow(sample_out[k], states[i].indices[j].particles_in_state);
+					}
+				}
+
+				for (u32 j = 0; j < N; ++j) {
+					out[j] += coeffs[i]*mp_out[j];
+				}
+			}
+
+			for (u32 i = 0; i < N; ++i) {
+				f32 tmp = (f32)cabs(out[i]);
+				adata[i] = tmp*tmp;
+			}
+
+			push_line_plot(&(plot_push_desc){
+					.space = &sp,
+					.data = adata,
+					.label = "a",
+					.offset = res.energy_a,
+					});
+
+			plot_update_until_closed();
+			plot_shutdown();
+
+
+
+
+		}
+#endif
 
 #if 1
 		{
@@ -799,11 +1083,13 @@ describe (2comp_scim) {
 					.space = &sp,
 					.data = adata,
 					.label = "a",
+					.offset = res.energy_a,
 					});
 			push_line_plot(&(plot_push_desc){
 					.space = &sp,
 					.data = bdata,
 					.label = "b",
+					.offset = res.energy_b,
 					});
 
 			plot_update_until_closed();

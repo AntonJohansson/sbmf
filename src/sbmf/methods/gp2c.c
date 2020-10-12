@@ -61,6 +61,8 @@ struct gp2c_result gp2c(struct gp2c_settings settings, gp2c_operator_func* op_a,
 	struct gp2c_result res = {
 		.coeff_a = (c64*) sbmf_stack_push(N*sizeof(c64)),
 		.coeff_b = (c64*) sbmf_stack_push(N*sizeof(c64)),
+		.hamiltonian_a = complex_hermitian_bandmat_new_zero(N,N),
+		.hamiltonian_b = complex_hermitian_bandmat_new_zero(N,N),
 	};
 	c64* old_coeff_a = (c64*) sbmf_stack_push(N*sizeof(c64));
 	c64* old_coeff_b = (c64*) sbmf_stack_push(N*sizeof(c64));
@@ -80,9 +82,6 @@ struct gp2c_result gp2c(struct gp2c_settings settings, gp2c_operator_func* op_a,
 	res.coeff_a[0] = 1;
 	res.coeff_b[1] = 1;
 
-	struct complex_hermitian_bandmat Ha = complex_hermitian_bandmat_new_zero(N,N);
-	struct complex_hermitian_bandmat Hb = complex_hermitian_bandmat_new_zero(N,N);
-
 	struct integrand_params params_a = {
 		.coeff_count = N,
 		.coeff_a = res.coeff_a,
@@ -97,99 +96,143 @@ struct gp2c_result gp2c(struct gp2c_settings settings, gp2c_operator_func* op_a,
 		.op = op_b,
 	};
 
+	/* Precompute indices for matrix elements
+	 * 	This way we get a single array looping
+	 * 	over the matrix which is easier to
+	 * 	parallelize well.
+	 * */
+	u32 matrix_element_rows[N*(N+1)/2];
+	u32 matrix_element_cols[N*(N+1)/2];
+	{
+		u32 matrix_element_index = 0;
+		COMPLEX_HERMITIAN_BANDMAT_FOREACH(res.hamiltonian_a, r,c) {
+			matrix_element_rows[matrix_element_index] = r;
+			matrix_element_cols[matrix_element_index] = c;
+			matrix_element_index++;
+		}
+	}
+
+	/* Do the actual iterations */
 	for (; res.iterations < settings.max_iterations; ++res.iterations) {
 		memcpy(old_coeff_a, res.coeff_a, N*sizeof(c64));
 		memcpy(old_coeff_b, res.coeff_b, N*sizeof(c64));
 
 		/* Construct standard hamiltonian for a */
 		{
-			#pragma omp parallel for firstprivate(params_a, int_settings) shared(Ha)
-			COMPLEX_HERMITIAN_BANDMAT_FOREACH(Ha, r,c) {
+#pragma omp parallel for firstprivate(params_a, int_settings) shared(res)
+			for (u32 i = 0; i < N*(N+1)/2; ++i) {
+			//COMPLEX_HERMITIAN_BANDMAT_FOREACH(Ha, r,c) {
+				u32 r = matrix_element_rows[i];
+				u32 c = matrix_element_cols[i];
 				int_settings.userdata = &params_a;
 				params_a.n[0] = r;
 				params_a.n[1] = c;
 
-				integration_result res = quadgk_vec(scim_integrand, -INFINITY, INFINITY, int_settings);
+				integration_result int_res = quadgk_vec(scim_integrand, -INFINITY, INFINITY, int_settings);
 
-				if (!res.converged) {
+				if (!int_res.converged) {
 					log_error("integration failed for %d,%d", r,c);
-					log_integration_result(res);
+					log_integration_result(int_res);
 				}
-				assert(res.converged);
+				assert(int_res.converged);
 
-				u32 i = complex_hermitian_bandmat_index(Ha, r,c);
-				Ha.data[i] = res.integral;
+				u32 i = complex_hermitian_bandmat_index(res.hamiltonian_a, r,c);
+				res.hamiltonian_a.data[i] = int_res.integral;
 				if (r == c)
-					Ha.data[i] += ho_eigenvalue((i32[]){r},1);
+					res.hamiltonian_a.data[i] += ho_eigenvalue((i32[]){r},1);
 			}
 
-			assert(complex_hermitian_bandmat_is_valid(Ha));
+			assert(complex_hermitian_bandmat_is_valid(res.hamiltonian_a));
 		}
 
 		/* Construct standard hamiltonian for b */
 		{
-			#pragma omp parallel for firstprivate(params_b, int_settings) shared(Hb)
-			COMPLEX_HERMITIAN_BANDMAT_FOREACH(Hb, r,c) {
+#pragma omp parallel for firstprivate(params_b, int_settings) shared(res)
+			for (u32 i = 0; i < N*(N+1)/2; ++i) {
+			//COMPLEX_HERMITIAN_BANDMAT_FOREACH(Hb, r,c) {
+				u32 r = matrix_element_rows[i];
+				u32 c = matrix_element_cols[i];
 				int_settings.userdata = &params_b;
 				params_b.n[0] = r;
 				params_b.n[1] = c;
 
-				integration_result res = quadgk_vec(scim_integrand, -INFINITY, INFINITY, int_settings);
+				integration_result int_res = quadgk_vec(scim_integrand, -INFINITY, INFINITY, int_settings);
 
-				if (!res.converged) {
+				if (!int_res.converged) {
 					log_error("integration failed for %d,%d", r,c);
-					log_integration_result(res);
+					log_integration_result(int_res);
 				}
-				assert(res.converged);
+				assert(int_res.converged);
 
-				u32 i = complex_hermitian_bandmat_index(Hb, r,c);
-				Hb.data[i] = res.integral;
+				u32 i = complex_hermitian_bandmat_index(res.hamiltonian_b, r,c);
+				res.hamiltonian_b.data[i] = int_res.integral;
 				if (r == c)
-					Hb.data[i] += ho_eigenvalue((i32[]){r},1);
+					res.hamiltonian_b.data[i] += ho_eigenvalue((i32[]){r},1);
 			}
 
-			assert(complex_hermitian_bandmat_is_valid(Hb));
+			assert(complex_hermitian_bandmat_is_valid(res.hamiltonian_b));
 		}
 
 		/* Solve for first eigenvector (ground state) */
-		struct eigen_result eres_a = find_eigenpairs_sparse(Ha, 1, EV_SMALLEST_RE);
-		struct eigen_result eres_b = find_eigenpairs_sparse(Hb, 1, EV_SMALLEST_RE);
+		struct eigen_result eres_a = find_eigenpairs_sparse(res.hamiltonian_a, 1, EV_SMALLEST_RE);
+		struct eigen_result eres_b = find_eigenpairs_sparse(res.hamiltonian_b, 1, EV_SMALLEST_RE);
+
+		/* Copy energies */
+		res.energy_a = eres_a.eigenvalues[0];
+		res.energy_b = eres_b.eigenvalues[0];
 
 		/* Normalize and copy to result */
 		{
-			f64 sum_a = 0.0, sum_b = 0.0;
+			f64 sum_a = 0.0;
+#pragma omp parallel for shared(eres_a, res) reduction(+: sum_a)
 			for (u32 i = 0; i < N; ++i) {
 				res.coeff_a[i] = eres_a.eigenvectors[i];
-				res.coeff_b[i] = eres_b.eigenvectors[i];
 				f64 abs_a = cabs(eres_a.eigenvectors[i]);
-				f64 abs_b = cabs(eres_b.eigenvectors[i]);
 				sum_a += abs_a;
+			}
+
+			f64 sum_b = 0.0;
+#pragma omp parallel for shared(eres_b, res) reduction(+: sum_b)
+			for (u32 i = 0; i < N; ++i) {
+				res.coeff_b[i] = eres_b.eigenvectors[i];
+				f64 abs_b = cabs(eres_b.eigenvectors[i]);
 				sum_b += abs_b;
 			}
 
 			f64 scaling_a = 1.0/sqrt(sum_a);
-			f64 scaling_b = 1.0/sqrt(sum_b);
+#pragma omp parallel for
 			for (u32 i = 0; i < N; ++i) {
 				res.coeff_a[i] *= scaling_a;
+			}
+
+			f64 scaling_b = 1.0/sqrt(sum_b);
+#pragma omp parallel for
+			for (u32 i = 0; i < N; ++i) {
 				res.coeff_b[i] *= scaling_b;
 			}
 		}
 
 		/* Calculate error */
 		{
-			f64 sum_a = 0.0, sum_b = 0.0;
+			f64 sum_a = 0.0;
+#pragma omp parallel for shared(res, old_coeff_a) reduction(+: sum_a)
 			for (u32 i = 0; i < N; ++i) {
 				f64 diff_a = cabs(res.coeff_a[i]) - cabs(old_coeff_a[i]);
-				f64 diff_b = cabs(res.coeff_b[i]) - cabs(old_coeff_b[i]);
 				sum_a += diff_a*diff_a;
-				sum_b += diff_b*diff_b;
 			}
 			res.error_a = sqrt(sum_a);
+
+			f64 sum_b = 0.0;
+#pragma omp parallel for shared(res, old_coeff_b) reduction(+: sum_b)
+			for (u32 i = 0; i < N; ++i) {
+				f64 diff_b = cabs(res.coeff_b[i]) - cabs(old_coeff_b[i]);
+				sum_b += diff_b*diff_b;
+			}
 			res.error_b = sqrt(sum_b);
 		}
 
 		/* Break condition */
-		log_info("Finished iteration: %d with an error of a: %e, b: %e", res.iterations, res.error_a, res.error_b);
+		log_info("Finished iteration: %d with energyies: a: %.2e, b: %.2e, ana error of a: %.2e, b: %.2e", res.iterations, res.energy_a, res.energy_b, res.error_a, res.error_b);
 		if (res.error_a < settings.error_tol && res.error_b < settings.error_tol)
 			break;
 

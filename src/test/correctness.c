@@ -29,6 +29,7 @@
 #include <sbmf/methods/quadgk_vec.h>
 #include <sbmf/methods/quadgk_vec_inl.h>
 #include <sbmf/methods/find_groundstate.h>
+#include <sbmf/methods/best_meanfield.h>
 #include <sbmf/math/functions.h>
 #include <sbmf/math/harmonic_oscillator.h>
 #include <sbmf/math/matrix.h>
@@ -37,6 +38,7 @@
 #include <sbmf/memory/prioqueue.h>
 #include <sbmf/memory/bucketarray.h>
 #include <sbmf/debug/profile.h>
+#include <sbmf/math/manybodystate.h>
 
 #include <omp.h>
 #include <plot/plot.h>
@@ -823,6 +825,7 @@ static void Vijkl_integrand(f64* out, f64* in, u32 len, void* data) {
 	}
 }
 
+
 describe (2comp_scim) {
 	before_each(){sbmf_init();}
 	after_each(){sbmf_shutdown();}
@@ -835,7 +838,7 @@ describe (2comp_scim) {
 		};
 		struct gp2c_result res = gp2c(settings, gp2c_op_a, gp2c_op_b);
 
-#if 1
+#if 0
 		const u32 states_to_include = 5;
 		/* First order correction of the many-body wavefunction */
 		{
@@ -934,7 +937,7 @@ describe (2comp_scim) {
 							- (PARTICLE_COUNT-2)*eres_a.eigenvalues[0]
 							- eres_a.eigenvalues[m]
 							- eres_a.eigenvalues[n];
-						coeffs[index] = \sqrt{2}*inner_product/energy_diff;
+						coeffs[index] = sqrt(2)*inner_product/energy_diff;
 					} else {
 						states[index] = (struct manybody_state) {
 							.indices[0] = {
@@ -961,6 +964,15 @@ describe (2comp_scim) {
 
 					index++;
 				}
+			}
+
+			f64 sum = 0.0;
+			for (u32 i = 0; i < state_count; ++i) {
+				sum += coeffs[i]*coeffs[i];
+			}
+			f64 scaling = 1.0/sum;
+			for (u32 i = 0; i < state_count; ++i) {
+				coeffs[i] *= scaling;
 			}
 
 			for (u32 i = 0; i < state_count; ++i) {
@@ -1001,7 +1013,7 @@ describe (2comp_scim) {
 			for (u32 i = 0; i < N; ++i) {
 				out[i] = 0;
 			}
-			for (u32 i = 1; i < state_count; ++i) {
+			for (u32 i = 0; i < state_count; ++i) {
 
 				c64 mp_out[N];
 				for (u32 j = 0; j < N; ++j) {
@@ -1048,7 +1060,7 @@ describe (2comp_scim) {
 		}
 #endif
 
-#if 1
+#if 0
 		{
 			const u32 N = 256;
 			plot_init(800, 600, "gp2c");
@@ -1098,5 +1110,76 @@ describe (2comp_scim) {
 #endif
 	}
 }
+
+void bestmf_gp2c_op_a(f64* out, f64* in_x, c64* in_a, c64* in_b, u32 len) {
+	static u32 particle_count = 10;
+	static f64 gaa = -0.25;
+
+	#pragma omp simd
+	for (u32 i = 0; i < len; ++i) {
+		f64 ca = cabs(in_a[i]);
+		out[i] = gaussian(in_x[i],0,0.2) + gaa*(particle_count-1)*ca*ca;
+	}
+}
+
+describe (bestmf) {
+	before_each(){sbmf_init();}
+	after_each(){sbmf_shutdown();}
+
+	it ("?") {
+		struct gp2c_settings settings = {
+			.num_basis_functions = 64,
+			.max_iterations = 1e7,
+			.error_tol = 1e-8,
+		};
+		struct gp2c_result res = gp2c(settings, bestmf_gp2c_op_a, bestmf_gp2c_op_a);
+
+		struct eigen_result eres_a = find_eigenpairs_sparse(res.hamiltonian_a, 2, EV_SMALLEST_RE);
+
+		find_best_meanfield_occupations(10, settings.num_basis_functions,
+				&eres_a.eigenvectors[0],
+				&eres_a.eigenvectors[eres_a.num_eigenpairs]
+				);
+#if 0
+		{
+			const u32 N = 256;
+			plot_init(800, 600, "bestmf gp2c");
+			f32 potdata[N], adata[N], bdata[N];
+			sample_space sp = make_linspace(1, -5, 5.0, N);
+
+			for (u32 i = 0; i < N; ++i) {
+				f64 x = sp.points[i];
+				potdata[i] = (f32) ho_perturbed_potential(&x, 1, NULL);
+			}
+			push_line_plot(&(plot_push_desc){
+					.space = &sp,
+					.data = potdata,
+					.label = "potential",
+					});
+
+			c64 sample_out_a[N];
+			f64 sample_in[N];
+			for (u32 i = 0; i < N; ++i) {
+				sample_in[i] = (f64) sp.points[i];
+			}
+			hob_sample_vec(res.coeff_a, settings.num_basis_functions, sample_out_a, sample_in, N);
+			for (u32 i = 0; i < N; ++i) {
+				f64 ca = cabs(sample_out_a[i]);
+				adata[i] = ca*ca;
+			}
+			push_line_plot(&(plot_push_desc){
+					.space = &sp,
+					.data = adata,
+					.label = "a",
+					.offset = res.energy_a,
+					});
+
+			plot_update_until_closed();
+			plot_shutdown();
+		}
+#endif
+	}
+}
+
 
 snow_main();

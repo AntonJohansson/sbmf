@@ -6,6 +6,9 @@
 #include <math.h>
 #include <stdbool.h>
 
+#define CCOMP(z) \
+	creal(z), cimag(z)
+
 #define ARRLEN(arr) \
 	(sizeof(arr)/sizeof(arr[0]))
 

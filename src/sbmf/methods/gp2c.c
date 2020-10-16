@@ -75,12 +75,22 @@ struct gp2c_result gp2c(struct gp2c_settings settings, gp2c_operator_func* op_a,
 	};
 
 	/* Set initial guess to the ho groundstate */
-	for (u32 i = 0; i < N; ++i) {
-		res.coeff_a[i] = 0;
-		res.coeff_b[i] = 0;
+	if (settings.guess_a) {
+		settings.guess_a(res.coeff_a, N);
+	} else {
+		for (u32 i = 0; i < N; ++i) {
+			res.coeff_a[i] = 0;
+		}
+		res.coeff_a[0] = 1;
 	}
-	res.coeff_a[0] = 1;
-	res.coeff_b[1] = 1;
+	if (settings.guess_b) {
+		settings.guess_b(res.coeff_b, N);
+	} else {
+		for (u32 i = 0; i < N; ++i) {
+			res.coeff_b[i] = 0;
+		}
+		res.coeff_b[0] = 1;
+	}
 
 	struct integrand_params params_a = {
 		.coeff_count = N,
@@ -212,10 +222,15 @@ struct gp2c_result gp2c(struct gp2c_settings settings, gp2c_operator_func* op_a,
 			}
 		}
 
+		/* Callback */
+		if (settings.post_normalize_callback) {
+			settings.post_normalize_callback(res.coeff_a, res.coeff_b, N);
+		}
+
 		/* Calculate error */
 		{
 			f64 sum_a = 0.0;
-#pragma omp parallel for shared(res, old_coeff_a) reduction(+: sum_a)
+//#pragma omp parallel for shared(res, old_coeff_a) reduction(+: sum_a)
 			for (u32 i = 0; i < N; ++i) {
 				f64 diff_a = cabs(res.coeff_a[i]) - cabs(old_coeff_a[i]);
 				sum_a += diff_a*diff_a;
@@ -223,7 +238,7 @@ struct gp2c_result gp2c(struct gp2c_settings settings, gp2c_operator_func* op_a,
 			res.error_a = sqrt(sum_a);
 
 			f64 sum_b = 0.0;
-#pragma omp parallel for shared(res, old_coeff_b) reduction(+: sum_b)
+//#pragma omp parallel for shared(res, old_coeff_b) reduction(+: sum_b)
 			for (u32 i = 0; i < N; ++i) {
 				f64 diff_b = cabs(res.coeff_b[i]) - cabs(old_coeff_b[i]);
 				sum_b += diff_b*diff_b;

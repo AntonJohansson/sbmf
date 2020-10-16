@@ -10,6 +10,7 @@ PROJ_SRCS = \
 	src/sbmf/methods/item.c \
 	src/sbmf/methods/scim.c \
 	src/sbmf/methods/gp2c.c \
+	src/sbmf/methods/best_meanfield.c \
 	src/sbmf/math/find_eigenpairs.c \
 	src/sbmf/math/matrix.c \
 	src/sbmf/debug/profile.c \
@@ -53,7 +54,7 @@ DEBUG_FLAGS = -g \
 			  -fsanitize=float-cast-overflow \
 			  -fsanitize=signed-integer-overflow
 
-MODE_FLAGS = $(RELEASE_FLAGS)
+MODE_FLAGS = $(DEBUG_FLAGS)
 PROJ_FLAGS = $(MODE_FLAGS) -c -fpic -pedantic -Wall -Wextra -Isrc -Ithird_party/include
 TEST_FLAGS = $(MODE_FLAGS)          -pedantic -Wall -Wextra -Isrc -Ithird_party/include -I/home/aj/.local/include
 

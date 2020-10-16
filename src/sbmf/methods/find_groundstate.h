@@ -63,6 +63,8 @@ struct gss_result ho_scim(struct scim_settings settings, gss_potential_vec_func*
  */
 
 typedef void gp2c_operator_func(f64* out, f64* in_x, c64* in_a, c64* in_b, u32 len);
+typedef void gp2c_guess_func(c64* out, u32 len);
+typedef void gp2c_callback(c64* a, c64* b, u32 len);
 
 struct gp2c_settings {
 	u32 num_basis_functions;
@@ -72,6 +74,11 @@ struct gp2c_settings {
 
 	u32 measure_every;
 	scim_debug_callback* dbgcallback;
+
+	gp2c_guess_func* guess_a;
+	gp2c_guess_func* guess_b;
+
+	gp2c_callback* post_normalize_callback;
 };
 
 struct gp2c_result {

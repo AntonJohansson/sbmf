@@ -5,7 +5,11 @@
 #include <sbmf/math/functions.h>
 #include "find_groundstate.h"
 
-static f64 lambda = -0.25 * (10 - 1);
+#include <sbmf/methods/quadgk_vec.h>
+#include <sbmf/math/harmonic_oscillator.h>
+
+#define lambda0 (-0.25)
+static f64 lambda = lambda0 * (10 - 1);
 
 static c64* _orbital_1_coeffs;
 static c64* _orbital_2_coeffs;
@@ -17,7 +21,7 @@ static void op1(f64* out, f64* in_x, c64* in_1, c64* in_2, u32 len) {
 	for (u32 i = 0; i < len; ++i) {
 		f64 abs1 = cabs(in_1[i]);
 		f64 abs2 = cabs(in_2[i]);
-		out[i] = gaussian(in_x[i],0,0.2) + 0.75 * lambda * abs1*abs1 + 0.25 * lambda * abs2*abs2;
+		out[i] = gaussian(in_x[i],0, 0.2) + 0.75 * lambda * abs1*abs1 + 0.25 * lambda * abs2*abs2;
 	}
 }
 
@@ -25,7 +29,7 @@ static void op2(f64* out, f64* in_x, c64* in_1, c64* in_2, u32 len) {
 	for (u32 i = 0; i < len; ++i) {
 		f64 abs1 = cabs(in_1[i]);
 		f64 abs2 = cabs(in_2[i]);
-		out[i] = gaussian(in_x[i],0,0.2) + 0.75 * lambda * abs2*abs2 + 0.25 * lambda * abs1*abs1;
+		out[i] = gaussian(in_x[i],0, 0.2) + 0.75 * lambda * abs2*abs2 + 0.25 * lambda * abs1*abs1;
 	}
 }
 
@@ -68,9 +72,11 @@ static void ensure_structure_of_func(c64* a, c64* b, u32 len) {
 }
 
 void find_best_meanfield_occupations(const u32 particle_count,
-									const u32 coeff_count,
-									c64 orbital_1_coeffs[static coeff_count],
-									c64 orbital_2_coeffs[static coeff_count]) {
+                                     const u32 coeff_count,
+                                     c64 orbital_1_coeffs[static coeff_count],
+                                     c64 orbital_2_coeffs[static coeff_count],
+                                     const f64 energy_1,
+									 const f64 energy_2) {
 	_n1 = particle_count/2;
 	_n2 = particle_count - _n1;
 	_particle_count = particle_count;
@@ -79,7 +85,7 @@ void find_best_meanfield_occupations(const u32 particle_count,
 
 	struct gp2c_settings settings = {
 		.num_basis_functions = coeff_count,
-		.max_iterations = 1e7,
+		.max_iterations = 1e5,
 		.error_tol = 1e-10,
 		.guess_a = guess_1,
 		.guess_b = guess_2,
@@ -87,7 +93,60 @@ void find_best_meanfield_occupations(const u32 particle_count,
 	};
 	struct gp2c_result res = gp2c(settings, op1, op2);
 
-	log_info("n1: %u -- n2: %u", _n1, _n2);
+	best_meanfield_energy(particle_count, coeff_count, orbital_1_coeffs, orbital_2_coeffs, energy_1, energy_2, _n1, _n2);
+	best_meanfield_energy(particle_count, coeff_count, orbital_1_coeffs, orbital_2_coeffs, energy_1, energy_2, 6, 4);
+	best_meanfield_energy(particle_count, coeff_count, orbital_1_coeffs, orbital_2_coeffs, energy_1, energy_2, 7, 3);
+}
 
-	/* Need to copy gp2c and force scaling relation between bases */
+struct bme_integrand_params {
+	u32 coeff_count;
+	c64* orbital_1_coeffs;
+	c64* orbital_2_coeffs;
+};
+
+void bme_integrand(f64* out, f64* in, u32 len, void* data) {
+	struct bme_integrand_params* params = data;
+
+	c64 sample_1_out[params->coeff_count];
+	hob_sample_vec(params->orbital_1_coeffs, params->coeff_count, sample_1_out, in, len);
+
+	c64 sample_2_out[params->coeff_count];
+	hob_sample_vec(params->orbital_2_coeffs, params->coeff_count, sample_2_out, in, len);
+
+	for (u32 i = 0; i < len; ++i) {
+		f64 abs1 = cabs(sample_1_out[i]);
+		f64 abs2 = cabs(sample_2_out[i]);
+		out[i] = abs1*abs1*abs2*abs2;
+	}
+}
+
+void best_meanfield_energy(const u32 particle_count,
+                           const u32 coeff_count,
+                           c64 orbital_1_coeffs[static coeff_count],
+                           c64 orbital_2_coeffs[static coeff_count],
+						   const f64 energy_1,
+						   const f64 energy_2,
+                           const u32 occupation_1,
+                           const u32 occupation_2) {
+
+	struct bme_integrand_params params = {
+		.coeff_count = coeff_count,
+		.orbital_1_coeffs = orbital_1_coeffs,
+		.orbital_2_coeffs = orbital_2_coeffs,
+	};
+	struct integration_settings int_settings = {
+		.gk = gk7,
+		.abs_error_tol = 1e-10,
+		.rel_error_tol = 1e-10,
+		.max_evals = 1e5,
+		.userdata = &params,
+	};
+
+	struct integration_result res = quadgk_vec(bme_integrand, -INFINITY, INFINITY, int_settings);
+	assert(res.converged);
+
+	f64 E = occupation_1*energy_1 + occupation_2*energy_2 + 2*lambda0*occupation_1*occupation_2*res.integral;
+	log_info("(%u,%u) Energy: %lf", occupation_1, occupation_2, E);
+	log_info("(%u,0) Energy: %lf", occupation_1+occupation_2, (occupation_1+occupation_2)*energy_1);
+	log_info("(0,%u) Energy: %lf", occupation_1+occupation_2, (occupation_1+occupation_2)*energy_2);
 }

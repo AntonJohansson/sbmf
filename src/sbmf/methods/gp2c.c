@@ -3,6 +3,7 @@
 #include <sbmf/math/find_eigenpairs.h>
 #include <sbmf/math/harmonic_oscillator.h>
 #include <sbmf/methods/quadgk_vec.h>
+#include <sbmf/math/functions.h>
 #include <assert.h> /* Not the correct way to handle this */
 #include <omp.h>
 
@@ -75,21 +76,23 @@ struct gp2c_result gp2c(struct gp2c_settings settings, gp2c_operator_func* op_a,
 	};
 
 	/* Set initial guess to the ho groundstate */
-	if (settings.guess_a) {
-		settings.guess_a(res.coeff_a, N);
-	} else {
-		for (u32 i = 0; i < N; ++i) {
-			res.coeff_a[i] = 0;
+	{
+		if (settings.guess_a) {
+			settings.guess_a(res.coeff_a, N);
+		} else {
+			for (u32 i = 0; i < N; ++i) {
+				res.coeff_a[i] = 0;
+			}
+			res.coeff_a[0] = 1;
 		}
-		res.coeff_a[0] = 1;
-	}
-	if (settings.guess_b) {
-		settings.guess_b(res.coeff_b, N);
-	} else {
-		for (u32 i = 0; i < N; ++i) {
-			res.coeff_b[i] = 0;
+		if (settings.guess_b) {
+			settings.guess_b(res.coeff_b, N);
+		} else {
+			for (u32 i = 0; i < N; ++i) {
+				res.coeff_b[i] = 0;
+			}
+			res.coeff_b[0] = 1;
 		}
-		res.coeff_b[0] = 1;
 	}
 
 	struct integrand_params params_a = {
@@ -131,7 +134,6 @@ struct gp2c_result gp2c(struct gp2c_settings settings, gp2c_operator_func* op_a,
 		{
 #pragma omp parallel for firstprivate(params_a, int_settings) shared(res)
 			for (u32 i = 0; i < N*(N+1)/2; ++i) {
-			//COMPLEX_HERMITIAN_BANDMAT_FOREACH(Ha, r,c) {
 				u32 r = matrix_element_rows[i];
 				u32 c = matrix_element_cols[i];
 				int_settings.userdata = &params_a;
@@ -159,7 +161,6 @@ struct gp2c_result gp2c(struct gp2c_settings settings, gp2c_operator_func* op_a,
 		{
 #pragma omp parallel for firstprivate(params_b, int_settings) shared(res)
 			for (u32 i = 0; i < N*(N+1)/2; ++i) {
-			//COMPLEX_HERMITIAN_BANDMAT_FOREACH(Hb, r,c) {
 				u32 r = matrix_element_rows[i];
 				u32 c = matrix_element_cols[i];
 				int_settings.userdata = &params_b;
@@ -193,33 +194,8 @@ struct gp2c_result gp2c(struct gp2c_settings settings, gp2c_operator_func* op_a,
 
 		/* Normalize and copy to result */
 		{
-			f64 sum_a = 0.0;
-#pragma omp parallel for shared(eres_a, res) reduction(+: sum_a)
-			for (u32 i = 0; i < N; ++i) {
-				res.coeff_a[i] = eres_a.eigenvectors[i];
-				f64 abs_a = cabs(eres_a.eigenvectors[i]);
-				sum_a += abs_a;
-			}
-
-			f64 sum_b = 0.0;
-#pragma omp parallel for shared(eres_b, res) reduction(+: sum_b)
-			for (u32 i = 0; i < N; ++i) {
-				res.coeff_b[i] = eres_b.eigenvectors[i];
-				f64 abs_b = cabs(eres_b.eigenvectors[i]);
-				sum_b += abs_b;
-			}
-
-			f64 scaling_a = 1.0/sqrt(sum_a);
-#pragma omp parallel for
-			for (u32 i = 0; i < N; ++i) {
-				res.coeff_a[i] *= scaling_a;
-			}
-
-			f64 scaling_b = 1.0/sqrt(sum_b);
-#pragma omp parallel for
-			for (u32 i = 0; i < N; ++i) {
-				res.coeff_b[i] *= scaling_b;
-			}
+			c64_normalize(res.coeff_a, eres_a.eigenvectors, N);
+			c64_normalize(res.coeff_b, eres_b.eigenvectors, N);
 		}
 
 		/* Callback */
@@ -230,7 +206,7 @@ struct gp2c_result gp2c(struct gp2c_settings settings, gp2c_operator_func* op_a,
 		/* Calculate error */
 		{
 			f64 sum_a = 0.0;
-//#pragma omp parallel for shared(res, old_coeff_a) reduction(+: sum_a)
+#pragma omp parallel for shared(res, old_coeff_a) reduction(+: sum_a)
 			for (u32 i = 0; i < N; ++i) {
 				f64 diff_a = cabs(res.coeff_a[i]) - cabs(old_coeff_a[i]);
 				sum_a += diff_a*diff_a;
@@ -238,7 +214,7 @@ struct gp2c_result gp2c(struct gp2c_settings settings, gp2c_operator_func* op_a,
 			res.error_a = sqrt(sum_a);
 
 			f64 sum_b = 0.0;
-//#pragma omp parallel for shared(res, old_coeff_b) reduction(+: sum_b)
+#pragma omp parallel for shared(res, old_coeff_b) reduction(+: sum_b)
 			for (u32 i = 0; i < N; ++i) {
 				f64 diff_b = cabs(res.coeff_b[i]) - cabs(old_coeff_b[i]);
 				sum_b += diff_b*diff_b;

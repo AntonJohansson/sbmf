@@ -17,3 +17,5 @@ struct manybodystate {
 		u32 index_in_basis;
 	}* single_states;
 };
+
+/* How do we calculate the energy of a manybody state? */

@@ -1060,7 +1060,7 @@ describe (2comp_scim) {
 		}
 #endif
 
-#if 0
+#if 1
 		{
 			const u32 N = 256;
 			plot_init(800, 600, "gp2c");
@@ -1111,6 +1111,34 @@ describe (2comp_scim) {
 	}
 }
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 void bestmf_gp2c_op_a(f64* out, f64* in_x, c64* in_a, c64* in_b, u32 len) {
 	static u32 particle_count = 10;
 	static f64 gaa = -0.25;
@@ -1128,23 +1156,21 @@ describe (bestmf) {
 
 	it ("?") {
 		struct gp2c_settings settings = {
-			.num_basis_functions = 64,
+			.num_basis_functions = 32,
 			.max_iterations = 1e7,
 			.error_tol = 1e-8,
 		};
 		struct gp2c_result res = gp2c(settings, bestmf_gp2c_op_a, bestmf_gp2c_op_a);
 
 		struct eigen_result eres_a = find_eigenpairs_sparse(res.hamiltonian_a, 2, EV_SMALLEST_RE);
+		c64_normalize(&eres_a.eigenvectors[0], &eres_a.eigenvectors[0], settings.num_basis_functions);
+		c64_normalize(&eres_a.eigenvectors[settings.num_basis_functions], &eres_a.eigenvectors[settings.num_basis_functions], settings.num_basis_functions);
 
-		find_best_meanfield_occupations(10, settings.num_basis_functions,
-				&eres_a.eigenvectors[0],
-				&eres_a.eigenvectors[eres_a.num_eigenpairs]
-				);
-#if 0
+#if 1
 		{
 			const u32 N = 256;
 			plot_init(800, 600, "bestmf gp2c");
-			f32 potdata[N], adata[N], bdata[N];
+			f32 potdata[N], adata[N], b0data[N], b1data[N];
 			sample_space sp = make_linspace(1, -5, 5.0, N);
 
 			for (u32 i = 0; i < N; ++i) {
@@ -1158,14 +1184,24 @@ describe (bestmf) {
 					});
 
 			c64 sample_out_a[N];
+			c64 sample_out_b0[N];
+			c64 sample_out_b1[N];
 			f64 sample_in[N];
 			for (u32 i = 0; i < N; ++i) {
 				sample_in[i] = (f64) sp.points[i];
 			}
 			hob_sample_vec(res.coeff_a, settings.num_basis_functions, sample_out_a, sample_in, N);
+			hob_sample_vec(&eres_a.eigenvectors[0], settings.num_basis_functions, sample_out_b0, sample_in, N);
+			hob_sample_vec(&eres_a.eigenvectors[settings.num_basis_functions], settings.num_basis_functions, sample_out_b1, sample_in, N);
 			for (u32 i = 0; i < N; ++i) {
 				f64 ca = cabs(sample_out_a[i]);
 				adata[i] = ca*ca;
+
+				f64 cb0 = cabs(sample_out_b0[i]);
+				b0data[i] = cb0*cb0;
+
+				f64 cb1 = cabs(sample_out_b1[i]);
+				b1data[i] = cb1*cb1;
 			}
 			push_line_plot(&(plot_push_desc){
 					.space = &sp,
@@ -1174,10 +1210,45 @@ describe (bestmf) {
 					.offset = res.energy_a,
 					});
 
+			push_line_plot(&(plot_push_desc){
+					.space = &sp,
+					.data = b0data,
+					.label = "b0",
+					.offset = eres_a.eigenvalues[0]
+					});
+
+			push_line_plot(&(plot_push_desc){
+					.space = &sp,
+					.data = b1data,
+					.label = "b1",
+					.offset = eres_a.eigenvalues[1]
+					});
+
 			plot_update_until_closed();
 			plot_shutdown();
 		}
 #endif
+
+		log_info("---------------------------------");
+
+
+		log_info("0 -- energy: %lf", eres_a.eigenvalues[0]);
+		for (u32 i = 0; i < settings.num_basis_functions; ++i) {
+			printf("%.1lf\t",cabs(eres_a.eigenvectors[i]));
+		}
+		printf("\n");
+		log_info("1 -- energy: %lf", eres_a.eigenvalues[1]);
+		for (u32 i = 0; i < settings.num_basis_functions; ++i) {
+			printf("%.1lf\t",cabs(eres_a.eigenvectors[eres_a.num_eigenpairs + i]));
+		}
+		printf("\n");
+
+		find_best_meanfield_occupations(10, settings.num_basis_functions,
+				&eres_a.eigenvectors[0],
+				&eres_a.eigenvectors[settings.num_basis_functions],
+				eres_a.eigenvalues[0],
+				eres_a.eigenvalues[1]
+				);
 	}
 }
 

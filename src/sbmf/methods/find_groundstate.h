@@ -62,9 +62,15 @@ struct gss_result ho_scim(struct scim_settings settings, gss_potential_vec_func*
  *		be inlined for performance.
  */
 
-typedef void gp2c_operator_func(f64* out, f64* in_x, c64* in_a, c64* in_b, u32 len);
+typedef void gp2c_operator_func(const u32 len, f64 out[static len],
+                                f64 in_x[static len], const u32 component_count,
+                                c64 in_u[static len*component_count]);
 typedef void gp2c_guess_func(c64* out, u32 len);
 typedef void gp2c_callback(c64* a, c64* b, u32 len);
+
+struct gp2c_settings;
+struct gp2c_result;
+typedef void gp2c_debug_callback(struct gp2c_settings, struct gp2c_result);
 
 struct gp2c_settings {
 	u32 num_basis_functions;
@@ -72,28 +78,27 @@ struct gp2c_settings {
 	u32 max_iterations;
 	f64 error_tol;
 
-	u32 measure_every;
-	scim_debug_callback* dbgcallback;
+	gp2c_operator_func* ho_potential_perturbation;
 
-	gp2c_guess_func* guess_a;
-	gp2c_guess_func* guess_b;
+	u32 measure_every;
+	gp2c_debug_callback* dbgcallback;
 
 	gp2c_callback* post_normalize_callback;
 };
 
-struct gp2c_result {
-	c64* coeff_a;
-	c64* coeff_b;
-
-	f64 error_a;
-	f64 error_b;
-	u32 iterations;
-
-	f64 energy_a;
-	f64 energy_b;
-
-	struct complex_hermitian_bandmat hamiltonian_a;
-	struct complex_hermitian_bandmat hamiltonian_b;
+struct gp2c_component {
+	gp2c_guess_func* guess;
+	gp2c_operator_func* op;
 };
 
-struct gp2c_result gp2c(struct gp2c_settings, gp2c_operator_func* op_a, gp2c_operator_func* op_b);
+struct gp2c_result {
+	u32 iterations;
+	u32 component_count;
+	u32 coeff_count;
+	c64* coeff;
+	f64* error;
+	f64* energy;
+	struct complex_hermitian_bandmat* hamiltonian;
+};
+
+struct gp2c_result gp2c(struct gp2c_settings settings, const u32 component_count, struct gp2c_component components[static component_count]);

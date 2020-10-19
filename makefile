@@ -54,7 +54,7 @@ DEBUG_FLAGS = -g \
 			  -fsanitize=float-cast-overflow \
 			  -fsanitize=signed-integer-overflow
 
-MODE_FLAGS = $(DEBUG_FLAGS)
+MODE_FLAGS = $(RELEASE_FLAGS)
 PROJ_FLAGS = $(MODE_FLAGS) -c -fpic -pedantic -Wall -Wextra -Isrc -Ithird_party/include
 TEST_FLAGS = $(MODE_FLAGS)          -pedantic -Wall -Wextra -Isrc -Ithird_party/include -I/home/aj/.local/include
 

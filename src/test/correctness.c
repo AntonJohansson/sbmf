@@ -584,7 +584,7 @@ void debug_callback(struct scim_settings settings, c64* wavefunction) {
 	plot_shutdown();
 }
 
-describe(item_vs_scim_groundstate_finding) {
+describe(item_vs_scim) {
 	before_each() { sbmf_init(); }
 	after_each() { sbmf_shutdown(); }
 
@@ -826,6 +826,7 @@ static void Vijkl_integrand(f64* out, f64* in, u32 len, void* data) {
 }
 
 
+#if 0
 describe (2comp_scim) {
 	before_each(){sbmf_init();}
 	after_each(){sbmf_shutdown();}
@@ -1110,6 +1111,7 @@ describe (2comp_scim) {
 #endif
 	}
 }
+#endif
 
 
 
@@ -1135,19 +1137,66 @@ describe (2comp_scim) {
 
 
 
-
-
-
-
-void bestmf_gp2c_op_a(f64* out, f64* in_x, c64* in_a, c64* in_b, u32 len) {
-	static u32 particle_count = 10;
-	static f64 gaa = -0.25;
-
-	#pragma omp simd
+void bestmf_perturbation(const u32 len, f64 out[static len],
+                                f64 in_x[static len], const u32 component_count,
+                                c64 in_u[static len*component_count]) {
+	assert(component_count == 0);
 	for (u32 i = 0; i < len; ++i) {
-		f64 ca = cabs(in_a[i]);
-		out[i] = gaussian(in_x[i],0,0.2) + gaa*(particle_count-1)*ca*ca;
+		out[i] = gaussian(in_x[i],0,0.2);
 	}
+}
+
+void bestmf_gp2c_op_a(const u32 len, f64 out[static len],
+                                f64 in_x[static len], const u32 component_count,
+                                c64 in_u[static len*component_count]) {
+	assert(component_count == 1);
+	u32 particle_count = 100;
+	f64 gaa = (-1.5)/(particle_count - 1);
+
+#pragma omp simd
+	for (u32 i = 0; i < len; ++i) {
+		f64 ca = cabs(in_u[i]);
+		out[i] = gaa*(particle_count-1)*ca*ca;
+	}
+}
+
+void bestmf_debug_callback(struct gp2c_settings settings, struct gp2c_result res) {
+//	if (res.iterations < 10 || res.iterations > 20)
+//		return;
+//
+//	log_info("hamiltonian on iteration %u", res.iterations);
+//	COMPLEX_HERMITIAN_BANDMAT_FOREACH(res.hamiltonian_a, r,c) {
+//		u32 i = complex_hermitian_bandmat_index(res.hamiltonian_a, r,c);
+//		printf("%lf\t", cabs(res.hamiltonian_a.data[i]));
+//	}
+//	printf("\n");
+//	log_info("coeff_a on iteration %u", res.iterations);
+//	for (u32 i = 0; i < settings.num_basis_functions; ++i) {
+//		printf("%lf\t", cabs(res.coeff_a[i]));
+//	}
+//	printf("\n");
+//
+//
+//	const u32 N = 256;
+//	f32 adata[N];
+//	sample_space sp = make_linspace(1, -5, 5.0, N);
+//
+//
+//	c64 sample_out_a[N];
+//	f64 sample_in[N];
+//	for (u32 i = 0; i < N; ++i) {
+//		sample_in[i] = (f64) sp.points[i];
+//	}
+//	hob_sample_vec(res.coeff_a, settings.num_basis_functions, sample_out_a, sample_in, N);
+//	for (u32 i = 0; i < N; ++i) {
+//		f64 ca = cabs(sample_out_a[i]);
+//		adata[i] = ca*ca;
+//	}
+//	push_line_plot(&(plot_push_desc){
+//			.space = &sp,
+//			.data = adata,
+//			.label = plot_snprintf("iter: %u", res.iterations),
+//			});
 }
 
 describe (bestmf) {
@@ -1159,14 +1208,19 @@ describe (bestmf) {
 			.num_basis_functions = 32,
 			.max_iterations = 1e7,
 			.error_tol = 1e-8,
+			.dbgcallback = bestmf_debug_callback,
+			.measure_every = 0,
+			.ho_potential_perturbation = bestmf_perturbation,
 		};
-		struct gp2c_result res = gp2c(settings, bestmf_gp2c_op_a, bestmf_gp2c_op_a);
+		struct gp2c_component component = {
+			.op = bestmf_gp2c_op_a,
+		};
+		struct gp2c_result res = gp2c(settings, 1, &component);
 
-		struct eigen_result eres_a = find_eigenpairs_sparse(res.hamiltonian_a, 2, EV_SMALLEST_RE);
+		struct eigen_result eres_a = find_eigenpairs_sparse(res.hamiltonian[0], 2, EV_SMALLEST_RE);
 		c64_normalize(&eres_a.eigenvectors[0], &eres_a.eigenvectors[0], settings.num_basis_functions);
 		c64_normalize(&eres_a.eigenvectors[settings.num_basis_functions], &eres_a.eigenvectors[settings.num_basis_functions], settings.num_basis_functions);
-
-#if 1
+#if 0
 		{
 			const u32 N = 256;
 			plot_init(800, 600, "bestmf gp2c");
@@ -1190,7 +1244,7 @@ describe (bestmf) {
 			for (u32 i = 0; i < N; ++i) {
 				sample_in[i] = (f64) sp.points[i];
 			}
-			hob_sample_vec(res.coeff_a, settings.num_basis_functions, sample_out_a, sample_in, N);
+			hob_sample_vec(res.coeff, settings.num_basis_functions, sample_out_a, sample_in, N);
 			hob_sample_vec(&eres_a.eigenvectors[0], settings.num_basis_functions, sample_out_b0, sample_in, N);
 			hob_sample_vec(&eres_a.eigenvectors[settings.num_basis_functions], settings.num_basis_functions, sample_out_b1, sample_in, N);
 			for (u32 i = 0; i < N; ++i) {
@@ -1207,7 +1261,7 @@ describe (bestmf) {
 					.space = &sp,
 					.data = adata,
 					.label = "a",
-					.offset = res.energy_a,
+					.offset = res.energy[0],
 					});
 
 			push_line_plot(&(plot_push_desc){
@@ -1243,12 +1297,97 @@ describe (bestmf) {
 		}
 		printf("\n");
 
-		find_best_meanfield_occupations(10, settings.num_basis_functions,
+		u32 particle_count = 100;
+		f64 g = (-1.5)/(particle_count-1);
+		find_best_meanfield_occupations(particle_count, g, settings.num_basis_functions,
 				&eres_a.eigenvectors[0],
 				&eres_a.eigenvectors[settings.num_basis_functions],
 				eres_a.eigenvalues[0],
 				eres_a.eigenvalues[1]
 				);
+	}
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+f64 item_weird_pot(f64* v, i32 n, c64 u) {
+	SBMF_UNUSED(u);
+	f64 absu = cabs(u);
+	return ho_perturbed_potential(v, n, NULL) - 0.25*(10-1) * absu*absu;
+}
+
+describe(weird_asymmetry) {
+	before_each() { sbmf_init(); }
+	after_each() { sbmf_shutdown(); }
+
+	it ("?") {
+		const f64 L = 10.0;
+		const u32 N = 256;
+		struct grid space = generate_grid(1,
+				(f64[]){-L/2.0},
+				(f64[]){+L/2.0},
+				(i32[]){N});
+		struct item_settings item_settings = {
+			.g = space,
+			.max_iterations = 1e7,
+			.error_tol = 1e-10,
+			.dt = 0.001,
+		};
+
+		struct gss_result item_res = item(item_settings, item_weird_pot, guess);
+		log_info("\nitem:\niterations: %d\nerror: %e", item_res.iterations, item_res.error);
+
+#if 1
+		{
+			plot_init(800, 600, "fdm groundstate");
+			f32 pdata[N];
+			sample_space sp = make_linspace(1, -L/2.0, L/2.0, N);
+
+			for (u32 i = 0; i < N; ++i) {
+				f64 x = sp.points[i];
+				pdata[i] = (f32) ho_perturbed_potential(&x, 1, NULL);
+			}
+			push_line_plot(&(plot_push_desc){
+					.space = &sp,
+					.data = pdata,
+					.label = "potential",
+					});
+
+			for (u32 i = 0; i < N; ++i) {
+				c64 c = cabs(item_res.wavefunction[i]);
+				pdata[i] = c*c;
+			}
+			push_line_plot(&(plot_push_desc){
+					.space = &sp,
+					.data = pdata,
+					.label = "item groundstate",
+					});
+
+			plot_update_until_closed();
+			plot_shutdown();
+		}
+#endif
 	}
 }
 

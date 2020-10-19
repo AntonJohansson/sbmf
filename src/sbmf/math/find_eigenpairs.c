@@ -148,7 +148,7 @@ struct eigen_result find_eigenpairs_sparse(struct complex_hermitian_bandmat bm, 
 		if (info != 0) {
 			log_error("arpack zneupd(...) error: (%d) %s", info, arpack_zneupd_error_code_to_string(info));
 		} else {
-			/*
+#if 0
 			i32 nconv = iparam[4];
 			log_info("arpack znaupd(...) convergence info:");
 			log_info("\t Matrix size: %d", n);
@@ -167,7 +167,7 @@ struct eigen_result find_eigenpairs_sparse(struct complex_hermitian_bandmat bm, 
 				cblas_zaxpy(n, &neg_eigenvalue, &z[i*n], 1, ax, 1);
 				log_info("\t\t %lf + %lfi -- %e", creal(d[i]), cimag(d[i]), cblas_dznrm2(n, ax, 1));
 			}
-			*/
+#endif
 
 			sbmf_stack_free_to_marker(memory_marker);
 

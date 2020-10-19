@@ -93,7 +93,7 @@ struct gp2c_result gp2c(struct gp2c_settings settings, const u32 component_count
 	c64* old_coeff = (c64*) sbmf_stack_push(component_count*(N*sizeof(c64)));
 
 	integration_settings int_settings = {
-		.gk = gk7,
+		.gk = gk15,
 		.abs_error_tol = 1e-10,
 		.rel_error_tol = 1e-10,
 		.max_evals = settings.max_iterations,

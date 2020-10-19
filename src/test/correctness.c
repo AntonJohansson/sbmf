@@ -1205,7 +1205,7 @@ describe (bestmf) {
 
 	it ("?") {
 		struct gp2c_settings settings = {
-			.num_basis_functions = 32,
+			.num_basis_functions = 64,
 			.max_iterations = 1e7,
 			.error_tol = 1e-8,
 			.dbgcallback = bestmf_debug_callback,

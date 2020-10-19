@@ -2,7 +2,7 @@
 
 #include <sbmf/types.h>
 
-#define MAX_GAUSS_POINTS 7
+#define MAX_GAUSS_POINTS 20
 struct gk_data {
 	f64 kronod_nodes[MAX_GAUSS_POINTS+1];
 	f64 kronod_weights[MAX_GAUSS_POINTS+1];
@@ -12,6 +12,9 @@ struct gk_data {
 };
 
 extern struct gk_data gk7;
+extern struct gk_data gk10;
+extern struct gk_data gk15;
+extern struct gk_data gk20;
 
 typedef f64 integrand(f64,void*);
 typedef struct integration_settings {

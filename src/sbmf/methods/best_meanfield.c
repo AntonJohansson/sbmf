@@ -107,9 +107,9 @@ void find_best_meanfield_occupations(const u32 particle_count,
 
 	struct gp2c_settings settings = {
 		.num_basis_functions = coeff_count,
-		.max_iterations = 1e8,
+		.max_iterations = 1e7,
 		.error_tol = 1e-8,
-		//.post_normalize_callback = ensure_structure_of_func,
+		.post_normalize_callback = ensure_structure_of_func,
 		.ho_potential_perturbation = bestmf_perturbation,
 	};
 	struct gp2c_component component[2] = {

@@ -526,133 +526,20 @@ void linear_hamiltonian_vec_pot(f64* out, f64* in_x, c64* in_u, u32 len) {
 
 f64 non_linear_hamiltonian_pot(f64* v, i32 n, c64 u) {
 	/* assuming 1d */
-	return ho_potential(v, n, 0) + cabs(u)*cabs(u);
+	return ho_perturbed_potential(v, n, 0)  -2.5*cabs(u)*cabs(u);
 }
 
-void non_linear_hamiltonian_vec_pot(f64* out, f64* in_x, c64* in_u, u32 len) {
-	SBMF_UNUSED(in_x);
+void non_linear_hamiltonian_vec_pot(const u32 len, f64 out[static len],
+                                f64 in_x[static len], const u32 component_count,
+                                c64 in_u[static len*component_count]) {
 	for (u32 i = 0; i < len; ++i) {
-		out[i] = cabs(in_u[i])*cabs(in_u[i]);
+		out[i] = gaussian(in_x[i],0,0.2) - 2.5*cabs(in_u[i])*cabs(in_u[i]);
 	}
-}
-
-void debug_callback(struct scim_settings settings, c64* wavefunction) {
-	plot_init(800, 600, "scim debug");
-	const u32 N = 128;
-	const f64 L = 5.0;
-	f32 pdata[N];
-	f32 wdata[N];
-	f32 rewdata[N];
-	f32 imwdata[N];
-	sample_space sp = make_linspace(1, -L/2.0, L/2.0, N);
-
-	for (u32 i = 0; i < N; ++i) {
-		c64 sample = hob_sample(wavefunction, settings.num_basis_functions, sp.points[i]);
-
-		f64 pdataout;
-		f64 x = sp.points[i];
-		non_linear_hamiltonian_vec_pot(&pdataout, &x, &sample, 1);
-		pdata[i] = (f32)pdataout;
-
-		c64 c = cabs(sample);
-		wdata[i] = c*c;
-		rewdata[i] = creal(sample);
-		imwdata[i] = cimag(sample);
-	}
-	push_line_plot(&(plot_push_desc){
-			.space = &sp,
-			.data = pdata,
-			.label = "potential",
-			});
-	push_line_plot(&(plot_push_desc){
-			.space = &sp,
-			.data = wdata,
-			.label = "abs",
-			});
-
-	push_line_plot(&(plot_push_desc){
-			.space = &sp,
-			.data = rewdata,
-			.label = "re",
-			});
-	push_line_plot(&(plot_push_desc){
-			.space = &sp,
-			.data = imwdata,
-			.label = "im",
-			});
-	plot_update_until_closed();
-	plot_shutdown();
 }
 
 describe(item_vs_scim) {
 	before_each() { sbmf_init(); }
 	after_each() { sbmf_shutdown(); }
-
-	it ("perturbed HO potential") {
-		const f64 L = 10.0;
-		const u32 N = 256;
-		struct grid space = generate_grid(1,
-				(f64[]){-L/2.0},
-				(f64[]){+L/2.0},
-				(i32[]){N});
-		struct item_settings item_settings = {
-			.g = space,
-			.max_iterations = 1e7,
-			.error_tol = 1e-10,
-			.dt = 0.001,
-		};
-		struct scim_settings scim_settings = {
-			.num_basis_functions = 32,
-			.max_iterations = 1e7,
-			.error_tol = 1e-10,
-		};
-
-		struct gss_result item_res = item(item_settings, linear_hamiltonian_pot, guess);
-		log_info("\nitem:\niterations: %d\nerror: %e", item_res.iterations, item_res.error);
-
-		struct gss_result hob_res = ho_scim(scim_settings, linear_hamiltonian_vec_pot, guess_vec);
-		log_info("\nhob:\niterations: %d\nerror: %e", hob_res.iterations, hob_res.error);
-#if 0
-		{
-			plot_init(800, 600, "fdm groundstate");
-			f32 pdata[N];
-			sample_space sp = make_linspace(1, -L/2.0, L/2.0, N);
-
-			for (u32 i = 0; i < N; ++i) {
-				f64 x = sp.points[i];
-				pdata[i] = (f32) ho_perturbed_potential(&x, 1, NULL);
-			}
-			push_line_plot(&(plot_push_desc){
-					.space = &sp,
-					.data = pdata,
-					.label = "potential",
-					});
-
-			for (u32 i = 0; i < N; ++i) {
-				c64 c = cabs(item_res.wavefunction[i]);
-				pdata[i] = c*c;
-			}
-			push_line_plot(&(plot_push_desc){
-					.space = &sp,
-					.data = pdata,
-					.label = "item groundstate",
-					});
-
-			for (u32 i = 0; i < N; ++i) {
-				c64 c = cabs(hob_sample(hob_res.wavefunction, scim_settings.num_basis_functions, sp.points[i]));
-				pdata[i] = c*c;
-			}
-			push_line_plot(&(plot_push_desc){
-					.space = &sp,
-					.data = pdata,
-					.label = "hob groundstate",
-					});
-
-			plot_update_until_closed();
-			plot_shutdown();
-		}
-#endif
-	}
 
 	it ("non-linear hamiltonian") {
 		const f64 L = 10.0;
@@ -667,25 +554,23 @@ describe(item_vs_scim) {
 			.error_tol = 1e-9,
 			.dt = 0.0001,
 		};
-		struct scim_settings scim_settings = {
-			.num_basis_functions = 32,
+		struct gp2c_settings gp2c_settings = {
+			.num_basis_functions = 8,
 			.max_iterations = 1e9,
 			.error_tol = 1e-7,
 			//.measure_every = 40,
 			//.dbgcallback = debug_callback,
 		};
 
-		PROFILE_BEGIN("entire item");
 		struct gss_result item_res = item(item_settings, non_linear_hamiltonian_pot, guess);
-		PROFILE_END("entire item");
-		log_info("\nitem:\niterations: %d\nerror: %e", item_res.iterations, item_res.error);
 
-		PROFILE_BEGIN("entire ho_scim");
-		struct gss_result hob_res = ho_scim(scim_settings, non_linear_hamiltonian_vec_pot, guess_vec);
-		PROFILE_END("entire ho_scim");
-		log_info("\nhob:\niterations: %d\nerror: %e", hob_res.iterations, hob_res.error);
+		struct gp2c_result gp2c_res = gp2c(gp2c_settings, 1, &(struct gp2c_component) {
+					.op = non_linear_hamiltonian_vec_pot,
+				});
 
-#if 0
+		complex_hermitian_bandmat_print(gp2c_res.hamiltonian[0], "gp2c H");
+
+#if 1
 		{
 			plot_init(800, 600, "fdm groundstate");
 			f32 pdata[N];
@@ -718,7 +603,7 @@ describe(item_vs_scim) {
 			for (u32 i = 0; i < N; ++i) {
 				sample_in[i] = (f64) sp.points[i];
 			}
-			hob_sample_vec(hob_res.wavefunction, scim_settings.num_basis_functions, sample_out, sample_in, N);
+			hob_sample_vec(gp2c_res.coeff, gp2c_res.coeff_count, sample_out, sample_in, N);
 			for (u32 i = 0; i < N; ++i) {
 				f64 c = cabs(sample_out[i]);
 				pdata[i] = c*c;
@@ -726,7 +611,7 @@ describe(item_vs_scim) {
 			push_line_plot(&(plot_push_desc){
 					.space = &sp,
 					.data = pdata,
-					.label = "hob groundstate",
+					.label = "gp2c",
 					});
 
 			plot_update_until_closed();
@@ -1151,7 +1036,7 @@ void bestmf_gp2c_op_a(const u32 len, f64 out[static len],
                                 c64 in_u[static len*component_count]) {
 	assert(component_count == 1);
 	u32 particle_count = 100;
-	f64 gaa = (-1.5)/(particle_count - 1);
+	f64 gaa = (-2.5)/(particle_count - 1);
 
 #pragma omp simd
 	for (u32 i = 0; i < len; ++i) {

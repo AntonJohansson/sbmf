@@ -3,6 +3,7 @@
 #include <sbmf/types.h>
 #include <sbmf/math/grid.h>
 #include <sbmf/math/matrix.h>
+#include <sbmf/methods/quadgk_vec.h>
 
 struct item_settings;
 struct scim_settings;
@@ -84,6 +85,9 @@ struct gp2c_settings {
 	gp2c_debug_callback* dbgcallback;
 
 	gp2c_callback* post_normalize_callback;
+
+	/* Choice of GK rule used for numerical integration internally */
+	struct gk_data gk;
 };
 
 struct gp2c_component {

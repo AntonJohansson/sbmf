@@ -93,7 +93,7 @@ struct gp2c_result gp2c(struct gp2c_settings settings, const u32 component_count
 	c64* old_coeff = (c64*) sbmf_stack_push(component_count*(N*sizeof(c64)));
 
 	integration_settings int_settings = {
-		.gk = gk15,
+		.gk = (settings.gk.gauss_size > 0) ? settings.gk : gk7,
 		.abs_error_tol = 1e-10,
 		.rel_error_tol = 1e-10,
 		.max_evals = settings.max_iterations,
@@ -174,6 +174,9 @@ struct gp2c_result gp2c(struct gp2c_settings settings, const u32 component_count
 		assert(complex_hermitian_bandmat_is_valid(linear_hamiltonian));
 	}
 
+	struct complex_hermitian_bandmat prev = complex_hermitian_bandmat_new_zero(N,N);
+	struct complex_hermitian_bandmat delta = complex_hermitian_bandmat_new_zero(N,N);
+
 	/* Do the actual iterations */
 	for (; res.iterations < settings.max_iterations; ++res.iterations) {
 		memcpy(old_coeff, res.coeff, res.component_count * res.coeff_count * sizeof(c64));
@@ -198,6 +201,12 @@ struct gp2c_result gp2c(struct gp2c_settings settings, const u32 component_count
 					log_integration_result(int_res);
 				}
 				assert(int_res.converged);
+
+				/* Check if the resultant integral is less than what we can resolve,
+				 * if so, zero it.
+				 */
+				if (fabs(int_res.integral) < int_settings.abs_error_tol)
+					int_res.integral = 0.0;
 
 				u32 me_index = complex_hermitian_bandmat_index(res.hamiltonian[i], r,c);
 				res.hamiltonian[i].data[me_index] = linear_hamiltonian.data[me_index] + int_res.integral;

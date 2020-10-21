@@ -1090,7 +1090,7 @@ describe (bestmf) {
 
 	it ("?") {
 		struct gp2c_settings settings = {
-			.num_basis_functions = 64,
+			.num_basis_functions = 8,
 			.max_iterations = 1e7,
 			.error_tol = 1e-8,
 			.dbgcallback = bestmf_debug_callback,
@@ -1183,7 +1183,7 @@ describe (bestmf) {
 		printf("\n");
 
 		u32 particle_count = 100;
-		f64 g = (-1.5)/(particle_count-1);
+		f64 g = (-2.5)/(particle_count-1);
 		find_best_meanfield_occupations(particle_count, g, settings.num_basis_functions,
 				&eres_a.eigenvectors[0],
 				&eres_a.eigenvectors[settings.num_basis_functions],

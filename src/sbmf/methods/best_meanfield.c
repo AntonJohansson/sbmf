@@ -98,7 +98,7 @@ void find_best_meanfield_occupations(const u32 particle_count,
                                      const f64 energy_1,
 									 const f64 energy_2) {
 	_n1 = particle_count;
-	_n2 = 0;
+	_n2 = particle_count - _n1;
 	_lambda0 = g;
 	_lambda = g*(_particle_count - 1);
 	_particle_count = particle_count;
@@ -111,6 +111,7 @@ void find_best_meanfield_occupations(const u32 particle_count,
 		.error_tol = 1e-8,
 		.post_normalize_callback = ensure_structure_of_func,
 		.ho_potential_perturbation = bestmf_perturbation,
+		.gk = gk15,
 	};
 	struct gp2c_component component[2] = {
 		[0] = {
@@ -125,8 +126,8 @@ void find_best_meanfield_occupations(const u32 particle_count,
 	struct gp2c_result res = gp2c(settings, 2, component);
 
 	best_meanfield_energy(particle_count, coeff_count, orbital_1_coeffs, orbital_2_coeffs, energy_1, energy_2, _n1, _n2);
-	best_meanfield_energy(particle_count, coeff_count, orbital_1_coeffs, orbital_2_coeffs, energy_1, energy_2, 6, 4);
-	best_meanfield_energy(particle_count, coeff_count, orbital_1_coeffs, orbital_2_coeffs, energy_1, energy_2, 7, 3);
+	best_meanfield_energy(particle_count, coeff_count, orbital_1_coeffs, orbital_2_coeffs, energy_1, energy_2, 0.6*particle_count, 0.4*particle_count);
+	best_meanfield_energy(particle_count, coeff_count, orbital_1_coeffs, orbital_2_coeffs, energy_1, energy_2, 0.7*particle_count, 0.3*particle_count);
 }
 
 struct bme_integrand_params {

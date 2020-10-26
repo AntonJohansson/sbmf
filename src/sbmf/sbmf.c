@@ -42,9 +42,9 @@ void sbmf_init() {
 	signal(SIGINT, interrupt_handler);
 	signal(SIGABRT, interrupt_handler);
 	/* log_set_level(LOG_LEVEL_WARNING); */
-	log_open_and_clear_file("sbmf.log");
+	log_open_and_clear_file("output/sbmf.log");
 
-	_state.memory_log_fd = fopen("memory.log", "w");
+	_state.memory_log_fd = fopen("output/memory.log", "w");
 	if (!_state.memory_log_fd) {
 		log_error("Unable to open memory log file!");
 	} else {

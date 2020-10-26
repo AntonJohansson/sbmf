@@ -102,7 +102,7 @@ struct gp2c_result gp2c(struct gp2c_settings settings, const u32 component_count
 	/* Setup intial guess values for coeffs */
 	for (u32 i = 0; i < component_count; ++i) {
 		if (component[i].guess) {
-			component[i].guess(&res.coeff[i], res.coeff_count);
+			component[i].guess(&res.coeff[i*res.coeff_count], res.coeff_count);
 		} else {
 			for (u32 j = 0; j < res.coeff_count; ++j) {
 				res.coeff[i*res.coeff_count + j] = 0;
@@ -174,9 +174,6 @@ struct gp2c_result gp2c(struct gp2c_settings settings, const u32 component_count
 		assert(complex_hermitian_bandmat_is_valid(linear_hamiltonian));
 	}
 
-	struct complex_hermitian_bandmat prev = complex_hermitian_bandmat_new_zero(N,N);
-	struct complex_hermitian_bandmat delta = complex_hermitian_bandmat_new_zero(N,N);
-
 	/* Do the actual iterations */
 	for (; res.iterations < settings.max_iterations; ++res.iterations) {
 		memcpy(old_coeff, res.coeff, res.component_count * res.coeff_count * sizeof(c64));
@@ -220,10 +217,10 @@ struct gp2c_result gp2c(struct gp2c_settings settings, const u32 component_count
 			struct eigen_result eigres = find_eigenpairs_sparse(res.hamiltonian[i], 1, EV_SMALLEST_RE);
 
 			/* Copy energies */
-			res.energy[i] = eigres.eigenvalues[i];
+			res.energy[i] = eigres.eigenvalues[0];
 
 			/* Normalize and copy to result */
-			c64_normalize(&res.coeff[i*res.coeff_count], &eigres.eigenvectors[i*res.coeff_count], res.coeff_count);
+			c64_normalize(&res.coeff[i*res.coeff_count], &eigres.eigenvectors[0], res.coeff_count);
 		}
 
 		/* Callback */
@@ -247,7 +244,7 @@ struct gp2c_result gp2c(struct gp2c_settings settings, const u32 component_count
 		for (u32 i = 0; i < component_count; ++i) {
 			if (res.error[i] > settings.error_tol)
 				should_exit = false;
-			log_info("\t[0] -- error: %.2e, energy: %.2e", res.error[i], res.energy[i]);
+			log_info("\t[%u] -- error: %.2e, energy: %.2e", i, res.error[i], res.energy[i]);
 		}
 		if (should_exit)
 			break;

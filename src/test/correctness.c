@@ -47,6 +47,7 @@
 
 #include <math.h>
 #include <stdio.h>
+#include <errno.h>
 
 #define DISABLE_SLOW_TESTS 0
 
@@ -526,14 +527,14 @@ void linear_hamiltonian_vec_pot(f64* out, f64* in_x, c64* in_u, u32 len) {
 
 f64 non_linear_hamiltonian_pot(f64* v, i32 n, c64 u) {
 	/* assuming 1d */
-	return ho_perturbed_potential(v, n, 0)  -2.5*cabs(u)*cabs(u);
+	return ho_perturbed_potential(v, n, 0)  -3.5*cabs(u)*cabs(u);
 }
 
 void non_linear_hamiltonian_vec_pot(const u32 len, f64 out[static len],
                                 f64 in_x[static len], const u32 component_count,
                                 c64 in_u[static len*component_count]) {
 	for (u32 i = 0; i < len; ++i) {
-		out[i] = gaussian(in_x[i],0,0.2) - 2.5*cabs(in_u[i])*cabs(in_u[i]);
+		out[i] = gaussian(in_x[i],0,0.2) - 3.5*cabs(in_u[i])*cabs(in_u[i]);
 	}
 }
 
@@ -555,7 +556,7 @@ describe(item_vs_scim) {
 			.dt = 0.0001,
 		};
 		struct gp2c_settings gp2c_settings = {
-			.num_basis_functions = 8,
+			.num_basis_functions = 16,
 			.max_iterations = 1e9,
 			.error_tol = 1e-7,
 			//.measure_every = 40,
@@ -1031,17 +1032,19 @@ void bestmf_perturbation(const u32 len, f64 out[static len],
 	}
 }
 
+static u32 bestmf_particle_count = 100;
+static f64 bestmf_interaction_strength = 0.0;
+
 void bestmf_gp2c_op_a(const u32 len, f64 out[static len],
                                 f64 in_x[static len], const u32 component_count,
                                 c64 in_u[static len*component_count]) {
 	assert(component_count == 1);
-	u32 particle_count = 100;
-	f64 gaa = (-2.5)/(particle_count - 1);
+	f64 gaa = bestmf_interaction_strength/(bestmf_particle_count - 1);
 
 #pragma omp simd
 	for (u32 i = 0; i < len; ++i) {
 		f64 ca = cabs(in_u[i]);
-		out[i] = gaa*(particle_count-1)*ca*ca;
+		out[i] = gaa*(bestmf_particle_count-1)*ca*ca;
 	}
 }
 
@@ -1193,88 +1196,273 @@ describe (bestmf) {
 	}
 }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-f64 item_weird_pot(f64* v, i32 n, c64 u) {
-	SBMF_UNUSED(u);
-	f64 absu = cabs(u);
-	return ho_perturbed_potential(v, n, NULL) - 0.25*(10-1) * absu*absu;
-}
-
-describe(weird_asymmetry) {
-	before_each() { sbmf_init(); }
-	after_each() { sbmf_shutdown(); }
+describe(bestmf_fig_1) {
+	before_each(){sbmf_init();}
+	after_each(){sbmf_shutdown();}
 
 	it ("?") {
-		const f64 L = 10.0;
-		const u32 N = 256;
-		struct grid space = generate_grid(1,
-				(f64[]){-L/2.0},
-				(f64[]){+L/2.0},
-				(i32[]){N});
-		struct item_settings item_settings = {
-			.g = space,
-			.max_iterations = 1e7,
-			.error_tol = 1e-10,
-			.dt = 0.001,
+		struct gp2c_settings settings = {
+			.num_basis_functions = 32,
+			.max_iterations = 1e8,
+			.error_tol = 1e-8,
+			.dbgcallback = bestmf_debug_callback,
+			.measure_every = 0,
+			.ho_potential_perturbation = bestmf_perturbation,
+		};
+		struct gp2c_component component = {
+			.op = bestmf_gp2c_op_a,
+		};
+		bestmf_particle_count = 500;
+
+		const f64 gvals[] = {
+			(-4.0)/(bestmf_particle_count-1),
+			(-3.5)/(bestmf_particle_count-1),
+			(-2.5)/(bestmf_particle_count-1),
+			(-1.5)/(bestmf_particle_count-1),
+			(-1.0)/(bestmf_particle_count-1),
+			(-0.5)/(bestmf_particle_count-1),
+			( 0.5)/(bestmf_particle_count-1)
 		};
 
-		struct gss_result item_res = item(item_settings, item_weird_pot, guess);
-		log_info("\nitem:\niterations: %d\nerror: %e", item_res.iterations, item_res.error);
+		FILE* bestfile = fopen("bestmf_data_solved", "w");
+		for (u32 i = 0; i < ARRLEN(gvals); ++i) {
+			static char buf[50];
+			snprintf(buf, 50, "output/bestmf_data_%.1lf", gvals[i]*(bestmf_particle_count-1));
+			FILE* datafile = fopen(buf, "w");
+			if (!datafile) {
+				log_error("Unable to open log file: %s", buf);
+				log_error("errno: (%d) %s", errno, strerror(errno));
+			}
 
-#if 1
+			bestmf_interaction_strength = gvals[i];
+
+			struct gp2c_result res = gp2c(settings, 1, &component);
+			struct eigen_result eres_a = find_eigenpairs_sparse(res.hamiltonian[0], 2, EV_SMALLEST_RE);
+			c64_normalize(&eres_a.eigenvectors[0], &eres_a.eigenvectors[0], settings.num_basis_functions);
+			c64_normalize(&eres_a.eigenvectors[settings.num_basis_functions], &eres_a.eigenvectors[settings.num_basis_functions], settings.num_basis_functions);
+
+			for (u32 j = 0; j <= bestmf_particle_count; j += 5) {
+				const f64 energy = best_meanfield_energy(bestmf_particle_count,
+											settings.num_basis_functions,
+											&eres_a.eigenvectors[0],
+											&eres_a.eigenvectors[settings.num_basis_functions],
+											eres_a.eigenvalues[0],
+											eres_a.eigenvalues[1],
+											j,
+											bestmf_particle_count - j,
+											gvals[i]);
+				fprintf(datafile, "%lf\t%lf\n", (f64)j/(f64)bestmf_particle_count, energy/(f64)bestmf_particle_count);
+			}
+			fclose(datafile);
+
+			struct best_meanfield_results bmfres = find_best_meanfield_occupations(bestmf_particle_count, gvals[i], settings.num_basis_functions,
+												&eres_a.eigenvectors[0],
+												&eres_a.eigenvectors[settings.num_basis_functions],
+												eres_a.eigenvalues[0],
+												eres_a.eigenvalues[1]);
+			fprintf(bestfile, "%lf\t%lf\n", (f64)bmfres.occupation_1/(f64)bestmf_particle_count, bmfres.energy/(f64)bestmf_particle_count);
+		}
+		fclose(bestfile);
+	}
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+#define PLOT_EXCITED_STATES_PARTICLE_COUNT 100
+#define PLOT_EXCITED_STATES_GAA (-1.0/((f64)PLOT_EXCITED_STATES_PARTICLE_COUNT-1))
+#define PLOT_EXCITED_STATES_GAB (+2.0/((f64)PLOT_EXCITED_STATES_PARTICLE_COUNT))
+#define PLOT_EXCITED_STATES_GBB (-1.0/((f64)PLOT_EXCITED_STATES_PARTICLE_COUNT-1))
+#define PLOT_EXCITED_STATES_PERTURBATION(x) gaussian(x, 0, 0.2);
+
+void plot_excited_states_op_a(const u32 len, f64 out[static len],
+                                f64 in_x[static len], const u32 component_count,
+                                c64 in_u[static len*component_count]) {
+	for (u32 i = 0; i < len; ++i) {
+		f64 ca = cabs(in_u[i]);
+		f64 cb = cabs(in_u[len + i]);
+		out[i] =
+			+ PLOT_EXCITED_STATES_GAA*(PLOT_EXCITED_STATES_PARTICLE_COUNT-1)*ca*ca
+			+ PLOT_EXCITED_STATES_GAB*(PLOT_EXCITED_STATES_PARTICLE_COUNT)*cb*cb;
+	}
+}
+
+void plot_excited_states_op_b(const u32 len, f64 out[static len],
+                                f64 in_x[static len], const u32 component_count,
+                                c64 in_u[static len*component_count]) {
+	for (u32 i = 0; i < len; ++i) {
+		f64 ca = cabs(in_u[i]);
+		f64 cb = cabs(in_u[len + i]);
+		out[i] =
+			+ PLOT_EXCITED_STATES_GBB*(PLOT_EXCITED_STATES_PARTICLE_COUNT-1)*cb*cb
+			+ PLOT_EXCITED_STATES_GAB*(PLOT_EXCITED_STATES_PARTICLE_COUNT)*ca*ca;
+	}
+}
+
+struct pesi_params {
+	u32 n;
+	f64 xoffset;
+};
+
+void plot_excited_states_integrand(f64* out, f64* in, u32 len, void* data) {
+	struct pesi_params* params = (struct pesi_params*)data;
+	for (u32 i = 0; i < len; ++i) {
+		out[i] = ho_eigenfunction((i32[]){params->n}, &in[i], 1) * gaussian(in[i], params->xoffset, 0.2);
+	}
+}
+
+void plot_excited_states_guess_a(c64* out, u32 len) {
+	static struct integration_settings settings = {
+		.abs_error_tol = 1e-10,
+		.rel_error_tol = 1e-10,
+		.max_evals = 1e5,
+	};
+	struct pesi_params params = {
+		.xoffset = 0.25,
+	};
+	settings.userdata = &params;
+	for (u32 i = 0; i < len; ++i) {
+		params.n = i;
+		struct integration_result res = quadgk_vec(plot_excited_states_integrand, -INFINITY, INFINITY, settings);
+		out[i] = res.integral;
+	}
+}
+
+void plot_excited_states_guess_b(c64* out, u32 len) {
+	static struct integration_settings settings = {
+		.abs_error_tol = 1e-10,
+		.rel_error_tol = 1e-10,
+		.max_evals = 1e5,
+	};
+	struct pesi_params params = {
+		.xoffset = -0.25,
+	};
+	settings.userdata = &params;
+	for (u32 i = 0; i < len; ++i) {
+		params.n = i;
+		struct integration_result res = quadgk_vec(plot_excited_states_integrand, -INFINITY, INFINITY, settings);
+		out[i] = res.integral;
+	}
+}
+
+void plot_excited_states_perturbation(const u32 len, f64 out[static len],
+                                f64 in_x[static len], const u32 component_count,
+                                c64 in_u[static len*component_count]) {
+	assert(component_count == 0);
+	for (u32 i = 0; i < len; ++i) {
+		out[i] = PLOT_EXCITED_STATES_PERTURBATION(in_x[i]);
+	}
+}
+
+describe(plot_excited_states) {
+	before_each(){sbmf_init();}
+	after_each(){sbmf_shutdown();}
+
+	it ("?") {
+		struct gp2c_settings settings = {
+			.num_basis_functions = 16,
+			.max_iterations = 1e8,
+			.error_tol = 1e-8,
+			.ho_potential_perturbation = plot_excited_states_perturbation,
+			.gk = gk15,
+		};
+		struct gp2c_component components[2] = {
+			[0] = {
+				.op = plot_excited_states_op_a,
+				.guess = plot_excited_states_guess_a
+			},
+			[1] = {
+				.op = plot_excited_states_op_b,
+				.guess = plot_excited_states_guess_b
+			},
+		};
+
+		struct gp2c_result res = gp2c(settings, 2, components);
+
+
 		{
-			plot_init(800, 600, "fdm groundstate");
-			f32 pdata[N];
-			sample_space sp = make_linspace(1, -L/2.0, L/2.0, N);
+			const u32 N = 256;
+			plot_init(800, 600, "gp2c");
+			f32 potdata[N], adata[N], bdata[N];
+			sample_space sp = make_linspace(1, -5, 5, N);
 
 			for (u32 i = 0; i < N; ++i) {
 				f64 x = sp.points[i];
-				pdata[i] = (f32) ho_perturbed_potential(&x, 1, NULL);
+				potdata[i] = (f32) ho_potential(&x,1,0) + PLOT_EXCITED_STATES_PERTURBATION(x);
 			}
 			push_line_plot(&(plot_push_desc){
 					.space = &sp,
-					.data = pdata,
+					.data = potdata,
 					.label = "potential",
 					});
 
+			f64 sample_in[N];
 			for (u32 i = 0; i < N; ++i) {
-				c64 c = cabs(item_res.wavefunction[i]);
-				pdata[i] = c*c;
+				sample_in[i] = (f64) sp.points[i];
 			}
-			push_line_plot(&(plot_push_desc){
-					.space = &sp,
-					.data = pdata,
-					.label = "item groundstate",
-					});
+
+			const u32 states_to_include = 5;
+			for (u32 i = 0; i < res.component_count; ++i) {
+				struct eigen_result eres = find_eigenpairs_sparse(res.hamiltonian[i], states_to_include, EV_SMALLEST_RE);
+				for (u32 j = 0; j < states_to_include; ++j) {
+					c64_normalize(&eres.eigenvectors[j*res.coeff_count], &eres.eigenvectors[j*res.coeff_count], res.coeff_count);
+
+					c64 sample_out[N];
+					hob_sample_vec(&eres.eigenvectors[j*res.coeff_count], res.coeff_count, sample_out, sample_in, N);
+
+					f32 data[N];
+					for (u32 k = 0; k < N; ++k) {
+						data[k] = cabs(sample_out[k])*cabs(sample_out[k]);
+					}
+					push_line_plot(&(plot_push_desc){
+							.space = &sp,
+							.data = data,
+							.label = plot_snprintf("comp: %u -- %u", i,j),
+							.offset = eres.eigenvalues[j],
+							});
+				}
+			}
 
 			plot_update_until_closed();
 			plot_shutdown();
 		}
-#endif
 	}
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 snow_main();

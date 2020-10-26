@@ -67,20 +67,21 @@ static void ensure_structure_of_func(c64* a, c64* b, u32 len) {
 		sum += conj(a[i])*b[i];
 	}
 
-	log_info("sum: %lf + %lfi", CCOMP(sum));
 	f64 n2_minus_n1 = (f64)_particle_count * creal(sum);
-	log_info("n2 - n1 = %lf", n2_minus_n1);
+	/*log_info("n2 - n1 = %lf", n2_minus_n1);*/
 	/* n2 - n1 = (N-n1)-n1 = N-2n1 => N-2n1 - (n2-n1) = 0
 	 * => n1 = (N-(n2-n1))/2
 	 */
-	//u32 n1 = lroundl(((f64)_particle_count - n2_minus_n1)/2.0);
+	//c64 n1 = ((f64)_particle_count - n2_minus_n1)/2.0;
+	//c64 n2 = (f64)_particle_count - n1;
 	u32 n1 = (u32)(((f64)_particle_count - n2_minus_n1)/2.0);
 	u32 n2 = _particle_count - n1;
-	log_info("%u,%u", n1,n2);
+	log_info("n1: %u -- n2: %u", n1,n2);
+	//log_info("(%.2lf+%.2lfi) + (%.2lf+%.2lfi)", CCOMP(n1), CCOMP(n2));
 
 	for (u32 i = 0; i < len; ++i) {
-		f64 c1 = sqrt((f64)n1/(f64)_particle_count);
-		f64 c2 = sqrt((f64)n2/(f64)_particle_count);
+		f64 c1 = sqrt((f64)(n1)/ (f64)_particle_count);
+		f64 c2 = sqrt((f64)(n2)/ (f64)_particle_count);
 
 		a[i] = c1 * _orbital_1_coeffs[i] + c2 * _orbital_2_coeffs[i];
 		b[i] = c2 * _orbital_2_coeffs[i] - c1 * _orbital_1_coeffs[i];
@@ -90,7 +91,7 @@ static void ensure_structure_of_func(c64* a, c64* b, u32 len) {
 	_n2 = n2;
 }
 
-void find_best_meanfield_occupations(const u32 particle_count,
+struct best_meanfield_results find_best_meanfield_occupations(const u32 particle_count,
 									 const f64 g,
                                      const u32 coeff_count,
                                      c64 orbital_1_coeffs[static coeff_count],
@@ -99,15 +100,15 @@ void find_best_meanfield_occupations(const u32 particle_count,
 									 const f64 energy_2) {
 	_n1 = particle_count;
 	_n2 = particle_count - _n1;
+	_particle_count = particle_count;
 	_lambda0 = g;
 	_lambda = g*(_particle_count - 1);
-	_particle_count = particle_count;
 	_orbital_1_coeffs = orbital_1_coeffs;
 	_orbital_2_coeffs = orbital_2_coeffs;
 
 	struct gp2c_settings settings = {
 		.num_basis_functions = coeff_count,
-		.max_iterations = 1e7,
+		.max_iterations = 1e6,
 		.error_tol = 1e-8,
 		.post_normalize_callback = ensure_structure_of_func,
 		.ho_potential_perturbation = bestmf_perturbation,
@@ -125,10 +126,26 @@ void find_best_meanfield_occupations(const u32 particle_count,
 	};
 	struct gp2c_result res = gp2c(settings, 2, component);
 
-	best_meanfield_energy(particle_count, coeff_count, orbital_1_coeffs, orbital_2_coeffs, energy_1, energy_2, _n1, _n2);
-	best_meanfield_energy(particle_count, coeff_count, orbital_1_coeffs, orbital_2_coeffs, energy_1, energy_2, 0.6*particle_count, 0.4*particle_count);
-	best_meanfield_energy(particle_count, coeff_count, orbital_1_coeffs, orbital_2_coeffs, energy_1, energy_2, 0.7*particle_count, 0.3*particle_count);
+	const f64 energy = best_meanfield_energy(particle_count, coeff_count, orbital_1_coeffs, orbital_2_coeffs, energy_1, energy_2, _n1, _n2, g);
+
+	best_meanfield_energy(particle_count, coeff_count, orbital_1_coeffs, orbital_2_coeffs, energy_1, energy_2, 0.6*particle_count, 0.4*particle_count, g);
+
+	return (struct best_meanfield_results) {
+		.occupation_1 = _n1,
+		.occupation_2 = _n2,
+		.energy = energy
+	};
 }
+
+
+
+
+
+
+
+
+
+
 
 struct bme_integrand_params {
 	u32 coeff_count;
@@ -139,10 +156,10 @@ struct bme_integrand_params {
 void bme_integrand(f64* out, f64* in, u32 len, void* data) {
 	struct bme_integrand_params* params = data;
 
-	c64 sample_1_out[params->coeff_count];
+	c64 sample_1_out[len];
 	hob_sample_vec(params->orbital_1_coeffs, params->coeff_count, sample_1_out, in, len);
 
-	c64 sample_2_out[params->coeff_count];
+	c64 sample_2_out[len];
 	hob_sample_vec(params->orbital_2_coeffs, params->coeff_count, sample_2_out, in, len);
 
 	for (u32 i = 0; i < len; ++i) {
@@ -152,15 +169,15 @@ void bme_integrand(f64* out, f64* in, u32 len, void* data) {
 	}
 }
 
-void best_meanfield_energy(const u32 particle_count,
+f64 best_meanfield_energy(const u32 particle_count,
                            const u32 coeff_count,
                            c64 orbital_1_coeffs[static coeff_count],
                            c64 orbital_2_coeffs[static coeff_count],
 						   const f64 energy_1,
 						   const f64 energy_2,
                            const u32 occupation_1,
-                           const u32 occupation_2) {
-
+                           const u32 occupation_2,
+						   const f64 interaction_strength) {
 	struct bme_integrand_params params = {
 		.coeff_count = coeff_count,
 		.orbital_1_coeffs = orbital_1_coeffs,
@@ -177,8 +194,9 @@ void best_meanfield_energy(const u32 particle_count,
 	struct integration_result res = quadgk_vec(bme_integrand, -INFINITY, INFINITY, int_settings);
 	assert(res.converged);
 
-	f64 E = occupation_1*energy_1 + occupation_2*energy_2 + 2*_lambda0*occupation_1*occupation_2*res.integral;
+	f64 E = occupation_1*energy_1 + occupation_2*energy_2 + 2*interaction_strength*occupation_1*occupation_2*res.integral;
 	log_info("(%u,%u) Energy: %lf", occupation_1, occupation_2, E);
 	log_info("(%u,0) Energy: %lf", occupation_1+occupation_2, (occupation_1+occupation_2)*energy_1);
 	log_info("(0,%u) Energy: %lf", occupation_1+occupation_2, (occupation_1+occupation_2)*energy_2);
+	return E;
 }

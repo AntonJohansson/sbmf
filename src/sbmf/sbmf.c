@@ -1,4 +1,4 @@
-#include "sbmf.h"
+#include <sbmf/sbmf.h>
 #include <sbmf/memory/stack_allocator.h>
 #include <sbmf/debug/log.h>
 #include <sbmf/debug/profile.h>

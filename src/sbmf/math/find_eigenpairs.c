@@ -1,4 +1,4 @@
-#include "find_eigenpairs.h"
+#include <sbmf/math/find_eigenpairs.h>
 #include <sbmf/sbmf.h>
 #include <sbmf/debug/log.h>
 

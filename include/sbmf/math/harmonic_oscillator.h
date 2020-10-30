@@ -2,7 +2,6 @@
 
 #include <sbmf/sbmf.h>
 #include "matrix.h"
-#include <sbmf/debug/log.h>
 
 #include <assert.h>
 

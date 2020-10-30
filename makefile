@@ -1,4 +1,3 @@
-CC = gcc
 PROJECT = sbmf
 
 BUILDDIR = build
@@ -54,11 +53,27 @@ DEBUG_FLAGS = -g \
 			  -fsanitize=float-cast-overflow \
 			  -fsanitize=signed-integer-overflow
 
-MODE_FLAGS = $(RELEASE_FLAGS)
-PROJ_FLAGS = $(MODE_FLAGS) -c -fpic -pedantic -Wall -Wextra -Isrc -Ithird_party/include
-TEST_FLAGS = $(MODE_FLAGS)          -pedantic -Wall -Wextra -Isrc -Ithird_party/include -I/home/aj/.local/include
+PROJ_FLAGS = -c -fpic -pedantic -Wall -Wextra -Isrc -Ithird_party/include -Iinclude
+TEST_FLAGS = -pedantic -Wall -Wextra -Isrc -Ithird_party/include -I/home/aj/.local/include -Iinclude
 
 all: tests
+
+.PHONY: release
+release: PROJ_FLAGS += $(RELEASE_FLAGS)
+release: TEST_FLAGS += $(RELEASE_FLAGS)
+release: all
+
+.PHONY: debug
+debug: PROJ_FLAGS += $(DEBUG_FLAGS)
+debug: TEST_FLAGS += $(DEBUG_FLAGS)
+debug: all
+
+.PHONY: install
+install:
+	mkdir -p ~/ .local/lib
+	mkdir -p ~/ .local/include/
+	cp $(BUILDDIR)/$(PROJECT).a ~/.local/lib/
+	cp -r include/sbmf ~/.local/include/
 
 $(BUILDDIR):
 	mkdir -p $(shell find src -type d | sed -e "s/^/$(BUILDDIR)\//")
@@ -70,13 +85,19 @@ $(BUILDDIR)/%.o: %.c
 	$(CC) -o $@ $^ -static $(PROJ_FLAGS) $(PROJ_LIBS)
 
 $(BUILDDIR)/$(PROJECT).a: $(BUILDDIR) $(PROJ_OBJS)
-	ar rcs $@ $(PROJ_OBJS)
+	mkdir -p $(BUILDDIR)/tmp
+	ar x third_party/lib/libarpack.a --output=$(BUILDDIR)/tmp
+	ar x third_party/lib/libopenblas.a --output=$(BUILDDIR)/tmp
+	ar x third_party/lib/libfftw3.a --output=$(BUILDDIR)/tmp
+	ar rcs $@ $(PROJ_OBJS) $(BUILDDIR)/tmp/*.o
+	rm -r $(BUILDDIR)/tmp
 
 $(BUILDDIR)/test_correctness: $(TEST_CORRECTNESS_SRCS) $(BUILDDIR)/$(PROJECT).a
 	$(CC) $(TEST_CORRECTNESS_SRCS) -o $@ $(TEST_FLAGS) $(TEST_LIBS)
 
 $(BUILDDIR)/test_performance: $(TEST_PERFORMANCE_SRCS) $(BUILDDIR)/$(PROJECT).a
 	$(CC) $(TEST_PERFORMANCE_SRCS) -o $@ $(TEST_FLAGS) $(TEST_LIBS)
+
 
 .PHONY: lib
 lib: $(BUILDDIR)/$(PROJECT).a

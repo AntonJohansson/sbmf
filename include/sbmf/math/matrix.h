@@ -2,9 +2,7 @@
 
 #include <sbmf/sbmf.h>
 #include <sbmf/types.h>
-#include <sbmf/debug/log.h>
-#include <stdio.h>
-#include <string.h>
+#include <string.h> /* memset */
 
 struct complex_hermitian_bandmat {
 	c64* data;
@@ -125,14 +123,4 @@ static inline bool complex_hermitian_bandmat_is_valid(struct complex_hermitian_b
 	return true;
 }
 
-static inline void complex_hermitian_bandmat_print(struct complex_hermitian_bandmat bm, const char label[]) {
-	log_info("[%ux%u] %s", bm.size, bm.size, label);
-	COMPLEX_HERMITIAN_BANDMAT_FOREACH(bm, r,c) {
-		u32 index = complex_hermitian_bandmat_index(bm, r,c);
-		printf("%.2e+%.2ei\t", CCOMP(bm.data[index]));
-		if (c == bm.size-1) {
-			printf("\n");
-		}
-	}
-	printf("\n");
-}
+void complex_hermitian_bandmat_print(struct complex_hermitian_bandmat bm, const char label[]);

@@ -1,4 +1,4 @@
-#include "find_groundstate.h"
+#include <sbmf/methods/find_groundstate.h>
 #include <sbmf/sbmf.h>
 #include <sbmf/math/find_eigenpairs.h>
 #include <sbmf/math/harmonic_oscillator.h>
@@ -214,7 +214,7 @@ struct gp2c_result gp2c(struct gp2c_settings settings, const u32 component_count
 
 		for (u32 i = 0; i < component_count; ++i) {
 			/* Solve for first eigenvector (ground state) */
-			struct eigen_result eigres = find_eigenpairs_sparse(res.hamiltonian[i], 1, EV_SMALLEST_RE);
+			struct eigen_result eigres = find_eigenpairs_sparse(res.hamiltonian[i], 5, EV_SMALLEST_RE);
 
 			/* Copy energies */
 			res.energy[i] = eigres.eigenvalues[0];

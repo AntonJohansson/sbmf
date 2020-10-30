@@ -1,4 +1,4 @@
-#include "find_groundstate.h"
+#include <sbmf/methods/find_groundstate.h>
 
 #include <fftw3.h>
 

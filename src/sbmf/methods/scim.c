@@ -1,4 +1,4 @@
-#include "find_groundstate.h"
+#include <sbmf/methods/find_groundstate.h>
 #include <sbmf/sbmf.h>
 #include <sbmf/math/find_eigenpairs.h>
 #include <sbmf/math/harmonic_oscillator.h>

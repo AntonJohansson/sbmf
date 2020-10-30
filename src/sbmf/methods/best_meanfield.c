@@ -1,9 +1,9 @@
-#include "best_meanfield.h"
+#include <sbmf/methods/best_meanfield.h>
 
 #include <sbmf/sbmf.h>
 #include <sbmf/debug/log.h>
 #include <sbmf/math/functions.h>
-#include "find_groundstate.h"
+#include <sbmf/methods/find_groundstate.h>
 
 #include <sbmf/methods/quadgk_vec.h>
 #include <sbmf/math/harmonic_oscillator.h>
@@ -195,8 +195,8 @@ f64 best_meanfield_energy(const u32 particle_count,
 	assert(res.converged);
 
 	f64 E = occupation_1*energy_1 + occupation_2*energy_2 + 2*interaction_strength*occupation_1*occupation_2*res.integral;
-	log_info("(%u,%u) Energy: %lf", occupation_1, occupation_2, E);
-	log_info("(%u,0) Energy: %lf", occupation_1+occupation_2, (occupation_1+occupation_2)*energy_1);
-	log_info("(0,%u) Energy: %lf", occupation_1+occupation_2, (occupation_1+occupation_2)*energy_2);
+	//log_info("(%u,%u) Energy: %lf", occupation_1, occupation_2, E);
+	//log_info("(%u,0) Energy: %lf", occupation_1+occupation_2, (occupation_1+occupation_2)*energy_1);
+	//log_info("(0,%u) Energy: %lf", occupation_1+occupation_2, (occupation_1+occupation_2)*energy_2);
 	return E;
 }

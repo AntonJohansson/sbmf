@@ -1,4 +1,4 @@
-#include "matrix.h"
+#include <sbmf/math/matrix.h>
 #include <sbmf/sbmf.h>
 #include <sbmf/debug/log.h>
 
@@ -46,4 +46,16 @@ struct complex_hermitian_bandmat construct_finite_diff_mat(u32 samples_per_dimen
 	}
 
 	return m;
+}
+
+void complex_hermitian_bandmat_print(struct complex_hermitian_bandmat bm, const char label[]) {
+	log_info("[%ux%u] %s", bm.size, bm.size, label);
+	COMPLEX_HERMITIAN_BANDMAT_FOREACH(bm, r,c) {
+		u32 index = complex_hermitian_bandmat_index(bm, r,c);
+		printf("%.2e+%.2ei\t", CCOMP(bm.data[index]));
+		if (c == bm.size-1) {
+			printf("\n");
+		}
+	}
+	printf("\n");
 }

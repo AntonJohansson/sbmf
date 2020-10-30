@@ -1,4 +1,4 @@
-#include "quadgk_vec.h"
+#include <sbmf/methods/quadgk_vec.h>
 
 #include <sbmf/memory/prioqueue.h>
 #include <sbmf/debug/log.h>

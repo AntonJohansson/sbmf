@@ -94,8 +94,8 @@ struct gp2c_result gp2c(struct gp2c_settings settings, const u32 component_count
 
 	integration_settings int_settings = {
 		.gk = (settings.gk.gauss_size > 0) ? settings.gk : gk7,
-		.abs_error_tol = 1e-10,
-		.rel_error_tol = 1e-10,
+		.abs_error_tol = 1e-15,
+		.rel_error_tol = 1e-15,
 		.max_evals = settings.max_iterations,
 	};
 
@@ -154,6 +154,9 @@ struct gp2c_result gp2c(struct gp2c_settings settings, const u32 component_count
 
 				integration_result int_res = quadgk_vec(linear_me_integrand, -INFINITY, INFINITY, int_settings);
 
+				//if (fabs(int_res.integral) < int_settings.abs_error_tol)
+				//	int_res.integral = 0.0;
+
 				if (!int_res.converged) {
 					log_error("In construction of linear hamiltonian:");
 					log_error("\tIntegration failed for %d,%d", r,c);
@@ -202,8 +205,8 @@ struct gp2c_result gp2c(struct gp2c_settings settings, const u32 component_count
 				/* Check if the resultant integral is less than what we can resolve,
 				 * if so, zero it.
 				 */
-				if (fabs(int_res.integral) < int_settings.abs_error_tol)
-					int_res.integral = 0.0;
+				//if (fabs(int_res.integral) < int_settings.abs_error_tol)
+				//	int_res.integral = 0.0;
 
 				u32 me_index = complex_hermitian_bandmat_index(res.hamiltonian[i], r,c);
 				res.hamiltonian[i].data[me_index] = linear_hamiltonian.data[me_index] + int_res.integral;
@@ -214,7 +217,7 @@ struct gp2c_result gp2c(struct gp2c_settings settings, const u32 component_count
 
 		for (u32 i = 0; i < component_count; ++i) {
 			/* Solve for first eigenvector (ground state) */
-			struct eigen_result eigres = find_eigenpairs_sparse(res.hamiltonian[i], 5, EV_SMALLEST_RE);
+			struct eigen_result eigres = find_eigenpairs_sparse(res.hamiltonian[i], 1, EV_SMALLEST_MAG);
 
 			/* Copy energies */
 			res.energy[i] = eigres.eigenvalues[0];

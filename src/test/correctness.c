@@ -527,14 +527,14 @@ void linear_hamiltonian_vec_pot(f64* out, f64* in_x, c64* in_u, u32 len) {
 
 f64 non_linear_hamiltonian_pot(f64* v, i32 n, c64 u) {
 	/* assuming 1d */
-	return ho_perturbed_potential(v, n, 0)  -3.5*cabs(u)*cabs(u);
+	return ho_perturbed_potential(v, n, 0)  -2.0*cabs(u)*cabs(u);
 }
 
 void non_linear_hamiltonian_vec_pot(const u32 len, f64 out[static len],
                                 f64 in_x[static len], const u32 component_count,
                                 c64 in_u[static len*component_count]) {
 	for (u32 i = 0; i < len; ++i) {
-		out[i] = gaussian(in_x[i],0,0.2) - 3.5*cabs(in_u[i])*cabs(in_u[i]);
+		out[i] = gaussian(in_x[i],0,0.2) - 2.0*cabs(in_u[i])*cabs(in_u[i]);
 	}
 }
 
@@ -569,7 +569,6 @@ describe(item_vs_scim) {
 					.op = non_linear_hamiltonian_vec_pot,
 				});
 
-		complex_hermitian_bandmat_print(gp2c_res.hamiltonian[0], "gp2c H");
 
 #if 1
 		{
@@ -1242,12 +1241,9 @@ describe(bestmf_fig_1) {
 			c64_normalize(&eres_a.eigenvectors[settings.num_basis_functions], &eres_a.eigenvectors[settings.num_basis_functions], settings.num_basis_functions);
 
 			for (u32 j = 0; j <= bestmf_particle_count; j += 5) {
-				const f64 energy = best_meanfield_energy(bestmf_particle_count,
-											settings.num_basis_functions,
+				const f64 energy = best_meanfield_energy(settings.num_basis_functions,
 											&eres_a.eigenvectors[0],
 											&eres_a.eigenvectors[settings.num_basis_functions],
-											eres_a.eigenvalues[0],
-											eres_a.eigenvalues[1],
 											j,
 											bestmf_particle_count - j,
 											gvals[i]);

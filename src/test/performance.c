@@ -3,7 +3,6 @@
 
 #include <sbmf/sbmf.h>
 #include <sbmf/methods/quadgk_vec.h>
-#include <sbmf/methods/quadgk_vec_inl.h>
 #include <sbmf/math/harmonic_oscillator.h>
 #include <sbmf/debug/profile.h>
 #include <sbmf/debug/log.h>
@@ -55,15 +54,6 @@ describe (quadgk_perf) {
 			sum_vec += res.integral;
 		}
 		log_info("sum_vec: %lf -- iters: %d", sum_vec, res.performed_evals);
-
-        f64 sum_vec_inl = 0.0;
-        for (u32 i = 0; i < repetitions; ++i) {
-            PROFILE_BEGIN("quadgk_vec_inl");
-            res = quadgk_vec_inl(func_vec, -INFINITY, INFINITY, settings);
-            PROFILE_END("quadgk_vec_inl");
-			sum_vec_inl += res.integral;
-		}
-		log_info("sum_vec_inl: %lf -- iters: %d", sum_vec_inl, res.performed_evals);
 
 		profile_print_results();
 	}

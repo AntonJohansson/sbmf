@@ -27,7 +27,6 @@
 
 #include <sbmf/sbmf.h>
 #include <sbmf/methods/quadgk_vec.h>
-#include <sbmf/methods/quadgk_vec_inl.h>
 #include <sbmf/methods/find_groundstate.h>
 #include <sbmf/methods/best_meanfield.h>
 #include <sbmf/math/functions.h>
@@ -388,85 +387,6 @@ describe (quad_gk_vec_numerical_integration){
 
 	it ("sin, 0 -> pi") {
 		integration_result res = quadgk_vec(sinx_vec, 0, M_PI, settings);
-		check_quadgk_converge(res, 2.0);
-	}
-}
-
-/* quadgk_vec_inl 1D numerical integration */
-
-describe (quad_gk_vec_inl_numerical_integration){
-	before_each() { sbmf_init(); }
-	after_each() { sbmf_shutdown(); }
-
-	integration_settings settings = {
-		.gk = gk7,
-		.abs_error_tol = 1e-10,
-		.rel_error_tol = 1e-10,
-		.max_evals = 500,
-	};
-
-	it ("x2, 0 -> 2") {
-		integration_result res = quadgk_vec_inl(x2_vec, 0, 2, settings);
-		check_quadgk_converge(res, 8.0/3.0);
-	}
-
-	it ("x2, 2 -> 0") {
-		integration_result res = quadgk_vec_inl(x2_vec, 2, 0, settings);
-		check_quadgk_converge(res, -8.0/3.0);
-	}
-
-	it ("x2, -2 -> 0") {
-		integration_result res = quadgk_vec_inl(x2_vec, -2, 0, settings);
-		check_quadgk_converge(res, 8.0/3.0);
-	}
-
-	it ("x2, 0 -> -2") {
-		integration_result res = quadgk_vec_inl(x2_vec, 0, -2, settings);
-		check_quadgk_converge(res, -8.0/3.0);
-	}
-
-	it ("x2, -2 -> 2") {
-		integration_result res = quadgk_vec_inl(x2_vec, -2, 2, settings);
-		check_quadgk_converge(res, 2*8.0/3.0);
-	}
-
-	it ("expnx, 0 -> inf") {
-		integration_result res = quadgk_vec_inl(expnx_vec, 0, INFINITY, settings);
-		check_quadgk_converge(res, 1.0);
-	}
-
-	it ("expnx, inf -> 0") {
-		integration_result res = quadgk_vec_inl(expnx_vec, INFINITY, 0, settings);
-		check_quadgk_converge(res, -1.0);
-	}
-
-	it ("expx, -inf -> 0") {
-		integration_result res = quadgk_vec_inl(expx_vec, -INFINITY, 0, settings);
-		check_quadgk_converge(res, 1.0);
-	}
-
-	it ("expx, 0 -> -inf") {
-		integration_result res = quadgk_vec_inl(expx_vec, 0, -INFINITY, settings);
-		check_quadgk_converge(res, -1.0);
-	}
-
-	it ("|expnx|, -inf -> inf") {
-		integration_result res = quadgk_vec_inl(expnabsx_vec, -INFINITY, INFINITY, settings);
-		check_quadgk_converge(res, 2.0);
-	}
-
-	it ("|expnx|, inf -> -inf") {
-		integration_result res = quadgk_vec_inl(expnabsx_vec, INFINITY, -INFINITY, settings);
-		check_quadgk_converge(res, -2.0);
-	}
-
-	it ("sin, 0 -> 2pi") {
-		integration_result res = quadgk_vec_inl(sinx_vec, 0, 2*M_PI, settings);
-		check_quadgk_converge(res, 0.0);
-	}
-
-	it ("sin, 0 -> pi") {
-		integration_result res = quadgk_vec_inl(sinx_vec, 0, M_PI, settings);
 		check_quadgk_converge(res, 2.0);
 	}
 }

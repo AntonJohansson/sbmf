@@ -5,16 +5,13 @@ BUILDDIR = build
 PROJ_SRCS = \
 	src/sbmf/sbmf.c \
 	src/sbmf/methods/quadgk_vec.c \
-	src/sbmf/methods/quadgk_vec_inl.c \
 	src/sbmf/methods/item.c \
-	src/sbmf/methods/scim.c \
 	src/sbmf/methods/gp2c.c \
 	src/sbmf/methods/best_meanfield.c \
 	src/sbmf/math/find_eigenpairs.c \
 	src/sbmf/math/matrix.c \
 	src/sbmf/debug/profile.c \
-	src/sbmf/debug/log.c \
-	src/sbmf/threading/thread_pool.c
+	src/sbmf/debug/log.c
 
 PROJ_OBJS = $(patsubst %.c, $(BUILDDIR)/%.o, $(PROJ_SRCS))
 

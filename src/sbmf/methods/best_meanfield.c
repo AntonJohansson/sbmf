@@ -3,7 +3,7 @@
 #include <sbmf/sbmf.h>
 #include <sbmf/debug/log.h>
 #include <sbmf/math/functions.h>
-#include <sbmf/methods/find_groundstate.h>
+#include <sbmf/methods/gp2c.h>
 
 #include <sbmf/methods/quadgk_vec.h>
 #include <sbmf/math/harmonic_oscillator.h>

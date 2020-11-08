@@ -1,9 +1,9 @@
-#include <sbmf/methods/find_groundstate.h>
+#include <sbmf/methods/gp2c.h>
 #include <sbmf/sbmf.h>
 #include <sbmf/math/find_eigenpairs.h>
 #include <sbmf/math/harmonic_oscillator.h>
-#include <sbmf/methods/quadgk_vec.h>
 #include <sbmf/math/functions.h>
+
 #include <assert.h> /* Not the correct way to handle this */
 #include <omp.h>
 

@@ -98,9 +98,8 @@ struct eigen_result_real find_eigenpairs_sparse_real(struct hermitian_bandmat bm
 	i32 ipntr[14];
 
 	f64* workd = (f64*)sbmf_stack_push(sizeof(f64)*3*n);
-	i32 lworkl = 3*ncv*ncv + 6*ncv;
+	i32 lworkl = ncv*ncv + 8*ncv;
 	f64* workl = (f64*)sbmf_stack_push(sizeof(f64)*lworkl);
-	f64 rwork[ncv];
 
 	i32 info = 0;
 
@@ -108,8 +107,7 @@ struct eigen_result_real find_eigenpairs_sparse_real(struct hermitian_bandmat bm
 
 	while (ido != 99 && info == 0) {
 
-		//dnaupd_c(&ido, "I", n, which_str, nev, tol, resid, ncv, v, ldv, iparam, ipntr, double* workd, double* workl, a_int lworkl, a_int* info);
-		dnaupd_c(&ido, "I", n, which_str, nev, tol, resid, ncv, v, n, iparam, ipntr,
+		dsaupd_c(&ido, "I", n, which_str, nev, tol, resid, ncv, v, n, iparam, ipntr,
 				workd, workl, lworkl, &info);
 
 		if (info != 0) {
@@ -122,18 +120,15 @@ struct eigen_result_real find_eigenpairs_sparse_real(struct hermitian_bandmat bm
 		}
 	}
 
-
 	// Convergence or error
 	if (info == 0) {
 		i32 select[n]; // not used
-		f64* dr = (f64*)sbmf_stack_push(sizeof(f64)*(nev+1));
-		f64* di = (f64*)sbmf_stack_push(sizeof(f64)*(nev+1));
-		f64* z  = (f64*)sbmf_stack_push(sizeof(f64)*n*(nev+1));
+		f64* d  = (f64*)sbmf_stack_push(sizeof(f64)*(nev));
+		f64* z  = (f64*)sbmf_stack_push(sizeof(f64)*n*(nev));
 		f64 sigma = 0; // not used
 		f64* workev = (f64*)sbmf_stack_push(sizeof(f64)*2*n);
 
-		//dneupd_c(rvec, howmny, select, a_int ldz, double sigmar, double sigmai, double * workev, char const* bmat, a_int n, char const* which, a_int nev, double tol, double* resid, a_int ncv, double* v, a_int ldv, a_int* iparam, a_int* ipntr, double* workd, double* workl, a_int lworkl, a_int* info);
-		dneupd_c(true, "A", select, dr, di, z, n, sigma, sigma, workev,
+		dseupd_c(true, "A", select, d, z, n, sigma,
 				"I", n, which_str, nev, tol, resid, ncv, v, n, iparam, ipntr, workd, workl, lworkl, &info);
 
 		if (info != 0) {
@@ -163,15 +158,13 @@ struct eigen_result_real find_eigenpairs_sparse_real(struct hermitian_bandmat bm
 			//sbmf_stack_free_to_marker(memory_marker);
 
 			struct eigen_result_real res = {
-				.eigenvalues_real = (f64*)sbmf_stack_push(sizeof(f64)*(nev+1)),
-				.eigenvalues_imag = (f64*)sbmf_stack_push(sizeof(f64)*(nev+1)),
-				.eigenvectors = (f64*)sbmf_stack_push(sizeof(f64)*bm.size*(nev+1)),
+				.eigenvalues  = (f64*)sbmf_stack_push(sizeof(f64)*(nev)),
+				.eigenvectors = (f64*)sbmf_stack_push(sizeof(f64)*bm.size*(nev)),
 				.num_eigenpairs = nev,
 				.points_per_eigenvector = bm.size,
 			};
-			memcpy(res.eigenvalues_real,  dr, 	sizeof(f64)*(nev+1));
-			memcpy(res.eigenvalues_imag,  di, 	sizeof(f64)*(nev+1));
-			memcpy(res.eigenvectors, z, 		sizeof(f64)*n*(nev+1));
+			memcpy(res.eigenvalues,  d, sizeof(f64)*nev);
+			memcpy(res.eigenvectors, z, sizeof(f64)*bm.size*nev);
 
 			return res;
 		}
@@ -290,7 +283,7 @@ struct eigen_result find_eigenpairs_sparse(struct complex_hermitian_bandmat bm, 
 			}
 #endif
 
-			sbmf_stack_free_to_marker(memory_marker);
+			//sbmf_stack_free_to_marker(memory_marker);
 
 			struct eigen_result res = {
 				.eigenvalues = (c64*)sbmf_stack_push(sizeof(c64)*nev),

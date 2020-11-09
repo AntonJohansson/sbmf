@@ -3,6 +3,7 @@
 #include <sbmf/types.h>
 #include <sbmf/math/matrix.h>
 #include <sbmf/methods/quadgk_vec.h>
+#include <sbmf/math/basis.h>
 
 typedef void gp2c_operator_func(const u32 len, f64 out[static len],
                                 f64 in_x[static len], const u32 component_count,
@@ -29,6 +30,9 @@ struct gp2c_settings {
 
 	/* Choice of GK rule used for numerical integration internally */
 	struct gk_data gk;
+
+	/* Choice of basis to solve to problem in */
+	struct basis basis;
 };
 
 struct gp2c_component {

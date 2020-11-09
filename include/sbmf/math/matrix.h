@@ -136,7 +136,27 @@ void complex_hermitian_bandmat_mulv(c64* ans_vec, struct complex_hermitian_bandm
 
 struct complex_hermitian_bandmat construct_finite_diff_mat(u32 samples_per_dimension, u32 dimensions, f64* deltas);
 
-#include <sbmf/debug/log.h>
+static inline bool hermitian_bandmat_is_valid(struct hermitian_bandmat bm) {
+	//f64 smallest_abs =  INFINITY;
+	//f64 largest_abs  = -INFINITY;
+	COMPLEX_HERMITIAN_BANDMAT_FOREACH(bm, r,c) {
+		u32 i = hermitian_bandmat_index(bm, r,c);
+
+		//f64 c = fabs(bm.data[i]);
+		//if (c > largest_abs)
+		//	largest_abs = c;
+		//if (c < smallest_abs)
+		//	smallest_abs = c;
+
+		if (!f64_is_valid(bm.data[i]))
+			return false;
+	}
+
+	//log_info("smallest abs: %e", smallest_abs);
+	//log_info("largest abs: %e",  largest_abs);
+
+	return true;
+}
 
 static inline bool complex_hermitian_bandmat_is_valid(struct complex_hermitian_bandmat bm) {
 	f64 smallest_abs = INFINITY;
@@ -156,8 +176,8 @@ static inline bool complex_hermitian_bandmat_is_valid(struct complex_hermitian_b
 		}
 	}
 
-	log_info("smallest abs: %lf", smallest_abs);
-	log_info("largest abs: %lf",  largest_abs);
+	//log_info("smallest abs: %lf", smallest_abs);
+	//log_info("largest abs: %lf",  largest_abs);
 
 	return true;
 }

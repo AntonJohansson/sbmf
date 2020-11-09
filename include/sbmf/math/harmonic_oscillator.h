@@ -2,10 +2,11 @@
 
 #include <sbmf/sbmf.h>
 #include "matrix.h"
+#include <sbmf/math/basis.h>
 
 #include <assert.h>
 
-static inline f128 factorial_128(u32 n) {
+static inline f128 factorial_128(const u32 n) {
 	f128 prod = 1.0;
 	f128 current_value = (f128) n;
 	while (current_value > 0.0) {
@@ -15,43 +16,8 @@ static inline f128 factorial_128(u32 n) {
 	return prod;
 }
 
-/* Computed the value of the harmonic oscillator eigenfunction
- * at the passed in point in space and state-space
- */
-static f64 ho_eigenfunction(i32 states[], f64 point[], i32 dims) {
-	/*
-	 * HN = 2xH_{N-1} - 2(N-1)H_{N-2}
-	 * psiN = 1/sqrt(2^N * N!) * (1/pi^(1/4)) * exp(-x^2/2) * HN
-	 */
-
-	f64 prod = 1.0;
-	const f64 pi_factor = 1.0/pow(M_PI,0.25);
-	for (i32 i = 0; i < dims; ++i) {
-		i32 n = states[i];
-		assert(n < 270);
-
-		f64 x = point[i];
-
-		f64 normalization_factor = exp(-x*x/2.0) * pi_factor / sqrt(pow(2,n) * factorial_128(n));
-		f64 H[3] = {
-			normalization_factor,
-			normalization_factor,
-			normalization_factor,
-		};
-
-		for (i32 j = 1; j <= n; ++j) {
-			H[2] = 2*(x*H[1] - (j-1)*H[0]);
-			H[0] = H[1];
-			H[1] = H[2];
-		}
-
-		prod *= H[2];
-	}
-	return prod;
-}
-
 /* Currently doesnt handle 2d/3d/... case */
-static inline void ho_eigenfunction_vec(u32 n, f64* out, f64* in, u32 len) {
+static void ho_eigenfunc(const u32 n, const u32 len, f64 out[static len], f64 in[static len]) {
 	/*
 	 * HN = 2xH_{N-1} - 2(N-1)H_{N-2}
 	 * psiN = 1/sqrt(2^N * N!) * (1/pi^(1/4)) * exp(-x^2/2) * HN
@@ -81,133 +47,112 @@ static inline void ho_eigenfunction_vec(u32 n, f64* out, f64* in, u32 len) {
 	}
 }
 
-
-
-
-
-
-
-
-
-#if 0
-
-/* Same as above but computes the eigenfunction for multiple state-values. Might remove. */
-static void ho_eigenfunction_statevec(u32 bases_per_dim[], f64 point[], u32 dims, f64* out) {
-	static const f64 pi_factor = 1.0/pow(M_PI,0.25);
-
-	/* Compute total dimensionality and find maximum states */
-	u32 tot = 1;
-	u32 max_state = 0;
-	for (u32 i = 0; i < dims; ++i) {
-		tot *= bases_per_dim[i];
-		if (bases_per_dim[i] > max_state)
-			max_state = bases_per_dim[i];
-	}
-
-	/* Storage for cached results */
-	u32 store_index = 0;
-	f64 store[max_state];
-
-	u32 n[dims];
-	memset(n, 0, dims*sizeof(u32));
-
-	/* Combination of states u00 u01 u10 u11:
-	 * 		(u0*u0) + (u0*u1) + (u1*u0) + (u1*u1)
-	 */
-
-	f64 sum = 0.0;
-	for (u32 i = 0; i < tot; ++i) {
-		f64 prod = 1.0;
-		/* Go over each n0,n1,n2,... and compute H_(n0)(x),... */
-		for (u32 j = 0; j < dims; ++j) {
-
-			f64 x = point[j];
-
-			f64 H[3] = {1,1,1};
-			if (store_index > n[j]) {
-				H[2] = store[n[j]];
-			} else {
-				/* Compute hermite polynomial and store it */
-				for (u32 k = 1; k <= n[j]; ++k) {
-					H[2] = 2*(x*H[1] - (k-1)*H[0]);
-					H[0] = H[1];
-					H[1] = H[2];
-				}
-				store[n[j]] = H[2];
-				store_index++;
-			}
-
-			f64 psi_factor = exp(-x*x/2.0)*pi_factor;
-			prod *= psi_factor*H[2]/sqrt(pow(2,n[j]) * factorial_128(n[j]));
-		}
-		sum += prod;
-
-		/* Computes indices n0,n1,n2,... from global index i */
-		{
-			if (i == tot-1)
-				break;
-
-			u32 index = dims-1;
-			while (n[index]++ >= bases_per_dim[index]-1) {
-				n[index--] = 0;
-			}
-		}
-	}
-	log_info("sum: %lf", sum);
-
-}
-
-#endif
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-static inline f64 ho_eigenvalue(i32 states[], i32 dims) {
+/* energy eigenvalue */
+static f64 ho_eigenval(const u32 n) {
+	/*
 	f64 sum = 0.0;
 	for (i32 i = 0; i < dims; ++i)
 		sum += states[i];
 
 	return sum + dims/2.0;
+	*/
+	return (f64)n + 0.5;
 }
+
+/* Currently doesnt handle 2d/3d/... case */
+static void ho_sample(const u32 coeff_count,
+		c64 coeffs[static coeff_count],
+		const u32 len,
+		c64 out[static len],
+		f64 in[static len]) {
+	for (u32 i = 0; i < len; ++i)
+		out[i] = 0;
+
+	f64 eigenfunc_out[len];
+	for (u32 i = 0; i < coeff_count; ++i) {
+		ho_eigenfunc(i, len, eigenfunc_out, in);
+		for (u32 j = 0; j < len; ++j) {
+			out[j] += coeffs[i]*eigenfunc_out[j];
+		}
+	}
+}
+
+static struct basis ho_basis = {
+	.eigenfunc = ho_eigenfunc,
+	.eigenval  = ho_eigenval,
+	.sample    = ho_sample
+};
+
+
+
+
+
+
+
+
+
+#include <gsl/gsl_sf_hermite.h>
+
+static void ho_gsl_eigenfunc(const u32 n, const u32 len, f64 out[static len], f64 in[static len]) {
+	for (u32 i = 0; i < len; ++i) {
+		out[i] = gsl_sf_hermite_func(n, in[i]);
+	}
+}
+
+static f64 ho_gsl_eigenval(const u32 n) {
+	return n + 0.5;
+}
+
+static void ho_gsl_sample(const u32 coeff_count,
+		c64 coeffs[static coeff_count],
+		const u32 len,
+		c64 out[static len],
+		f64 in[static len]) {
+	for (u32 i = 0; i < len; ++i)
+		out[i] = 0;
+
+	f64 eigenfunc_out[len];
+	for (u32 i = 0; i < coeff_count; ++i) {
+		ho_gsl_eigenfunc(i, len, eigenfunc_out, in);
+		for (u32 j = 0; j < len; ++j) {
+			out[j] += coeffs[i]*eigenfunc_out[j];
+		}
+	}
+}
+
+
+static struct basis ho_gsl_basis = {
+	.eigenfunc = ho_gsl_eigenfunc,
+	.eigenval  = ho_gsl_eigenval,
+	.sample    = ho_gsl_sample
+};
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 static inline f64 ho_potential(f64* v, i32 n, c64 u) {
 	SBMF_UNUSED(u);
@@ -224,90 +169,4 @@ static inline void ho_potential_vec(f64* out, f64* in, u32 len) {
 	for (u32 i = 0; i < len; ++i) {
 		out[i] = 0.5*in[i]*in[i];
 	}
-}
-
-static inline c64 hob_sample(c64* v, u32 n, f64 x) {
-	c64 output = 0;
-	for (u32 i = 0; i < n; ++i) {
-		output += v[i] * ho_eigenfunction((i32[]){i}, &x, 1);
-	}
-	return output;
-}
-
-// p = a|0> + b|1>
-// |p|^2 = (<0|a* + <1|b*)(a|0> + b|1>)
-//       = |a|^2 <0|0> + |b|^2 <1|1>
-
-/* Currently doesnt handle 2d/3d/... case */
-static inline void hob_sample_vec(c64* coeffs, u32 coeff_len, c64* out, f64* in, u32 in_len) {
-	for (u32 i = 0; i < in_len; ++i)
-		out[i] = 0;
-
-	f64 eigfunc_out[in_len];
-	for (u32 i = 0; i < coeff_len; ++i) {
-		ho_eigenfunction_vec(i, eigfunc_out, in, in_len);
-		for (u32 j = 0; j < in_len; ++j) {
-			out[j] += coeffs[i]*eigfunc_out[j];
-		}
-	}
-}
-
-/* <m|H|n> = <m|T|n> + <m|V|n>
- * T = p^2/2
- * * := adjoint operator
- * p = i(a* - a)/sqrt(2)
- * p^2 = -(a*a* - a*a - aa* + aa)/2
- * <m|a*a*|n> = <m|a*sqrt(n+1)|n+1>
- * 			  = sqrt[(n+2)(n+1)]<m|n+2>
- * 			  = sqrt[(n+2)(n+1)] if m == n+2,
- * 			    0 otherwise
- *
- * <m|a*a|n> = <m|a*sqrt(n)|n-1>
- * 			 = n<m|n>
- * 			 = n if m == n, 0 otherwise
- *
- * <m|aa*|n> = <m|asqrt(n+1)|n+1>
- * 			 = (n+1)<m|n>
- * 			 = (n+1) if m == n, 0 otherwise
- *
- * <m|aa|n> = <m|asqrt(n)|n-1>
- * 			= sqrt[n(n-1)]<m|n-2>
- * 			= sqrt(n(n-1)) if m == n-2, 0 otherwise
- *
- * that is the T matrix will have the following layout
- *
- * 		x   x
- * 		  x   x
- * 		x   x   x
- * 		  x   x
- * 		    x   x
- *
- * and <m|V|n> will be calculated numerically.
- */
-
-static inline struct complex_hermitian_bandmat construct_ho_kinetic_matrix(u32 size) {
-	/* We only really need 2 bands for this matrix:
-	 * the main diagonal + one off-diagonal band, since
-	 * it is symmetric.
-	 *
-	 * However, we might as well allocate the full upper triangle
-	 * since we'll add <m|V|n> terms to the diagonals later on
-	 * anyway.
-	 */
-	struct complex_hermitian_bandmat T = complex_hermitian_bandmat_new(size,size);
-
-
-	COMPLEX_HERMITIAN_BANDMAT_FOREACH(T, r,c) {
-		u32 i = complex_hermitian_bandmat_index(T, r,c);
-
-		if (r == c) {
-			T.data[i] = (2.0*(f64)c + 1.0)/4.0;
-		} else if (r == c - 2) {
-			T.data[i] = -sqrt((f64)c*((f64)c-1.0))/4.0;
-		} else {
-			T.data[i] = 0.0;
-		}
-	}
-
-	return T;
 }

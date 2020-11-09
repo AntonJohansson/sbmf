@@ -21,10 +21,18 @@
  */
 
 /* assuming 1D */
-typedef void basis_sample_func(u32 len, c64 coeffs[static len], f64 sample_x);
-typedef void basis_eigenfunc(u32 state_index, u32 len, f64 out[static len], f64 in[static len]);
-typedef f64  basis_energy_eigenval_func(u32 state_index);
+typedef void basis_eigenfunc_func(const u32 n, const u32 len,
+		f64 out[static len], f64 in[static len]);
+typedef f64  basis_energy_eigenval_func(const u32 n);
+typedef void basis_sample_func(
+		const u32 coeff_count,
+		c64 coeffs[static coeff_count],
+		const u32 len,
+		c64 out[static len],
+		f64 in[static len]);
 
 struct basis {
-	basis_sample_func* sample;
+	basis_eigenfunc_func*       eigenfunc;
+	basis_energy_eigenval_func* eigenval;
+	basis_sample_func*          sample;
 };

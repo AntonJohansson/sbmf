@@ -4,8 +4,10 @@
 #include <sbmf/math/harmonic_oscillator.h>
 #include <sbmf/math/functions.h>
 
-#include <assert.h> /* Not the correct way to handle this */
+#include <gsl/gsl_integration.h>
 #include <omp.h>
+
+#include <assert.h> /* Not the correct way to handle this */
 
 struct integrand_params {
 	u32 n[2];
@@ -16,51 +18,46 @@ struct integrand_params {
 	struct basis basis;
 };
 
-static void log_integration_result(integration_result res) {
-	log_info("integral: %e", res.integral);
-	log_info("error: %e", res.error);
-	log_info("performed evals: %d", res.performed_evals);
-	log_info("converged: %s", (res.converged) ? "yes" : "no");
-}
 
-static void linear_me_integrand(f64* out, f64* in, u32 len, void* data) {
+static f64 linear_me_integrand(f64 x, void* data) {
 	struct integrand_params* params = data;
 
-	f64 eig1[len];
-	f64 eig2[len];
-	params->basis.eigenfunc(params->n[0], len, eig1, in);
-	params->basis.eigenfunc(params->n[1], len, eig2, in);
+	f64 eig1;
+	f64 eig2;
+	params->basis.eigenfunc(params->n[0], 1, &eig1, &x);
+	params->basis.eigenfunc(params->n[1], 1, &eig2, &x);
 
-	f64 op[len];
-	params->op(len, op, in, 0, NULL);
+	f64 op;
+	params->op(1, &op, &x, 0, NULL);
 
-	for (u32 i = 0; i < len; ++i) {
-		out[i] = eig1[i]*eig2[i]*op[i];
-	}
+	return eig1*eig2*op;
 }
 
-static void nonlinear_me_integrand(f64* out, f64* in, u32 len, void* data) {
+static f64 nonlinear_me_integrand(f64 x, void* data) {
 	struct integrand_params* params = data;
 
-	f64 eig1[len];
-	f64 eig2[len];
-	params->basis.eigenfunc(params->n[0], len, eig1, in);
-	params->basis.eigenfunc(params->n[1], len, eig2, in);
+	f64 eig1;
+	f64 eig2;
+	params->basis.eigenfunc(params->n[0], 1, &eig1, &x);
+	params->basis.eigenfunc(params->n[1], 1, &eig2, &x);
 
-	c64 sample[len*params->component_count];
+	c64 sample[params->component_count];
 	for (u32 i = 0; i < params->component_count; ++i) {
-		params->basis.sample(params->coeff_count, &params->coeff[i*params->coeff_count], len, &sample[i*len], in);
+		params->basis.sample(params->coeff_count, &params->coeff[i*params->coeff_count], 1, &sample[i], &x);
 	}
 
-	f64 op[len];
-	params->op(len, op, in, params->component_count, sample);
+	f64 op;
+	params->op(1, &op, &x, params->component_count, sample);
 
-	for (u32 i = 0; i < len; ++i) {
-		out[i] = eig1[i]*eig2[i]*op[i];
-	}
+	return eig1*eig2*op;
 }
 
-struct gp2c_result gp2c(struct gp2c_settings settings, const u32 component_count, struct gp2c_component component[static component_count]) {
+
+
+
+
+
+struct gp2c_result gp2c_gsl(struct gp2c_settings settings, const u32 component_count, struct gp2c_component component[static component_count]) {
 	const u32 N = settings.num_basis_functions;
 	const u32 matrix_element_count = N*(N+1)/2;
 
@@ -80,13 +77,6 @@ struct gp2c_result gp2c(struct gp2c_settings settings, const u32 component_count
 
 	/* Place to store coeffs from previous iterations */
 	c64* old_coeff = (c64*) sbmf_stack_push(component_count*(N*sizeof(c64)));
-
-	integration_settings int_settings = {
-		.gk = (settings.gk.gauss_size > 0) ? settings.gk : gk7,
-		.abs_error_tol = 1e-15,
-		.rel_error_tol = 1e-15,
-		.max_evals = settings.max_iterations,
-	};
 
 	/* Setup intial guess values for coeffs */
 	for (u32 i = 0; i < component_count; ++i) {
@@ -128,34 +118,39 @@ struct gp2c_result gp2c(struct gp2c_settings settings, const u32 component_count
 		}
 	}
 
+	u32 limit = 1e8;
+	f64 atol = 1e-15;
+	f64 rtol = 1e-7;
+
+	/* Construct thread data */
+	gsl_integration_workspace* ws[omp_get_max_threads()];
+	for (u32 i = 0; i < omp_get_max_threads(); ++i) {
+		ws[i] = gsl_integration_workspace_alloc(limit);
+	}
+
 	/* Construct linear hamiltonian */
 	struct hermitian_bandmat linear_hamiltonian = hermitian_bandmat_new_zero(N,N);
 	{
 		if (settings.ho_potential_perturbation) {
 			params.op = settings.ho_potential_perturbation;
-#pragma omp parallel for firstprivate(params, int_settings) shared(res)
+#pragma omp parallel for firstprivate(params) shared(res)
 			for (u32 i = 0; i < matrix_element_count; ++i) {
 				u32 r = matrix_element_rows[i];
 				u32 c = matrix_element_cols[i];
 
-				int_settings.userdata = &params;
 				params.n[0] = r;
 				params.n[1] = c;
 
-				integration_result int_res = quadgk_vec(linear_me_integrand, -INFINITY, INFINITY, int_settings);
+				gsl_function F;
+				F.function = linear_me_integrand;
+				F.params = &params;
 
-				//if (fabs(int_res.integral) < 1e-10)
-				//	int_res.integral = 0.0;
-
-				if (!int_res.converged) {
-					log_error("In construction of linear hamiltonian:");
-					log_error("\tIntegration failed for %d,%d", r,c);
-					log_integration_result(int_res);
-				}
-				assert(int_res.converged);
+				f64 result;
+				f64 error;
+				gsl_integration_qagi(&F, atol, rtol, limit, ws[omp_get_thread_num()], &result, &error);
 
 				u32 me_index = hermitian_bandmat_index(linear_hamiltonian, r,c);
-				linear_hamiltonian.data[me_index] = int_res.integral;
+				linear_hamiltonian.data[me_index] = result;
 			}
 		}
 
@@ -163,8 +158,6 @@ struct gp2c_result gp2c(struct gp2c_settings settings, const u32 component_count
 			u32 me_index = hermitian_bandmat_index(linear_hamiltonian, i,i);
 			linear_hamiltonian.data[me_index] += settings.basis.eigenval(i);
 		}
-
-		//assert(complex_hermitian_bandmat_is_valid(linear_hamiltonian));
 	}
 
 	/* Do the actual iterations */
@@ -175,31 +168,28 @@ struct gp2c_result gp2c(struct gp2c_settings settings, const u32 component_count
 			params.op = component[i].op;
 
 			/* Construct the i:th component's hamiltonian */
-#pragma omp parallel for firstprivate(params, int_settings) shared(res, linear_hamiltonian)
+#pragma omp parallel for firstprivate(params) shared(res, linear_hamiltonian)
 			for (u32 j = 0; j < matrix_element_count; ++j) {
 				u32 r = matrix_element_rows[j];
 				u32 c = matrix_element_cols[j];
-				int_settings.userdata = &params;
+
 				params.n[0] = r;
 				params.n[1] = c;
 
-				integration_result int_res = quadgk_vec(nonlinear_me_integrand, -INFINITY, INFINITY, int_settings);
+				gsl_function F;
+				F.function = nonlinear_me_integrand;
+				F.params = &params;
 
-				/* Check if the resultant integral is less than what we can resolve,
-				 * if so, zero it.
-				 */
-				if (fabs(int_res.integral) < 1e-10)
-					int_res.integral = 0.0;
+				f64 result;
+				f64 error;
+				gsl_integration_qagi(&F, atol, rtol, limit, ws[omp_get_thread_num()], &result, &error);
 
-				if (!int_res.converged) {
-					log_error("In construction of component %u's hamiltonian:", i);
-					log_error("\tIntegration failed for %d,%d", r,c);
-					log_integration_result(int_res);
+				if (fabs(result) <= error || fabs(result) <= 1e-10) {
+					result = 0.0;
 				}
-				assert(int_res.converged);
 
 				u32 me_index = hermitian_bandmat_index(res.hamiltonian[i], r,c);
-				res.hamiltonian[i].data[me_index] = linear_hamiltonian.data[me_index] + int_res.integral;
+				res.hamiltonian[i].data[me_index] = linear_hamiltonian.data[me_index] + result;
 			}
 
 			assert(hermitian_bandmat_is_valid(res.hamiltonian[i]));
@@ -248,6 +238,11 @@ struct gp2c_result gp2c(struct gp2c_settings settings, const u32 component_count
 			}
 		}
 #endif
+	}
+
+	/* Free gsl stuff */
+	for (u32 i = 0; i < omp_get_max_threads(); ++i) {
+		gsl_integration_workspace_free(ws[i]);
 	}
 
 	return res;

@@ -157,10 +157,10 @@ void bme_integrand(f64* out, f64* in, u32 len, void* data) {
 	struct bme_integrand_params* params = data;
 
 	c64 sample_1_out[len];
-	hob_sample_vec(params->orbital_1_coeffs, params->coeff_count, sample_1_out, in, len);
+	ho_sample(params->coeff_count, params->orbital_1_coeffs, len, sample_1_out, in);
 
 	c64 sample_2_out[len];
-	hob_sample_vec(params->orbital_2_coeffs, params->coeff_count, sample_2_out, in, len);
+	ho_sample(params->coeff_count, params->orbital_2_coeffs, len, sample_2_out, in);
 
 	for (u32 i = 0; i < len; ++i) {
 		f64 abs1 = cabs(sample_1_out[i]);
@@ -291,7 +291,7 @@ void energy_per_particle_integrand(f64* out, f64* in, u32 len, void* data) {
     struct energy_per_particle_integrand_params* params = data;
 
     c64 sample_out[len];
-    hob_sample_vec(params->coeff, params->coeff_count, sample_out, in, len);
+	ho_sample(params->coeff_count, params->coeff, len, sample_out, in);
 
     for (u32 i = 0; i < len; ++i) {
         f64 c = cabs(sample_out[i]);
@@ -319,7 +319,7 @@ f64 gp_energy_per_particle(const u32 particle_count,
     f64 E = 0.0;
     for (u32 i = 0; i < coeff_count; ++i) {
         f64 c = cabs(coeff[i]);
-        E += c*c*ho_eigenvalue((i32[]){i},1);
+        E += c*c*ho_eigenval(i);
     }
 
     E += 0.5*interaction_strength*(particle_count-1)*res.integral;

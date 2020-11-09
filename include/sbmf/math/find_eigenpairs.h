@@ -20,8 +20,7 @@ struct eigen_result {
 };
 
 struct eigen_result_real {
-	f64* eigenvalues_real;
-	f64* eigenvalues_imag;
+	f64* eigenvalues;
 	f64* eigenvectors;
 	u32 num_eigenpairs;
 	u32 points_per_eigenvector;

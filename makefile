@@ -24,7 +24,8 @@ PROJ_LIBS = \
 	-l:third_party/lib/libarpack.a \
 	-l:third_party/lib/libopenblas.a \
 	-l:third_party/lib/libfftw3.a \
-	-lgfortran
+	-lgfortran \
+	-lgsl
 TEST_LIBS = \
 	-fopenmp \
 	-L . \
@@ -36,6 +37,8 @@ TEST_LIBS = \
 	-lcimgui \
 	-L/home/aj/.local/lib \
 	-lplot \
+	-lgsl \
+	-lcblas \
 	-lm \
 	-lpthread
 

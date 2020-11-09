@@ -114,8 +114,8 @@ u8* sbmf_stack_push_impl(u32 size_in_bytes, const u32 linenumber, const char fil
 	//	f64 elapsed = elapsed_time();
 	//	fprintf(_state.memory_log_fd, "%lf\t%u\t%u\t[%s:%d in %s()]\n",
 	//			elapsed,
-	//			_state.stacks[threadid]->top,
-	//			_state.stacks[threadid]->size,
+	//			_state.thread_storage[threadid].stack->top,
+	//			_state.thread_storage[threadid].stack->size,
 	//			file, linenumber, func);
 	//}
 
@@ -135,6 +135,9 @@ void sbmf_stack_free_to_marker(u32 marker) {
 	//if (_state.memory_log_fd) {
 	//	f64 elapsed = elapsed_time();
 
-	//	fprintf(_state.memory_log_fd, "%lf\t%u\t%u\n", elapsed, _state.stacks[threadid]->top, _state.stacks[threadid]->size);
+	//	fprintf(_state.memory_log_fd, "%lf\t%u\t%u\n",
+	//			elapsed,
+	//			_state.thread_storage[threadid].stack->top,
+	//			_state.thread_storage[threadid].stack->size);
 	//}
 }

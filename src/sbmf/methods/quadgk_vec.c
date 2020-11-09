@@ -190,6 +190,37 @@ struct gk_data gk20 = {
 	.gauss_size = 10,
 };
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 struct coordinate_transform {
 	coord_transform_input_func* input;
 	coord_transform_output_func* output;
@@ -206,7 +237,7 @@ typedef struct {
 } segment;
 
 static inline f64 norm(f64 r) {
-	return r*r;
+	return fabs(r);
 }
 
 typedef struct {

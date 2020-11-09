@@ -19,6 +19,14 @@ struct eigen_result {
 	u32 points_per_eigenvector;
 };
 
+struct eigen_result_real {
+	f64* eigenvalues_real;
+	f64* eigenvalues_imag;
+	f64* eigenvectors;
+	u32 num_eigenpairs;
+	u32 points_per_eigenvector;
+};
+
 /* Find _all_ eigenpairs for a dense, symmetric,
  * upper tridiagonal matrix.
  */
@@ -27,4 +35,5 @@ struct eigen_result find_eigenpairs_full(struct complex_hermitian_bandmat bm);
 /* Find _some_ eigenpairs (specified by the enum which_eigenpairs)
  * for a dense, upper tridiagonal matrix.
  */
+struct eigen_result_real find_eigenpairs_sparse_real(struct hermitian_bandmat bm, u32 num_eigenvalues, enum which_eigenpairs which);
 struct eigen_result find_eigenpairs_sparse(struct complex_hermitian_bandmat bm, u32 num_eigenvalues, enum which_eigenpairs which);

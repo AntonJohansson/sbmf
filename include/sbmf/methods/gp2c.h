@@ -43,7 +43,7 @@ struct gp2c_result {
 	c64* coeff;
 	f64* error;
 	f64* energy;
-	struct complex_hermitian_bandmat* hamiltonian;
+	struct hermitian_bandmat* hamiltonian;
 };
 
 struct gp2c_result gp2c(struct gp2c_settings settings, const u32 component_count, struct gp2c_component components[static component_count]);

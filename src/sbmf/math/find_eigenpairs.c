@@ -64,6 +64,127 @@ static const char* arpack_znaupd_error_code_to_string(i32 err);
 static const char* arpack_zneupd_error_code_to_string(i32 err);
 static const char* arpack_which_eigenpairs_to_string(enum which_eigenpairs which);
 
+struct eigen_result_real find_eigenpairs_sparse_real(struct hermitian_bandmat bm, u32 num_eigenvalues, enum which_eigenpairs which) {
+	u32 memory_marker = sbmf_stack_marker();
+
+	i32 ido = 0;
+	i32 n = bm.size;
+	const char* which_str = arpack_which_eigenpairs_to_string(which);
+
+	i32 nev = num_eigenvalues; // number of eigenvalues to find
+	if (2 + nev > n) {
+		log_error("eig_sparse_bandmat(...) failed:");
+		log_error("\t the number of requested eigenvalues nev=%d and the matrix N=%d size must satisfy:", nev, n);
+		log_error("\t\t 2 + nev <= N");
+
+		sbmf_stack_free_to_marker(memory_marker);
+		return (struct eigen_result_real){0};
+	}
+
+	f64 tol = 0.0; // relative error tolerance to achieve.
+	f64 resid[n]; // residual vectors
+
+	// Needs to satisfy
+	// 		2+nev <= ncv <= n
+	i32 ncv = (2+nev+n)/2;
+
+	f64* v = (f64*)sbmf_stack_push(sizeof(f64)*n*ncv);
+	i32 iparam[11] = {
+		[0] = 1, 		// Exact shift is used
+		[2] = 7000, 	// Max iterations
+		[3] = 1, 		// will not work without this for some reason
+		[6] = 1, 		// Mode
+	};
+	i32 ipntr[14];
+
+	f64* workd = (f64*)sbmf_stack_push(sizeof(f64)*3*n);
+	i32 lworkl = 3*ncv*ncv + 6*ncv;
+	f64* workl = (f64*)sbmf_stack_push(sizeof(f64)*lworkl);
+	f64 rwork[ncv];
+
+	i32 info = 0;
+
+	struct hermitian_bandmat input_mat = bm;
+
+	while (ido != 99 && info == 0) {
+
+		//dnaupd_c(&ido, "I", n, which_str, nev, tol, resid, ncv, v, ldv, iparam, ipntr, double* workd, double* workl, a_int lworkl, a_int* info);
+		dnaupd_c(&ido, "I", n, which_str, nev, tol, resid, ncv, v, n, iparam, ipntr,
+				workd, workl, lworkl, &info);
+
+		if (info != 0) {
+			log_error("arpack znaupd(...) error: (%d) %s", info, arpack_znaupd_error_code_to_string(info));
+			break;
+		}
+
+		if (ido == -1 || ido == 1) {
+			hermitian_bandmat_mulv(&workd[ipntr[1]-1], input_mat, &workd[ipntr[0]-1]);
+		}
+	}
+
+
+	// Convergence or error
+	if (info == 0) {
+		i32 select[n]; // not used
+		f64* dr = (f64*)sbmf_stack_push(sizeof(f64)*(nev+1));
+		f64* di = (f64*)sbmf_stack_push(sizeof(f64)*(nev+1));
+		f64* z  = (f64*)sbmf_stack_push(sizeof(f64)*n*(nev+1));
+		f64 sigma = 0; // not used
+		f64* workev = (f64*)sbmf_stack_push(sizeof(f64)*2*n);
+
+		//dneupd_c(rvec, howmny, select, a_int ldz, double sigmar, double sigmai, double * workev, char const* bmat, a_int n, char const* which, a_int nev, double tol, double* resid, a_int ncv, double* v, a_int ldv, a_int* iparam, a_int* ipntr, double* workd, double* workl, a_int lworkl, a_int* info);
+		dneupd_c(true, "A", select, dr, di, z, n, sigma, sigma, workev,
+				"I", n, which_str, nev, tol, resid, ncv, v, n, iparam, ipntr, workd, workl, lworkl, &info);
+
+		if (info != 0) {
+			log_error("arpack zneupd(...) error: (%d) %s", info, arpack_zneupd_error_code_to_string(info));
+		} else {
+#if 0
+			i32 nconv = iparam[4];
+			log_info("arpack znaupd(...) convergence info:");
+			log_info("\t Matrix size: %d", n);
+			log_info("\t Number of requested eigenvalues: %d", nev);
+			log_info("\t Number of generated Arnoldi vectors: %d", n);
+			log_info("\t Number of converged Ritz values: %d", nconv);
+			log_info("\t Sought eigenvalues: %s", which_str);
+			log_info("\t Number of iterations: %d", iparam[2]);
+			log_info("\t Number of OP*x: %d", iparam[8]);
+			log_info("\t Convergence tolerance: %lf", tol);
+			log_info("\t Eigenvalue residuals:");
+			for (i32 i = 0; i < nconv; ++i) {
+				c64 ax[n];
+				complex_hermitian_bandmat_mulv(ax, input_mat, &z[i*n]);
+				c64 neg_eigenvalue = -d[i];
+				cblas_zaxpy(n, &neg_eigenvalue, &z[i*n], 1, ax, 1);
+				log_info("\t\t %lf + %lfi -- %e", creal(d[i]), cimag(d[i]), cblas_dznrm2(n, ax, 1));
+			}
+#endif
+
+			//sbmf_stack_free_to_marker(memory_marker);
+
+			struct eigen_result_real res = {
+				.eigenvalues_real = (f64*)sbmf_stack_push(sizeof(f64)*(nev+1)),
+				.eigenvalues_imag = (f64*)sbmf_stack_push(sizeof(f64)*(nev+1)),
+				.eigenvectors = (f64*)sbmf_stack_push(sizeof(f64)*bm.size*(nev+1)),
+				.num_eigenpairs = nev,
+				.points_per_eigenvector = bm.size,
+			};
+			memcpy(res.eigenvalues_real,  dr, 	sizeof(f64)*(nev+1));
+			memcpy(res.eigenvalues_imag,  di, 	sizeof(f64)*(nev+1));
+			memcpy(res.eigenvectors, z, 		sizeof(f64)*n*(nev+1));
+
+			return res;
+		}
+	}
+
+	log_error("not sure when this is called");
+
+	sbmf_stack_free_to_marker(memory_marker);
+
+	return (struct eigen_result_real){0};
+}
+
+
 struct eigen_result find_eigenpairs_sparse(struct complex_hermitian_bandmat bm, u32 num_eigenvalues, enum which_eigenpairs which) {
 	u32 memory_marker = sbmf_stack_marker();
 

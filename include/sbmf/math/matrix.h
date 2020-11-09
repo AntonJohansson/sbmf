@@ -4,11 +4,25 @@
 #include <sbmf/types.h>
 #include <string.h> /* memset */
 
+struct hermitian_bandmat {
+	f64* data;
+	u32 bandcount; /* rows */
+	u32 size; /* cols */
+};
+
 struct complex_hermitian_bandmat {
 	c64* data;
 	u32 bandcount; /* rows */
 	u32 size; /* cols */
 };
+
+static inline struct hermitian_bandmat hermitian_bandmat_new(u32 bandcount, u32 size) {
+	return (struct hermitian_bandmat) {
+		.data = (f64*)sbmf_stack_push(sizeof(f64)*size*bandcount),
+		.bandcount = bandcount,
+		.size = size,
+	};
+}
 
 static inline struct complex_hermitian_bandmat complex_hermitian_bandmat_new(u32 bandcount, u32 size) {
 	return (struct complex_hermitian_bandmat) {
@@ -16,6 +30,12 @@ static inline struct complex_hermitian_bandmat complex_hermitian_bandmat_new(u32
 		.bandcount = bandcount,
 		.size = size,
 	};
+}
+
+static inline struct hermitian_bandmat hermitian_bandmat_new_zero(u32 bandcount, u32 size) {
+	struct hermitian_bandmat bm = hermitian_bandmat_new(bandcount, size);
+	memset(bm.data, 0, sizeof(f64)*size*bandcount);
+	return bm;
 }
 
 static inline struct complex_hermitian_bandmat complex_hermitian_bandmat_new_zero(u32 bandcount, u32 size) {
@@ -103,23 +123,42 @@ static inline struct complex_hermitian_bandmat complex_hermitian_bandmat_new_zer
  *
  *
  */
+static inline u32 hermitian_bandmat_index(struct hermitian_bandmat bm, u32 row, u32 col) {
+	return bm.size * (bm.bandcount - 1 + (row - col)) + col;
+}
 
 static inline u32 complex_hermitian_bandmat_index(struct complex_hermitian_bandmat bm, u32 row, u32 col) {
 	return bm.size * (bm.bandcount - 1 + (row - col)) + col;
 }
 
+void hermitian_bandmat_mulv(f64* ans_vec, struct hermitian_bandmat bm, f64* vec);
 void complex_hermitian_bandmat_mulv(c64* ans_vec, struct complex_hermitian_bandmat bm, c64* vec);
 
 struct complex_hermitian_bandmat construct_finite_diff_mat(u32 samples_per_dimension, u32 dimensions, f64* deltas);
 
+#include <sbmf/debug/log.h>
+
 static inline bool complex_hermitian_bandmat_is_valid(struct complex_hermitian_bandmat bm) {
+	f64 smallest_abs = INFINITY;
+	f64 largest_abs = -INFINITY;
 	for (u32 r = 0; r < bm.size; ++r) {
 		for (u32 c = r; c < bm.bandcount; ++c) {
 			u32 i = complex_hermitian_bandmat_index(bm, r,c);
+
+			f64 c = cabs(bm.data[i]);
+			if (c > largest_abs)
+				largest_abs = c;
+			if (c < smallest_abs)
+				smallest_abs = c;
+
 			if (!f64_is_valid(creal(bm.data[i])) || !f64_is_valid(cimag(bm.data[i])))
 				return false;
 		}
 	}
+
+	log_info("smallest abs: %lf", smallest_abs);
+	log_info("largest abs: %lf",  largest_abs);
+
 	return true;
 }
 

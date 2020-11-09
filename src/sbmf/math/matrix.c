@@ -8,6 +8,23 @@
 #include <string.h> // memcpy, memset
 #include <stdio.h> // sprintf
 
+void hermitian_bandmat_mulv(f64* ans_vec, struct hermitian_bandmat bm, f64* vec) {
+	static const f64 one = 1, zero = 0;
+
+	const u32 num_super_diags = bm.bandcount-1;
+
+	f64 bmtrans[bm.size*bm.bandcount];
+	for (u32 r = 0; r < bm.bandcount; ++r) {
+		for (u32 c = 0; c < bm.size; ++c) {
+			bmtrans[c*bm.bandcount + r] = bm.data[r*bm.size + c];
+		}
+	}
+
+	cblas_dsbmv(CblasColMajor, CblasUpper,
+			bm.size, num_super_diags,
+			one, bmtrans, bm.bandcount, vec, 1, zero, ans_vec, 1);
+}
+
 void complex_hermitian_bandmat_mulv(c64* ans_vec, struct complex_hermitian_bandmat bm, c64* vec) {
 	static const c64 one = 1, zero = 0;
 

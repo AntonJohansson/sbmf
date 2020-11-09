@@ -27,7 +27,8 @@
 
 #include <sbmf/sbmf.h>
 #include <sbmf/methods/quadgk_vec.h>
-#include <sbmf/methods/find_groundstate.h>
+#include <sbmf/methods/item.h>
+#include <sbmf/methods/gp2c.h>
 #include <sbmf/methods/best_meanfield.h>
 #include <sbmf/math/functions.h>
 #include <sbmf/math/harmonic_oscillator.h>
@@ -280,7 +281,7 @@ describe (hofunctionsampling) {
 static void check_quadgk_converge(integration_result res, f64 expected) {
 	bool correct_ans = f64_compare(res.integral, expected, 1e-9);
 	if (!res.converged || !correct_ans) {
-		printf("Integral failed to converge or got wrong answer:\n\tconverged: %d\n\tintegral: %lf\n\terror: %lf\n\texpected: %lf\n\tevals: %d\n", res.converged, res.integral, res.error, expected, res.performed_evals);
+		printf("Integral failed to converge or got wrong answer:\n\tconverged: %d\n\tintegral: %lf\n\terror: %e\n\texpected: %lf\n\tevals: %d\n", res.converged, res.integral, res.error, expected, res.performed_evals);
 	}
 
 asserteq(correct_ans && res.converged, true);
@@ -320,9 +321,9 @@ describe (quad_gk_vec_numerical_integration){
 
 	integration_settings settings = {
 		.gk = gk7,
-		.abs_error_tol = 1e-10,
-		.rel_error_tol = 1e-10,
-		.max_evals = 500,
+		.abs_error_tol = 1e-7,
+		.rel_error_tol = 1e-7,
+		.max_evals = 1e5,
 	};
 
 	it ("x2, 0 -> 2") {
@@ -382,6 +383,9 @@ describe (quad_gk_vec_numerical_integration){
 
 	it ("sin, 0 -> 2pi") {
 		integration_result res = quadgk_vec(sinx_vec, 0, 2*M_PI, settings);
+		log_info("integral: %e", res.integral);
+		log_info("error: %e", res.error);
+		log_info("iterations: %u", res.performed_evals);
 		check_quadgk_converge(res, 0.0);
 	}
 
@@ -393,12 +397,6 @@ describe (quad_gk_vec_numerical_integration){
 
 /* ------ 2D numerical integration */
 /* ------ 3D numerical integration */
-
-/* FDM vs HOB particle in a box */
-describe (fdm_vs_hob_particle_in_a_box) {
-	before_each() { sbmf_init(); }
-	after_each() { sbmf_shutdown(); }
-}
 
 /* FDM vs HOB perturbed harmonic oscillator */
 
@@ -447,14 +445,14 @@ void linear_hamiltonian_vec_pot(f64* out, f64* in_x, c64* in_u, u32 len) {
 
 f64 non_linear_hamiltonian_pot(f64* v, i32 n, c64 u) {
 	/* assuming 1d */
-	return ho_perturbed_potential(v, n, 0)  -2.0*cabs(u)*cabs(u);
+	return ho_perturbed_potential(v, n, 0)  - 4.0*cabs(u)*cabs(u);
 }
 
 void non_linear_hamiltonian_vec_pot(const u32 len, f64 out[static len],
                                 f64 in_x[static len], const u32 component_count,
                                 c64 in_u[static len*component_count]) {
 	for (u32 i = 0; i < len; ++i) {
-		out[i] = gaussian(in_x[i],0,0.2) - 2.0*cabs(in_u[i])*cabs(in_u[i]);
+		out[i] = gaussian(in_x[i],0,0.2) - 4.0*cabs(in_u[i])*cabs(in_u[i]);
 	}
 }
 
@@ -478,7 +476,8 @@ describe(item_vs_scim) {
 		struct gp2c_settings gp2c_settings = {
 			.num_basis_functions = 16,
 			.max_iterations = 1e9,
-			.error_tol = 1e-7,
+			.error_tol = 1e-15,
+			.gk = gk15
 			//.measure_every = 40,
 			//.dbgcallback = debug_callback,
 		};

@@ -1,5 +1,5 @@
 #include "profile.h"
-#include "log.h"
+#include <sbmf/sbmf.h>
 #include <sbmf/types.h>
 
 #include <time.h>
@@ -50,7 +50,7 @@
 		}
 
 		if(clock_gettime(CLOCK_REALTIME, &entry->start) != 0) {
-			log_error("clock_gettime(): failed in profile_begin() [errno: %s]", strerror(errno));
+			sbmf_log_error("clock_gettime(): failed in profile_begin() [errno: %s]", strerror(errno));
 			entry->start = (struct timespec){0};
 		}
 	}
@@ -58,12 +58,12 @@
 	void profile_end_impl(char const name[]) {
 		struct profile_entry* entry = profile_find_entry_by_name(name);
 		if(!entry) {
-			log_error("profile_end() failed, entry %s not found", name);
+			sbmf_log_error("profile_end() failed, entry %s not found", name);
 			return;
 		}
 
 		if(clock_gettime(CLOCK_REALTIME, &entry->end) != 0) {
-			log_error("clock_gettime(): failed in profile_end() [errno: %s]", strerror(errno));
+			sbmf_log_error("clock_gettime(): failed in profile_end() [errno: %s]", strerror(errno));
 			entry->end = (struct timespec){0};
 			return;
 		}
@@ -71,7 +71,7 @@
 		struct timespec* elapsed = &entry->elapsed[entry->sample_count % PROFILE_MAX_SAMPLE_COUNT];
 		elapsed->tv_sec  = entry->end.tv_sec - entry->start.tv_sec;
 		elapsed->tv_nsec = entry->end.tv_nsec - entry->start.tv_nsec;
-		//log_info("%s: %lu", name, elapsed->tv_nsec);
+		//sbmf_log_info("%s: %lu", name, elapsed->tv_nsec);
 		entry->total_ms += (1000000000*elapsed->tv_sec + elapsed->tv_nsec)/(f64)1000000;
 		entry->sample_count++;
 	}
@@ -80,9 +80,9 @@
 		if (profile_entry_count == 0)
 			return;
 
-		log_info("Timing results:");
-		log_info("%40s | %10s | %10s | %10s | %15s ", "entry", "avg. (ns)","min (ns)", "max (ns)", "tot (ms)");
-		log_info("-----------------------------------------+------------+------------+------------+----------------");
+		sbmf_log_info("Timing results:");
+		sbmf_log_info("%40s | %10s | %10s | %10s | %15s ", "entry", "avg. (ns)","min (ns)", "max (ns)", "tot (ms)");
+		sbmf_log_info("-----------------------------------------+------------+------------+------------+----------------");
 		for (u32 i = 0; i < profile_entry_count; ++i) {
 			struct profile_entry entry = profile_entries[i];
 
@@ -100,7 +100,7 @@
 			}
 			avg /= size;
 
-			log_info("%40s | %10ld | %10ld | %10ld | %10.5lf ", entry.name, avg, ns_min, ns_max, entry.total_ms);
+			sbmf_log_info("%40s | %10ld | %10ld | %10ld | %10.5lf ", entry.name, avg, ns_min, ns_max, entry.total_ms);
 		}
 	}
 

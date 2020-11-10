@@ -16,11 +16,11 @@ struct integrand_params {
 	struct basis basis;
 };
 
-static void log_integration_result(integration_result res) {
-	log_info("integral: %e", res.integral);
-	log_info("error: %e", res.error);
-	log_info("performed evals: %d", res.performed_evals);
-	log_info("converged: %s", (res.converged) ? "yes" : "no");
+static void sbmf_log_integration_result(integration_result res) {
+	sbmf_log_info("integral: %e", res.integral);
+	sbmf_log_info("error: %e", res.error);
+	sbmf_log_info("performed evals: %d", res.performed_evals);
+	sbmf_log_info("converged: %s", (res.converged) ? "yes" : "no");
 }
 
 static void linear_me_integrand(f64* out, f64* in, u32 len, void* data) {
@@ -148,9 +148,9 @@ struct gp2c_result gp2c(struct gp2c_settings settings, const u32 component_count
 				//	int_res.integral = 0.0;
 
 				if (!int_res.converged) {
-					log_error("In construction of linear hamiltonian:");
-					log_error("\tIntegration failed for %d,%d", r,c);
-					log_integration_result(int_res);
+					sbmf_log_error("In construction of linear hamiltonian:");
+					sbmf_log_error("\tIntegration failed for %d,%d", r,c);
+					sbmf_log_integration_result(int_res);
 				}
 				assert(int_res.converged);
 
@@ -192,9 +192,9 @@ struct gp2c_result gp2c(struct gp2c_settings settings, const u32 component_count
 					int_res.integral = 0.0;
 
 				if (!int_res.converged) {
-					log_error("In construction of component %u's hamiltonian:", i);
-					log_error("\tIntegration failed for %d,%d", r,c);
-					log_integration_result(int_res);
+					sbmf_log_error("In construction of component %u's hamiltonian:", i);
+					sbmf_log_error("\tIntegration failed for %d,%d", r,c);
+					sbmf_log_integration_result(int_res);
 				}
 				assert(int_res.converged);
 
@@ -230,12 +230,12 @@ struct gp2c_result gp2c(struct gp2c_settings settings, const u32 component_count
 		}
 
 		/* Break condition */
-		log_info("gp2c finished iterations %u", res.iterations);
+		sbmf_log_info("gp2c finished iterations %u", res.iterations);
 		bool should_exit = true;
 		for (u32 i = 0; i < component_count; ++i) {
 			if (res.error[i] > settings.error_tol)
 				should_exit = false;
-			log_info("\t[%u] -- error: %.2e, energy: %.2e", i, res.error[i], res.energy[i]);
+			sbmf_log_info("\t[%u] -- error: %.2e, energy: %.2e", i, res.error[i], res.energy[i]);
 		}
 		if (should_exit)
 			break;

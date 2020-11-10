@@ -1,7 +1,6 @@
 #include <sbmf/methods/best_meanfield.h>
 
 #include <sbmf/sbmf.h>
-#include <sbmf/debug/log.h>
 #include <sbmf/math/functions.h>
 #include <sbmf/methods/gp2c.h>
 
@@ -68,7 +67,7 @@ static void ensure_structure_of_func(c64* a, c64* b, u32 len) {
 	}
 
 	f64 n2_minus_n1 = (f64)_particle_count * creal(sum);
-	/*log_info("n2 - n1 = %lf", n2_minus_n1);*/
+	/*sbmf_log_info("n2 - n1 = %lf", n2_minus_n1);*/
 	/* n2 - n1 = (N-n1)-n1 = N-2n1 => N-2n1 - (n2-n1) = 0
 	 * => n1 = (N-(n2-n1))/2
 	 */
@@ -76,8 +75,8 @@ static void ensure_structure_of_func(c64* a, c64* b, u32 len) {
 	//c64 n2 = (f64)_particle_count - n1;
 	u32 n1 = (u32)(((f64)_particle_count - n2_minus_n1)/2.0);
 	u32 n2 = _particle_count - n1;
-	log_info("n1: %u -- n2: %u", n1,n2);
-	//log_info("(%.2lf+%.2lfi) + (%.2lf+%.2lfi)", CCOMP(n1), CCOMP(n2));
+	sbmf_log_info("n1: %u -- n2: %u", n1,n2);
+	//sbmf_log_info("(%.2lf+%.2lfi) + (%.2lf+%.2lfi)", CCOMP(n1), CCOMP(n2));
 
 	for (u32 i = 0; i < len; ++i) {
 		f64 c1 = sqrt((f64)(n1)/ (f64)_particle_count);

@@ -1,6 +1,5 @@
 #include <sbmf/methods/quadgk_vec.h>
 #include <sbmf/memory/prioqueue.h>
-#include <sbmf/debug/log.h>
 #include <math.h> // INFINITY and isinf
 #include <stdio.h>
 
@@ -320,7 +319,7 @@ static eval_result evaluate_rule(integrand_vec* f, f64 start, f64 end,
 
 	bool valid = (!isinf(error) && !isnan(error));
 	if (!valid) {
-		log_error("evaluation of gk rule resulted in [%s]", (isinf(error) == 1) ? "inf" : "nan");
+		sbmf_log_error("evaluation of gk rule resulted in [%s]", (isinf(error) == 1) ? "inf" : "nan");
 	}
 
 	return (eval_result){

@@ -220,12 +220,12 @@ struct gp2c_result gp2c_gsl(struct gp2c_settings settings, const u32 component_c
 		}
 
 		/* Break condition */
-		log_info("gp2c finished iterations %u", res.iterations);
+		sbmf_log_info("gp2c finished iterations %u", res.iterations);
 		bool should_exit = true;
 		for (u32 i = 0; i < component_count; ++i) {
 			if (res.error[i] > settings.error_tol)
 				should_exit = false;
-			log_info("\t[%u] -- error: %.2e, energy: %.2e", i, res.error[i], res.energy[i]);
+			sbmf_log_info("\t[%u] -- error: %.2e, energy: %.2e", i, res.error[i], res.energy[i]);
 		}
 		if (should_exit)
 			break;

@@ -52,59 +52,6 @@
 
 #define DISABLE_SLOW_TESTS 0
 
-describe(random) {
-	it ("works") {
-		const u32 N = 5;
-		for (u32 i = 0; i < N; ++i) {
-			for (u32 j = i; j < N; ++j) {
-				log_info("%u,%u", i,j);
-			}
-		}
-		log_info("next one");
-		for (u32 i = 0; i < (N*(N+1))/2; ++i) {
-			log_info("%u", i);
-		}
-
-		//
-		//					0,0		0,1		0,2
-		//					--		1,1		1,2
-		//					--		--		2,2
-		//
-		//
-		//					u32 i = (H.size-1)*(H.size-(c-r)) + r;
-		//
-		//
-		//					(0) 0,0		(1)0,1		(3)0,2
-		//					--			(2)1,1		(4)1,2
-		//					--			--			(5)2,2
-		//
-		//					total number of unique combinations in a n*n grid
-		//					is given by the arithmetic series
-		//						1 + 2 + 3 + ... + n = n(n+1)/2
-		//
-		//					i  |  r,c
-		//					---+-----
-		//					0  |  0,0
-		//					1  |  0,1
-		//					2  |  0,2
-		//					3  |  1,1
-		//					4  |  1,2
-		//					5  |  2,2
-		//
-		//
-		//					i = (n-1)*(n - (c-r)) + r
-		//
-		//					0,0 -> 2*(3-(0-0))+0 = 6
-		//					0,1 -> 2*(3-(1-0))+0 = 4
-		//					0,2 -> 2*(3-(2-0))+0 = 2
-		//					1,1 -> 2*(3-(1-1))+1 = 7
-		//					1,2 -> 2*(3-(2-1))+1 = 5
-		//					2,2 -> 2*(3-(2-2))+2 = 8
-		//
-
-	}
-}
-
 /* bucket array */
 describe (bucketarray) {
 	before_each() { sbmf_init(); }
@@ -378,9 +325,6 @@ describe (quad_gk_vec_numerical_integration){
 
 	it ("sin, 0 -> 2pi") {
 		integration_result res = quadgk_vec(sinx_vec, 0, 2*M_PI, settings);
-		log_info("integral: %e", res.integral);
-		log_info("error: %e", res.error);
-		log_info("iterations: %u", res.performed_evals);
 		check_quadgk_converge(res, 0.0);
 	}
 
@@ -390,45 +334,15 @@ describe (quad_gk_vec_numerical_integration){
 	}
 }
 
-/* ------ 2D numerical integration */
-/* ------ 3D numerical integration */
-
-/* FDM vs HOB perturbed harmonic oscillator */
-
-static f64 ho_perturbed_potential(f64* x, i32 n, void* data) {
-	SBMF_UNUSED(n);
-	SBMF_UNUSED(data);
-	return ho_potential(x,1,0) + gaussian(*x,0,0.2);
-}
-
-typedef f64 pot_func(f64*,i32,void*);
-struct integrand_params {
-	u32 n[2];
-	pot_func* pot;
-};
-
-typedef void pot_func_vec(f64*,f64*,u32,void*);
-struct integrand_params_vec {
-	u32 n[2];
-	pot_func_vec* pot;
-};
-
 /* ITEM vs SCIM groundstate finding */
-
-c64 guess(f64* v, i32 n) {
+c64 item_guess(f64* v, i32 n) {
 	SBMF_UNUSED(n);
 	return gaussian(*v, 0, 0.2);
 }
 
-void guess_vec(c64* out, f64* in, u32 len) {
-	for (u32 i = 0; i < len; ++i) {
-		out[i] = gaussian(in[i],0,0.2);
-	}
-}
-
 f64 linear_hamiltonian_pot(f64* v, i32 n, c64 u) {
 	SBMF_UNUSED(u);
-	return ho_perturbed_potential(v, n, NULL);
+	return ho_potential(v,1,0) + gaussian(*v,0,0.2);
 }
 
 void linear_hamiltonian_vec_pot(f64* out, f64* in_x, c64* in_u, u32 len) {
@@ -440,18 +354,18 @@ void linear_hamiltonian_vec_pot(f64* out, f64* in_x, c64* in_u, u32 len) {
 
 f64 non_linear_hamiltonian_pot(f64* v, i32 n, c64 u) {
 	/* assuming 1d */
-	return ho_perturbed_potential(v, n, 0)  - 4.0*cabs(u)*cabs(u);
+	return ho_potential(v,1,0) + gaussian(*v, 0, 0.2)  - 3.0*cabs(u)*cabs(u);
 }
 
 void non_linear_hamiltonian_vec_pot(const u32 len, f64 out[static len],
                                 f64 in_x[static len], const u32 component_count,
                                 c64 in_u[static len*component_count]) {
 	for (u32 i = 0; i < len; ++i) {
-		out[i] = gaussian(in_x[i],0,0.2) - 4.0*cabs(in_u[i])*cabs(in_u[i]);
+		out[i] = gaussian(in_x[i],0,0.2) - 3.0*cabs(in_u[i])*cabs(in_u[i]);
 	}
 }
 
-describe(item_vs_scim) {
+describe(item_vs_gp2c) {
 	before_each() { sbmf_init(); }
 	after_each() { sbmf_shutdown(); }
 
@@ -466,53 +380,46 @@ describe(item_vs_scim) {
 			.g = space,
 			.max_iterations = 1e9,
 			.error_tol = 1e-9,
-			.dt = 0.0001,
+			.dt = 1e-4,
 		};
 		struct gp2c_settings gp2c_settings = {
-			.num_basis_functions = 16,
+			.num_basis_functions = 32,
 			.max_iterations = 1e9,
 			.error_tol = 1e-9,
 			.gk = gk15,
-			//.basis = ho_basis,
-			.basis = ho_gsl_basis,
-			//.measure_every = 40,
-			//.dbgcallback = debug_callback,
+			.basis = ho_basis,
 		};
 
-		//struct gss_result item_res = item(item_settings, non_linear_hamiltonian_pot, guess);
+		struct gss_result item_res = item(item_settings, non_linear_hamiltonian_pot, item_guess);
 
 		struct gp2c_result gp2c_res = gp2c(gp2c_settings, 1, &(struct gp2c_component) {
 					.op = non_linear_hamiltonian_vec_pot,
 				});
 
+		c64 gp2c_sample[N];
+		gp2c_settings.basis.sample(gp2c_res.coeff_count, gp2c_res.coeff, N, gp2c_sample, space.points);
 
-#if 1
+		for (u32 i = 0; i < N; ++i) {
+			f64 c1 = cabs(gp2c_sample[i]);
+			f64 c2 = cabs(item_res.wavefunction[i]);
+			asserteq(fabs(c1*c1 - c2*c2) < 1e-2, true);
+		}
+
+#if 0
 		{
 			plot_init(800, 600, "fdm groundstate");
 			f32 pdata[N];
 			sample_space sp = make_linspace(1, -L/2.0, L/2.0, N);
 
-			/*
 			for (u32 i = 0; i < N; ++i) {
-				f64 x = sp.points[i];
-				pdata[i] = (f32) ho_perturbed_potential(&x, 1, NULL);
+				c64 c = cabs(item_res.wavefunction[i]);
+				pdata[i] = c*c;
 			}
 			push_line_plot(&(plot_push_desc){
 					.space = &sp,
 					.data = pdata,
-					.label = "potential",
+					.label = "item groundstate",
 					});
-			*/
-
-			//for (u32 i = 0; i < N; ++i) {
-			//	c64 c = cabs(item_res.wavefunction[i]);
-			//	pdata[i] = c*c;
-			//}
-			//push_line_plot(&(plot_push_desc){
-			//		.space = &sp,
-			//		.data = pdata,
-			//		.label = "item groundstate",
-			//		});
 
 			c64 sample_out[N];
 			f64 sample_in[N];
@@ -598,7 +505,7 @@ void perturbation(const u32 len, f64 out[static len],
 
 describe(2comp) {
 	before_each() { sbmf_init(); }
-	after_each() { sbmf_shutdown(); }
+	after_each()  { sbmf_shutdown(); }
 
 	it ("?") {
 		struct gp2c_settings gp2c_settings = {
@@ -632,7 +539,7 @@ describe(2comp) {
 
 			for (u32 i = 0; i < N; ++i) {
 				f64 x = sp.points[i];
-				pdata[i] = (f32) ho_perturbed_potential(&x, 1, NULL);
+				pdata[i] = (f32) ho_potential(&x,1,0) + gaussian(x,0,0.2);
 			}
 			push_line_plot(&(plot_push_desc){
 					.space = &sp,
@@ -1096,45 +1003,6 @@ void bestmf_gp2c_op_a(const u32 len, f64 out[static len],
 	}
 }
 
-void bestmf_debug_callback(struct gp2c_settings settings, struct gp2c_result res) {
-//	if (res.iterations < 10 || res.iterations > 20)
-//		return;
-//
-//	log_info("hamiltonian on iteration %u", res.iterations);
-//	COMPLEX_HERMITIAN_BANDMAT_FOREACH(res.hamiltonian_a, r,c) {
-//		u32 i = complex_hermitian_bandmat_index(res.hamiltonian_a, r,c);
-//		printf("%lf\t", cabs(res.hamiltonian_a.data[i]));
-//	}
-//	printf("\n");
-//	log_info("coeff_a on iteration %u", res.iterations);
-//	for (u32 i = 0; i < settings.num_basis_functions; ++i) {
-//		printf("%lf\t", cabs(res.coeff_a[i]));
-//	}
-//	printf("\n");
-//
-//
-//	const u32 N = 256;
-//	f32 adata[N];
-//	sample_space sp = make_linspace(1, -5, 5.0, N);
-//
-//
-//	c64 sample_out_a[N];
-//	f64 sample_in[N];
-//	for (u32 i = 0; i < N; ++i) {
-//		sample_in[i] = (f64) sp.points[i];
-//	}
-//	hob_sample_vec(res.coeff_a, settings.num_basis_functions, sample_out_a, sample_in, N);
-//	for (u32 i = 0; i < N; ++i) {
-//		f64 ca = cabs(sample_out_a[i]);
-//		adata[i] = ca*ca;
-//	}
-//	push_line_plot(&(plot_push_desc){
-//			.space = &sp,
-//			.data = adata,
-//			.label = plot_snprintf("iter: %u", res.iterations),
-//			});
-}
-
 //describe (bestmf) {
 //	before_each(){sbmf_init();}
 //	after_each(){sbmf_shutdown();}
@@ -1219,15 +1087,15 @@ void bestmf_debug_callback(struct gp2c_settings settings, struct gp2c_result res
 //		}
 //#endif
 //
-//		log_info("---------------------------------");
+//		sbmf_log_info("---------------------------------");
 //
 //
-//		log_info("0 -- energy: %lf", eres_a.eigenvalues[0]);
+//		sbmf_log_info("0 -- energy: %lf", eres_a.eigenvalues[0]);
 //		for (u32 i = 0; i < settings.num_basis_functions; ++i) {
 //			printf("%.1lf\t",cabs(eres_a.eigenvectors[i]));
 //		}
 //		printf("\n");
-//		log_info("1 -- energy: %lf", eres_a.eigenvalues[1]);
+//		sbmf_log_info("1 -- energy: %lf", eres_a.eigenvalues[1]);
 //		for (u32 i = 0; i < settings.num_basis_functions; ++i) {
 //			printf("%.1lf\t",cabs(eres_a.eigenvectors[eres_a.num_eigenpairs + i]));
 //		}
@@ -1278,8 +1146,8 @@ void bestmf_debug_callback(struct gp2c_settings settings, struct gp2c_result res
 //			snprintf(buf, 50, "output/bestmf_data_%.1lf", gvals[i]*(bestmf_particle_count-1));
 //			FILE* datafile = fopen(buf, "w");
 //			if (!datafile) {
-//				log_error("Unable to open log file: %s", buf);
-//				log_error("errno: (%d) %s", errno, strerror(errno));
+//				sbmf_log_error("Unable to open log file: %s", buf);
+//				sbmf_log_error("errno: (%d) %s", errno, strerror(errno));
 //			}
 //
 //			bestmf_interaction_strength = gvals[i];

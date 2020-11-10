@@ -1,6 +1,5 @@
 #include <sbmf/math/find_eigenpairs.h>
 #include <sbmf/sbmf.h>
-#include <sbmf/debug/log.h>
 
 #include <lapacke.h>
 #include <cblas.h>
@@ -73,9 +72,9 @@ struct eigen_result_real find_eigenpairs_sparse_real(struct hermitian_bandmat bm
 
 	i32 nev = num_eigenvalues; // number of eigenvalues to find
 	if (2 + nev > n) {
-		log_error("eig_sparse_bandmat(...) failed:");
-		log_error("\t the number of requested eigenvalues nev=%d and the matrix N=%d size must satisfy:", nev, n);
-		log_error("\t\t 2 + nev <= N");
+		sbmf_log_error("eig_sparse_bandmat(...) failed:");
+		sbmf_log_error("\t the number of requested eigenvalues nev=%d and the matrix N=%d size must satisfy:", nev, n);
+		sbmf_log_error("\t\t 2 + nev <= N");
 
 		sbmf_stack_free_to_marker(memory_marker);
 		return (struct eigen_result_real){0};
@@ -111,7 +110,7 @@ struct eigen_result_real find_eigenpairs_sparse_real(struct hermitian_bandmat bm
 				workd, workl, lworkl, &info);
 
 		if (info != 0) {
-			log_error("arpack znaupd(...) error: (%d) %s", info, arpack_znaupd_error_code_to_string(info));
+			sbmf_log_error("arpack znaupd(...) error: (%d) %s", info, arpack_znaupd_error_code_to_string(info));
 			break;
 		}
 
@@ -132,26 +131,26 @@ struct eigen_result_real find_eigenpairs_sparse_real(struct hermitian_bandmat bm
 				"I", n, which_str, nev, tol, resid, ncv, v, n, iparam, ipntr, workd, workl, lworkl, &info);
 
 		if (info != 0) {
-			log_error("arpack zneupd(...) error: (%d) %s", info, arpack_zneupd_error_code_to_string(info));
+			sbmf_log_error("arpack zneupd(...) error: (%d) %s", info, arpack_zneupd_error_code_to_string(info));
 		} else {
 #if 0
 			i32 nconv = iparam[4];
-			log_info("arpack znaupd(...) convergence info:");
-			log_info("\t Matrix size: %d", n);
-			log_info("\t Number of requested eigenvalues: %d", nev);
-			log_info("\t Number of generated Arnoldi vectors: %d", n);
-			log_info("\t Number of converged Ritz values: %d", nconv);
-			log_info("\t Sought eigenvalues: %s", which_str);
-			log_info("\t Number of iterations: %d", iparam[2]);
-			log_info("\t Number of OP*x: %d", iparam[8]);
-			log_info("\t Convergence tolerance: %lf", tol);
-			log_info("\t Eigenvalue residuals:");
+			sbmf_log_info("arpack znaupd(...) convergence info:");
+			sbmf_log_info("\t Matrix size: %d", n);
+			sbmf_log_info("\t Number of requested eigenvalues: %d", nev);
+			sbmf_log_info("\t Number of generated Arnoldi vectors: %d", n);
+			sbmf_log_info("\t Number of converged Ritz values: %d", nconv);
+			sbmf_log_info("\t Sought eigenvalues: %s", which_str);
+			sbmf_log_info("\t Number of iterations: %d", iparam[2]);
+			sbmf_log_info("\t Number of OP*x: %d", iparam[8]);
+			sbmf_log_info("\t Convergence tolerance: %lf", tol);
+			sbmf_log_info("\t Eigenvalue residuals:");
 			for (i32 i = 0; i < nconv; ++i) {
 				c64 ax[n];
 				complex_hermitian_bandmat_mulv(ax, input_mat, &z[i*n]);
 				c64 neg_eigenvalue = -d[i];
 				cblas_zaxpy(n, &neg_eigenvalue, &z[i*n], 1, ax, 1);
-				log_info("\t\t %lf + %lfi -- %e", creal(d[i]), cimag(d[i]), cblas_dznrm2(n, ax, 1));
+				sbmf_log_info("\t\t %lf + %lfi -- %e", creal(d[i]), cimag(d[i]), cblas_dznrm2(n, ax, 1));
 			}
 #endif
 
@@ -170,7 +169,7 @@ struct eigen_result_real find_eigenpairs_sparse_real(struct hermitian_bandmat bm
 		}
 	}
 
-	log_error("not sure when this is called");
+	sbmf_log_error("not sure when this is called");
 
 	sbmf_stack_free_to_marker(memory_marker);
 
@@ -187,9 +186,9 @@ struct eigen_result find_eigenpairs_sparse(struct complex_hermitian_bandmat bm, 
 
 	i32 nev = num_eigenvalues; // number of eigenvalues to find
 	if (2 + nev > n) {
-		log_error("eig_sparse_bandmat(...) failed:");
-		log_error("\t the number of requested eigenvalues nev=%d and the matrix N=%d size must satisfy:", nev, n);
-		log_error("\t\t 2 + nev <= N");
+		sbmf_log_error("eig_sparse_bandmat(...) failed:");
+		sbmf_log_error("\t the number of requested eigenvalues nev=%d and the matrix N=%d size must satisfy:", nev, n);
+		sbmf_log_error("\t\t 2 + nev <= N");
 
 		sbmf_stack_free_to_marker(memory_marker);
 		return (struct eigen_result){0};
@@ -238,7 +237,7 @@ struct eigen_result find_eigenpairs_sparse(struct complex_hermitian_bandmat bm, 
 				workd, workl, lworkl, rwork, &info);
 
 		if (info != 0) {
-			log_error("arpack znaupd(...) error: (%d) %s", info, arpack_znaupd_error_code_to_string(info));
+			sbmf_log_error("arpack znaupd(...) error: (%d) %s", info, arpack_znaupd_error_code_to_string(info));
 			break;
 		}
 
@@ -260,26 +259,26 @@ struct eigen_result find_eigenpairs_sparse(struct complex_hermitian_bandmat bm, 
 				"I", n, which_str, nev, tol, resid, ncv, v, n, iparam, ipntr, workd, workl, lworkl, rwork, &info);
 
 		if (info != 0) {
-			log_error("arpack zneupd(...) error: (%d) %s", info, arpack_zneupd_error_code_to_string(info));
+			sbmf_log_error("arpack zneupd(...) error: (%d) %s", info, arpack_zneupd_error_code_to_string(info));
 		} else {
 #if 0
 			i32 nconv = iparam[4];
-			log_info("arpack znaupd(...) convergence info:");
-			log_info("\t Matrix size: %d", n);
-			log_info("\t Number of requested eigenvalues: %d", nev);
-			log_info("\t Number of generated Arnoldi vectors: %d", n);
-			log_info("\t Number of converged Ritz values: %d", nconv);
-			log_info("\t Sought eigenvalues: %s", which_str);
-			log_info("\t Number of iterations: %d", iparam[2]);
-			log_info("\t Number of OP*x: %d", iparam[8]);
-			log_info("\t Convergence tolerance: %lf", tol);
-			log_info("\t Eigenvalue residuals:");
+			sbmf_log_info("arpack znaupd(...) convergence info:");
+			sbmf_log_info("\t Matrix size: %d", n);
+			sbmf_log_info("\t Number of requested eigenvalues: %d", nev);
+			sbmf_log_info("\t Number of generated Arnoldi vectors: %d", n);
+			sbmf_log_info("\t Number of converged Ritz values: %d", nconv);
+			sbmf_log_info("\t Sought eigenvalues: %s", which_str);
+			sbmf_log_info("\t Number of iterations: %d", iparam[2]);
+			sbmf_log_info("\t Number of OP*x: %d", iparam[8]);
+			sbmf_log_info("\t Convergence tolerance: %lf", tol);
+			sbmf_log_info("\t Eigenvalue residuals:");
 			for (i32 i = 0; i < nconv; ++i) {
 				c64 ax[n];
 				complex_hermitian_bandmat_mulv(ax, input_mat, &z[i*n]);
 				c64 neg_eigenvalue = -d[i];
 				cblas_zaxpy(n, &neg_eigenvalue, &z[i*n], 1, ax, 1);
-				log_info("\t\t %lf + %lfi -- %e", creal(d[i]), cimag(d[i]), cblas_dznrm2(n, ax, 1));
+				sbmf_log_info("\t\t %lf + %lfi -- %e", creal(d[i]), cimag(d[i]), cblas_dznrm2(n, ax, 1));
 			}
 #endif
 
@@ -298,7 +297,7 @@ struct eigen_result find_eigenpairs_sparse(struct complex_hermitian_bandmat bm, 
 		}
 	}
 
-	log_error("not sure when this is called");
+	sbmf_log_error("not sure when this is called");
 
 	sbmf_stack_free_to_marker(memory_marker);
 

@@ -12,7 +12,10 @@ struct integrand_params {
 	u32 component_count;
 	u32 coeff_count;
 	c64* coeff;
+
 	gp2c_operator_func* op;
+	void* op_userdata;
+
 	struct basis basis;
 };
 
@@ -32,7 +35,7 @@ static void linear_me_integrand(f64* out, f64* in, u32 len, void* data) {
 	params->basis.eigenfunc(params->n[1], len, eig2, in);
 
 	f64 op[len];
-	params->op(len, op, in, 0, NULL);
+	params->op(len, op, in, 0, NULL, params->op_userdata);
 
 	for (u32 i = 0; i < len; ++i) {
 		out[i] = eig1[i]*eig2[i]*op[i];
@@ -53,7 +56,7 @@ static void nonlinear_me_integrand(f64* out, f64* in, u32 len, void* data) {
 	}
 
 	f64 op[len];
-	params->op(len, op, in, params->component_count, sample);
+	params->op(len, op, in, params->component_count, sample, params->op_userdata);
 
 	for (u32 i = 0; i < len; ++i) {
 		out[i] = eig1[i]*eig2[i]*op[i];
@@ -173,6 +176,7 @@ struct gp2c_result gp2c(struct gp2c_settings settings, const u32 component_count
 
 		for (u32 i = 0; i < component_count; ++i) {
 			params.op = component[i].op;
+			params.op_userdata = component[i].userdata;
 
 			/* Construct the i:th component's hamiltonian */
 #pragma omp parallel for firstprivate(params, int_settings) shared(res, linear_hamiltonian)

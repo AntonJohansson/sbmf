@@ -9,7 +9,10 @@ enum which_eigenpairs {
 	EV_LARGEST_RE		= 2,
 	EV_SMALLEST_RE 		= 3,
 	EV_LARGEST_IM 		= 4,
-	EV_SMALLEST_IM		= 5
+	EV_SMALLEST_IM		= 5,
+	EV_LARGEST			= 6,
+	EV_SMALLEST 		= 7,
+	EV_BOTH				= 8,
 };
 
 struct eigen_result {

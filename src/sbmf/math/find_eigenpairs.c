@@ -68,7 +68,18 @@ struct eigen_result_real find_eigenpairs_sparse_real(struct hermitian_bandmat bm
 
 	i32 ido = 0;
 	i32 n = bm.size;
-	const char* which_str = arpack_which_eigenpairs_to_string(which);
+	const char* which_str;
+	switch (which) {
+		case EV_LARGEST_MAG:  which_str = "LM"; break;
+		case EV_SMALLEST_MAG: which_str = "SM"; break;
+		case EV_LARGEST:	  which_str = "LA"; break;
+		case EV_SMALLEST:	  which_str = "SA"; break;
+		case EV_BOTH:		  which_str = "BE"; break;
+		default: {
+			sbmf_log_error("find_eigenparis_sprase_real(...): Invalid eigenvalue selected");
+			return (struct eigen_result_real){0};
+		 }
+	};
 
 	i32 nev = num_eigenvalues; // number of eigenvalues to find
 	if (2 + nev > n) {

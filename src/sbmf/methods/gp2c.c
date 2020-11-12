@@ -147,8 +147,8 @@ struct gp2c_result gp2c(struct gp2c_settings settings, const u32 component_count
 
 				integration_result int_res = quadgk_vec(linear_me_integrand, -INFINITY, INFINITY, int_settings);
 
-				//if (fabs(int_res.integral) < 1e-10)
-				//	int_res.integral = 0.0;
+				if (fabs(int_res.integral) < 1e-10)
+					int_res.integral = 0.0;
 
 				if (!int_res.converged) {
 					sbmf_log_error("In construction of linear hamiltonian:");
@@ -167,7 +167,7 @@ struct gp2c_result gp2c(struct gp2c_settings settings, const u32 component_count
 			linear_hamiltonian.data[me_index] += settings.basis.eigenval(i);
 		}
 
-		//assert(complex_hermitian_bandmat_is_valid(linear_hamiltonian));
+		assert(hermitian_bandmat_is_valid(linear_hamiltonian));
 	}
 
 	/* Do the actual iterations */
@@ -246,10 +246,8 @@ struct gp2c_result gp2c(struct gp2c_settings settings, const u32 component_count
 
 #if 1
 		/* Call debug callback if requested by user */
-		if (settings.measure_every > 0 && res.iterations % settings.measure_every == 0) {
-			if (settings.dbgcallback) {
-				settings.dbgcallback(settings, res);
-			}
+		if (settings.measure_every > 0 && settings.dbgcallback && res.iterations % settings.measure_every == 0) {
+			settings.dbgcallback(settings, res);
 		}
 #endif
 	}

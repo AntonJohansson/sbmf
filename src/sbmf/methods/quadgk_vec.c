@@ -428,7 +428,7 @@ static inline integration_result hadapt(integrand_vec* f, f64 start, f64 end,
 	result.error = s.error;
 
 	if (!eval_res.valid || should_exit(result, settings)) {
-		if (result.performed_evals <= settings.max_evals)
+		if (eval_res.valid && result.performed_evals <= settings.max_evals)
 			result.converged = true;
 		return result;
 	}

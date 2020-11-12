@@ -29,13 +29,13 @@ PROJ_LIBS = \
 TEST_LIBS = \
 	-fopenmp \
 	-L . \
+	-L/home/aj/.local/lib \
 	-l:$(BUILDDIR)/$(PROJECT).a \
 	-l:third_party/lib/libarpack.a \
 	-l:third_party/lib/libopenblas.a \
 	-l:third_party/lib/libfftw3.a \
 	-lgfortran \
-	-lcimgui \
-	-L/home/aj/.local/lib \
+	-l:cimgui.so \
 	-lplot \
 	-lgsl \
 	-lcblas \

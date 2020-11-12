@@ -61,9 +61,9 @@ static f64 ho_eigenval(const u32 n) {
 
 /* Currently doesnt handle 2d/3d/... case */
 static void ho_sample(const u32 coeff_count,
-		c64 coeffs[static coeff_count],
+		f64 coeffs[static coeff_count],
 		const u32 len,
-		c64 out[static len],
+		f64 out[static len],
 		f64 in[static len]) {
 	for (u32 i = 0; i < len; ++i)
 		out[i] = 0;
@@ -104,9 +104,9 @@ static f64 ho_gsl_eigenval(const u32 n) {
 }
 
 static void ho_gsl_sample(const u32 coeff_count,
-		c64 coeffs[static coeff_count],
+		f64 coeffs[static coeff_count],
 		const u32 len,
-		c64 out[static len],
+		f64 out[static len],
 		f64 in[static len]) {
 	for (u32 i = 0; i < len; ++i)
 		out[i] = 0;

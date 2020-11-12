@@ -7,9 +7,9 @@
 
 typedef void gp2c_operator_func(const u32 len, f64 out[static len],
                                 f64 in_x[static len], const u32 component_count,
-                                c64 in_u[static len*component_count],
+                                f64 in_u[static len*component_count],
 								void* userdata);
-typedef void gp2c_guess_func(c64* out, u32 len);
+typedef void gp2c_guess_func(f64* out, u32 len);
 typedef void gp2c_callback(c64* a, c64* b, u32 len);
 
 struct gp2c_settings;
@@ -46,7 +46,7 @@ struct gp2c_result {
 	u32 iterations;
 	u32 component_count;
 	u32 coeff_count;
-	c64* coeff;
+	f64* coeff;
 	f64* error;
 	f64* energy;
 	struct hermitian_bandmat* hamiltonian;

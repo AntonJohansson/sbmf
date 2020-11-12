@@ -345,7 +345,7 @@ f64 linear_hamiltonian_pot(f64* v, i32 n, c64 u) {
 	return ho_potential(v,1,0) + gaussian(*v,0,0.2);
 }
 
-void linear_hamiltonian_vec_pot(f64* out, f64* in_x, c64* in_u, u32 len) {
+void linear_hamiltonian_vec_pot(f64* out, f64* in_x, f64* in_u, u32 len) {
 	SBMF_UNUSED(in_u);
 	for (u32 i = 0; i < len; ++i) {
 		out[i] = gaussian(in_x[i],0,0.2);
@@ -359,9 +359,9 @@ f64 non_linear_hamiltonian_pot(f64* v, i32 n, c64 u) {
 
 void non_linear_hamiltonian_vec_pot(const u32 len, f64 out[static len],
                                 f64 in_x[static len], const u32 component_count,
-                                c64 in_u[static len*component_count]) {
+                                f64 in_u[static len*component_count], void* userdata) {
 	for (u32 i = 0; i < len; ++i) {
-		out[i] = gaussian(in_x[i],0,0.2) - 3.0*cabs(in_u[i])*cabs(in_u[i]);
+		out[i] = gaussian(in_x[i],0,0.2) - 3.0*fabs(in_u[i])*fabs(in_u[i]);
 	}
 }
 
@@ -396,11 +396,11 @@ describe(item_vs_gp2c) {
 					.op = non_linear_hamiltonian_vec_pot,
 				});
 
-		c64 gp2c_sample[N];
+		f64 gp2c_sample[N];
 		gp2c_settings.basis.sample(gp2c_res.coeff_count, gp2c_res.coeff, N, gp2c_sample, space.points);
 
 		for (u32 i = 0; i < N; ++i) {
-			f64 c1 = cabs(gp2c_sample[i]);
+			f64 c1 = fabs(gp2c_sample[i]);
 			f64 c2 = cabs(item_res.wavefunction[i]);
 			asserteq(fabs(c1*c1 - c2*c2) < 1e-2, true);
 		}
@@ -421,14 +421,14 @@ describe(item_vs_gp2c) {
 					.label = "item groundstate",
 					});
 
-			c64 sample_out[N];
+			f64 sample_out[N];
 			f64 sample_in[N];
 			for (u32 i = 0; i < N; ++i) {
 				sample_in[i] = (f64) sp.points[i];
 			}
 			gp2c_settings.basis.sample(gp2c_res.coeff_count, gp2c_res.coeff, N, sample_out, sample_in);
 			for (u32 i = 0; i < N; ++i) {
-				f64 c = cabs(sample_out[i]);
+				f64 c = fabs(sample_out[i]);
 				pdata[i] = c*c;
 			}
 			push_line_plot(&(plot_push_desc){
@@ -471,10 +471,10 @@ describe(item_vs_gp2c) {
 
 void op_2comp_a(const u32 len, f64 out[static len],
 		f64 in_x[static len], const u32 component_count,
-		c64 in_u[static len*component_count]) {
+		f64 in_u[static len*component_count], void* userdata) {
 	for (u32 i = 0; i < len; ++i) {
-		f64 ca = cabs(in_u[i]);
-		f64 cb = cabs(in_u[len + i]);
+		f64 ca = fabs(in_u[i]);
+		f64 cb = fabs(in_u[len + i]);
 		out[i] =
 			+ GAA_2COMP*ca*ca
             + GAB_2COMP*cb*cb;
@@ -483,10 +483,10 @@ void op_2comp_a(const u32 len, f64 out[static len],
 
 void op_2comp_b(const u32 len, f64 out[static len],
 		f64 in_x[static len], const u32 component_count,
-		c64 in_u[static len*component_count]) {
+		f64 in_u[static len*component_count], void* userdata) {
 	for (u32 i = 0; i < len; ++i) {
-		f64 ca = cabs(in_u[i]);
-		f64 cb = cabs(in_u[len + i]);
+		f64 ca = fabs(in_u[i]);
+		f64 cb = fabs(in_u[len + i]);
 		out[i] =
 			+ GBB_2COMP*cb*cb
             + GAB_2COMP*ca*ca;
@@ -495,7 +495,7 @@ void op_2comp_b(const u32 len, f64 out[static len],
 
 void perturbation(const u32 len, f64 out[static len],
                                 f64 in_x[static len], const u32 component_count,
-                                c64 in_u[static len*component_count]) {
+                                f64 in_u[static len*component_count], void* userdata) {
     assert(component_count == 0);
     for (u32 i = 0; i < len; ++i) {
         out[i] = gaussian(in_x[i], 0, 0.2);
@@ -553,11 +553,11 @@ describe(2comp) {
 			}
 
 			for (u32 i = 0; i < gp2c_res.component_count; ++i) {
-				c64 sample_out[N];
+				f64 sample_out[N];
 				gp2c_settings.basis.sample(gp2c_res.coeff_count, &gp2c_res.coeff[i*gp2c_res.coeff_count], N, sample_out, sample_in);
 
 				for (u32 i = 0; i < N; ++i) {
-					f64 c = cabs(sample_out[i]);
+					f64 c = fabs(sample_out[i]);
 					pdata[i] = c*c;
 				}
 				push_line_plot(&(plot_push_desc){
@@ -615,56 +615,6 @@ describe(2comp) {
 
 
 
-
-
-
-#define PARTICLE_COUNT 10
-#define GAA	-0.25
-#define GBB	-0.25
-#define GAB 0.5
-
-void gp2c_op_a(f64* out, f64* in_x, c64* in_a, c64* in_b, u32 len) {
-	#pragma omp simd
-	for (u32 i = 0; i < len; ++i) {
-		f64 ca = cabs(in_a[i]);
-		f64 cb = cabs(in_b[i]);
-		out[i] = gaussian(in_x[i],0,0.2) + GAA*(PARTICLE_COUNT-1)*ca*ca + GAB*(PARTICLE_COUNT-1)*cb*cb;
-	}
-}
-
-void gp2c_op_b(f64* out, f64* in_x, c64* in_a, c64* in_b, u32 len) {
-	#pragma omp simd
-	for (u32 i = 0; i < len; ++i) {
-		f64 ca = cabs(in_a[i]);
-		f64 cb = cabs(in_b[i]);
-		out[i] = gaussian(in_x[i],0,0.2) + GBB*(PARTICLE_COUNT-1)*cb*cb + GAB*(PARTICLE_COUNT-1)*ca*ca;
-	}
-}
-
-struct Vijkl_params {
-	u32 i, j;
-	c64* coeff_i;
-	c64* coeff_j;
-	c64* coeff_0;
-	u32 coeff_count;
-};
-
-static void Vijkl_integrand(f64* out, f64* in, u32 len, void* data) {
-	struct Vijkl_params* params = data;
-
-	c64 sample_i[len];
-	ho_sample(params->coeff_count, params->coeff_i, len, sample_i, in);
-
-	c64 sample_j[len];
-	ho_sample(params->coeff_count, params->coeff_j, len, sample_j, in);
-
-	c64 sample_0[len];
-	ho_sample(params->coeff_count, params->coeff_0, len, sample_0, in);
-
-	for (u32 i = 0; i < len; ++i) {
-		out[i] = creal(conj(sample_i[i]) * conj(sample_j[i]) * sample_0[i] * sample_0[i]);
-	}
-}
 
 
 #if 0
@@ -882,7 +832,7 @@ describe (2comp_scim) {
 			}
 
 			for (u32 i = 0; i < N; ++i) {
-				f32 tmp = (f32)cabs(out[i]);
+				f32 tmp = (f32)fabs(out[i]);
 				adata[i] = tmp*tmp;
 			}
 
@@ -928,8 +878,8 @@ describe (2comp_scim) {
 			hob_sample_vec(res.coeff_a, settings.num_basis_functions, sample_out_a, sample_in, N);
 			hob_sample_vec(res.coeff_b, settings.num_basis_functions, sample_out_b, sample_in, N);
 			for (u32 i = 0; i < N; ++i) {
-				f64 ca = cabs(sample_out_a[i]);
-				f64 cb = cabs(sample_out_b[i]);
+				f64 ca = fabs(sample_out_a[i]);
+				f64 cb = fabs(sample_out_b[i]);
 				adata[i] = ca*ca;
 				bdata[i] = cb*cb;
 			}
@@ -980,7 +930,7 @@ describe (2comp_scim) {
 
 void bestmf_perturbation(const u32 len, f64 out[static len],
                                 f64 in_x[static len], const u32 component_count,
-                                c64 in_u[static len*component_count]) {
+                                f64 in_u[static len*component_count]) {
 	assert(component_count == 0);
 	for (u32 i = 0; i < len; ++i) {
 		out[i] = gaussian(in_x[i],0,0.2);
@@ -992,13 +942,13 @@ static f64 bestmf_interaction_strength = 0.0;
 
 void bestmf_gp2c_op_a(const u32 len, f64 out[static len],
                                 f64 in_x[static len], const u32 component_count,
-                                c64 in_u[static len*component_count]) {
+                                f64 in_u[static len*component_count]) {
 	assert(component_count == 1);
 	f64 gaa = bestmf_interaction_strength/(bestmf_particle_count - 1);
 
 #pragma omp simd
 	for (u32 i = 0; i < len; ++i) {
-		f64 ca = cabs(in_u[i]);
+		f64 ca = fabs(in_u[i]);
 		out[i] = gaa*(bestmf_particle_count-1)*ca*ca;
 	}
 }

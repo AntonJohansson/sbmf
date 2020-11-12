@@ -13,7 +13,7 @@ struct integrand_params {
 	u32 n[2];
 	u32 component_count;
 	u32 coeff_count;
-	c64* coeff;
+	f64* coeff;
 	gp2c_operator_func* op;
 	void* op_userdata;
 	struct basis basis;
@@ -42,7 +42,7 @@ static f64 nonlinear_me_integrand(f64 x, void* data) {
 	params->basis.eigenfunc(params->n[0], 1, &eig1, &x);
 	params->basis.eigenfunc(params->n[1], 1, &eig2, &x);
 
-	c64 sample[params->component_count];
+	f64 sample[params->component_count];
 	for (u32 i = 0; i < params->component_count; ++i) {
 		params->basis.sample(params->coeff_count, &params->coeff[i*params->coeff_count], 1, &sample[i], &x);
 	}
@@ -67,7 +67,7 @@ struct gp2c_result gp2c_gsl(struct gp2c_settings settings, const u32 component_c
 		.iterations = 0,
 		.component_count = component_count,
 		.coeff_count = N,
-		.coeff = (c64*) sbmf_stack_push(component_count*(N*sizeof(c64))),
+		.coeff = (f64*) sbmf_stack_push(component_count*(N*sizeof(f64))),
 		.error = (f64*) sbmf_stack_push(component_count*sizeof(f64)),
 		.energy = (f64*) sbmf_stack_push(component_count*sizeof(f64)),
 		.hamiltonian = (struct hermitian_bandmat*) sbmf_stack_push(component_count * sizeof(struct hermitian_bandmat)),
@@ -77,7 +77,7 @@ struct gp2c_result gp2c_gsl(struct gp2c_settings settings, const u32 component_c
 	}
 
 	/* Place to store coeffs from previous iterations */
-	c64* old_coeff = (c64*) sbmf_stack_push(component_count*(N*sizeof(c64)));
+	f64* old_coeff = (f64*) sbmf_stack_push(component_count*(N*sizeof(f64)));
 
 	/* Setup intial guess values for coeffs */
 	for (u32 i = 0; i < component_count; ++i) {
@@ -163,7 +163,7 @@ struct gp2c_result gp2c_gsl(struct gp2c_settings settings, const u32 component_c
 
 	/* Do the actual iterations */
 	for (; res.iterations < settings.max_iterations; ++res.iterations) {
-		memcpy(old_coeff, res.coeff, res.component_count * res.coeff_count * sizeof(c64));
+		memcpy(old_coeff, res.coeff, res.component_count * res.coeff_count * sizeof(f64));
 
 		for (u32 i = 0; i < component_count; ++i) {
 			params.op = component[i].op;
@@ -207,7 +207,7 @@ struct gp2c_result gp2c_gsl(struct gp2c_settings settings, const u32 component_c
 			for (u32 j = 0; j < res.coeff_count; ++j) {
 				res.coeff[i*res.coeff_count + j] = eigres.eigenvectors[j];
 			}
-			c64_normalize(&res.coeff[i*res.coeff_count], &res.coeff[i*res.coeff_count], res.coeff_count);
+			f64_normalize(&res.coeff[i*res.coeff_count], &res.coeff[i*res.coeff_count], res.coeff_count);
 			//f64_normalize(&res.coeff[i*res.coeff_count], &eigres.eigenvectors[0], res.coeff_count);
 		}
 
@@ -215,7 +215,7 @@ struct gp2c_result gp2c_gsl(struct gp2c_settings settings, const u32 component_c
 		for (u32 i = 0; i < component_count; ++i) {
 			f64 sum = 0.0;
 			for (u32 j = 0; j < res.coeff_count; ++j) {
-				f64 diff = cabs(res.coeff[i*res.coeff_count + j]) - cabs(old_coeff[i*res.coeff_count + j]);
+				f64 diff = fabs(res.coeff[i*res.coeff_count + j]) - fabs(old_coeff[i*res.coeff_count + j]);
 				sum += diff*diff;
 			}
 			res.error[i] = sqrt(sum);

@@ -82,7 +82,7 @@ struct gp2c_result gp2c_gsl(struct gp2c_settings settings, const u32 component_c
 	/* Setup intial guess values for coeffs */
 	for (u32 i = 0; i < component_count; ++i) {
 		if (component[i].guess) {
-			component[i].guess(&res.coeff[i*res.coeff_count], res.coeff_count);
+			component[i].guess(&res.coeff[i*res.coeff_count], res.coeff_count, i);
 		} else {
 			for (u32 j = 0; j < res.coeff_count; ++j) {
 				res.coeff[i*res.coeff_count + j] = 0;

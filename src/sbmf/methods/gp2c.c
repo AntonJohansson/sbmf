@@ -94,7 +94,7 @@ struct gp2c_result gp2c(struct gp2c_settings settings, const u32 component_count
 	/* Setup intial guess values for coeffs */
 	for (u32 i = 0; i < component_count; ++i) {
 		if (component[i].guess) {
-			component[i].guess(&res.coeff[i*res.coeff_count], res.coeff_count);
+			component[i].guess(&res.coeff[i*res.coeff_count], res.coeff_count, i);
 		} else {
 			for (u32 j = 0; j < res.coeff_count; ++j) {
 				res.coeff[i*res.coeff_count + j] = 0;
@@ -147,7 +147,7 @@ struct gp2c_result gp2c(struct gp2c_settings settings, const u32 component_count
 
 				integration_result int_res = quadgk_vec(linear_me_integrand, -INFINITY, INFINITY, int_settings);
 
-				if (fabs(int_res.integral) < 1e-10)
+				if (fabs(int_res.integral) <= settings.zero_threshold)
 					int_res.integral = 0.0;
 
 				if (!int_res.converged) {
@@ -192,7 +192,7 @@ struct gp2c_result gp2c(struct gp2c_settings settings, const u32 component_count
 				/* Check if the resultant integral is less than what we can resolve,
 				 * if so, zero it.
 				 */
-				if (fabs(int_res.integral) < 1e-10)
+				if (fabs(int_res.integral) <= settings.zero_threshold)
 					int_res.integral = 0.0;
 
 				if (!int_res.converged) {

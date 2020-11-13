@@ -9,7 +9,7 @@ typedef void gp2c_operator_func(const u32 len, f64 out[static len],
                                 f64 in_x[static len], const u32 component_count,
                                 f64 in_u[static len*component_count],
 								void* userdata);
-typedef void gp2c_guess_func(f64* out, u32 len);
+typedef void gp2c_guess_func(f64* out, u32 len, u32 component);
 typedef void gp2c_callback(c64* a, c64* b, u32 len);
 
 struct gp2c_settings;
@@ -34,6 +34,8 @@ struct gp2c_settings {
 
 	/* Choice of basis to solve to problem in */
 	struct basis basis;
+
+	f64 zero_threshold;
 };
 
 struct gp2c_component {

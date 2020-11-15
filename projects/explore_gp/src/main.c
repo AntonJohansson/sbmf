@@ -2,6 +2,7 @@
 #include <sbmf/methods/gp2c.h>
 #include <sbmf/math/harmonic_oscillator.h>
 #include <sbmf/math/functions.h>
+#include <sbmf/methods/best_meanfield.h>
 
 #include <plot/plot.h>
 #define CIMGUI_DEFINE_ENUMS_AND_STRUCTS
@@ -12,6 +13,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <pthread.h>
+
 
 #define MAX_COMP_COUNT 16
 static f64 gs[MAX_COMP_COUNT*MAX_COMP_COUNT] = {0};
@@ -28,7 +30,12 @@ struct comp_info {
 	bool being_edited;
 	struct comp_info* next;
 	u32 cur_guess;
-	f64* gs;
+
+	u32 particle_count;
+
+	/* per particle energies */
+	f64 gp_chem_pot;
+	f64 gp_full_energy;
 };
 
 static u32 comp_count = 0;
@@ -39,6 +46,7 @@ static f64 ui_error_tol = 1e-9;
 static i32 ui_max_iterations = 1e8;
 static i32 ui_measure_every = 0;
 static f64 ui_zero_threshold = 1e-10;
+static i32 ui_excited_states = 2;
 
 /*
  * SBMF
@@ -48,6 +56,25 @@ static sample_space sp = {0};
 #define L 10.0
 #define N 128
 static f32 data[N];
+
+static bool gp2c_doing_calc = false;
+static bool gp2c_do_plot = false;
+static bool gp2c_have_groundstate = false;
+static struct gp2c_result gp2c_res;
+static struct gp2c_settings gp2c_settings;
+
+static pthread_t thread;
+static pthread_mutex_t mutex;
+
+
+
+
+
+static bool has_excited_states = false;
+struct eig_result_real excited_states;
+
+
+
 
 void log_callback(enum sbmf_log_level log_level, const char* msg) {
 	switch (log_level) {
@@ -59,15 +86,6 @@ void log_callback(enum sbmf_log_level log_level, const char* msg) {
 	};
 	printf("%s\n", msg);
 }
-
-static bool gp2c_doing_calc = false;
-static bool gp2c_do_plot = false;
-static struct gp2c_result gp2c_res;
-static struct gp2c_settings gp2c_settings;
-
-static pthread_t thread;
-static pthread_mutex_t mutex;
-
 
 void debug_callback(struct gp2c_settings s, struct gp2c_result r) {
 	pthread_mutex_lock(&mutex);
@@ -138,6 +156,7 @@ void* find_groundstate_thread(void* params) {
 	pthread_mutex_lock(&mutex);
 	gp2c_doing_calc = true;
 	gp2c_do_plot = false;
+	gp2c_have_groundstate = false;
 	/* Copy everything over to the settings */
     struct gp2c_settings settings = {
         .num_basis_functions = ui_num_basis_funcs,
@@ -156,6 +175,12 @@ void* find_groundstate_thread(void* params) {
 		struct comp_info* p = comp_info_head;
 		u32 iter = 0;
 		while (p) {
+			//for (u32 i = 0; i < comp_count; ++i) {
+			//	gs_w_particle_count[iter*MAX_COMP_COUNT] =
+			//		gs[iter*MAX_COMP_COUNT] *
+			//		((iter == i) ? (p->particle_count-1) : p->particle_count);
+			//}
+
 			comps[iter] = (struct gp2c_component) {
 				.op = operator,
 				.userdata = &gs[iter*MAX_COMP_COUNT],
@@ -178,6 +203,7 @@ void* find_groundstate_thread(void* params) {
 	pthread_mutex_lock(&mutex);
 	gp2c_doing_calc = false;
 	gp2c_do_plot = true;
+	gp2c_have_groundstate = true;
 	gp2c_res = res;
 	gp2c_settings = settings;
 	pthread_mutex_unlock(&mutex);
@@ -195,30 +221,31 @@ void update() {
 	static char buf[64];
 
 	igBegin("settings", 0, 0);
-		if (igInputInt("basis funcs.", &ui_num_basis_funcs, 1, 8, 0)) {
-			if (ui_num_basis_funcs < 1)
-				ui_num_basis_funcs = 1;
+		if (igCollapsingHeaderTreeNodeFlags("settings", 0)) {
+			if (igInputInt("basis funcs.", &ui_num_basis_funcs, 1, 8, 0)) {
+				if (ui_num_basis_funcs < 1)
+					ui_num_basis_funcs = 1;
+			}
+			if (igInputInt("max iters.", &ui_max_iterations, 1, 8, 0)) {
+				if (ui_max_iterations < 1)
+					ui_max_iterations = 1;
+			}
+			if (igInputDouble("error tol.", &ui_error_tol, 0.0, 0.0, "%.2e", 0)) {
+				if (ui_error_tol < 0.0)
+					ui_error_tol = 0.0;
+			}
+			if (igInputDouble("zero threshold", &ui_zero_threshold, 0.0, 0.0, "%.2e", 0)) {
+				if (ui_zero_threshold < 0.0)
+					ui_zero_threshold = 0.0;
+			}
+			if (igInputInt("measure every", &ui_measure_every, 1, 8, 0)) {
+				if (ui_measure_every < 0)
+					ui_measure_every = 0;
+			}
+			igSpacing();
+			igSeparator();
+			igSpacing();
 		}
-		if (igInputInt("max iters.", &ui_max_iterations, 1, 8, 0)) {
-			if (ui_max_iterations < 1)
-				ui_max_iterations = 1;
-		}
-		if (igInputDouble("error tol.", &ui_error_tol, 0.0, 0.0, "%.2e", 0)) {
-			if (ui_error_tol < 0.0)
-				ui_error_tol = 0.0;
-		}
-		if (igInputDouble("zero threshold", &ui_zero_threshold, 0.0, 0.0, "%.2e", 0)) {
-			if (ui_zero_threshold < 0.0)
-				ui_zero_threshold = 0.0;
-		}
-		if (igInputInt("measure every", &ui_measure_every, 1, 8, 0)) {
-			if (ui_measure_every < 0)
-				ui_measure_every = 0;
-		}
-
-		igSpacing();
-		igSeparator();
-		igSpacing();
 
 		/* add comp */
 		if (comp_count < MAX_COMP_COUNT && igButton("add component", (ImVec2){0,0})) {
@@ -231,8 +258,8 @@ void update() {
 
 			*pp = malloc(sizeof(struct comp_info));
 			memset(*pp, 0, sizeof(struct comp_info));
+			(*pp)->particle_count = 100;
 		}
-
 
 		/* comp buttons */
 		{
@@ -279,6 +306,35 @@ void update() {
 			find_groundstate();
 		}
 		igPopStyleColor(1);
+
+		if (gp2c_have_groundstate) {
+			if (igCollapsingHeaderTreeNodeFlags("Excited states", 0)) {
+			}
+			if (igCollapsingHeaderTreeNodeFlags("groundstate calcs.", 0)) {
+				if (igButton("calc. gp energy per particle", (ImVec2){0,0})) {
+					struct comp_info* p = comp_info_head;
+					u32 iter = 0;
+					while (p) {
+						p->gp_chem_pot = gp2c_res.energy[iter];
+						p->gp_full_energy = gp_energy_per_particle(p->particle_count, gs[iter*MAX_COMP_COUNT + iter]/(p->particle_count-1), gp2c_res.coeff_count, &gp2c_res.coeff[iter*gp2c_res.coeff_count]);
+						p = p->next;
+						iter++;
+					}
+				}
+				if (igButton("find bestmf occupations", (ImVec2){0,0})) {
+				}
+
+				struct comp_info* p = comp_info_head;
+				u32 iter = 0;
+				while (p) {
+					igText("[%u] chem pot: %e", iter, p->gp_chem_pot);
+					igText("[%u] full eng: %e", iter, p->gp_full_energy);
+					p = p->next;
+					iter++;
+				}
+			}
+		}
+
 	igEnd();
 
 
@@ -288,6 +344,10 @@ void update() {
 		if (p->being_edited) {
 			snprintf(buf, 64, "Editing component %d", index);
 			igBegin(buf, 0,0);
+				if (igInputInt("particle count", &p->particle_count, 1, 8, 0)) {
+					if (p->particle_count < 1)
+						p->particle_count = 1;
+				}
 				igComboStr_arr("guess", &p->cur_guess, guess_items, sizeof(guess_items)/sizeof(guess_items[0]), 0);
 				if (p->cur_guess == 1) {
 					/* gaussian */
@@ -347,6 +407,7 @@ void update() {
 		index++;
 	}
 
+	/* Plot result data if we have it */
 	if (gp2c_do_plot) {
 		/* Plot the result */
 		plot_clear();

@@ -267,7 +267,6 @@ int main() {
 
 			memcpy(&bmf_state_coeff[(2*i+0)*res.coeff_count], &eres.eigenvectors[0*res.coeff_count], res.coeff_count*sizeof(f64));
 			memcpy(&bmf_state_coeff[(2*i+1)*res.coeff_count], &eres.eigenvectors[1*res.coeff_count], res.coeff_count*sizeof(f64));
-
 		}
 
 		//f64 best_E = INFINITY;

@@ -10,9 +10,9 @@
 #include <stdio.h>
 
 #define PARTICLE_COUNT 100
-#define GAA (-4.0/((f64)PARTICLE_COUNT-1))
-#define GAB (+2.0/((f64)PARTICLE_COUNT))
-#define GBB (-4.0/((f64)PARTICLE_COUNT-1))
+#define GAA (-2.0/((f64)PARTICLE_COUNT-1))
+#define GAB (+1.0/((f64)PARTICLE_COUNT))
+#define GBB (-2.0/((f64)PARTICLE_COUNT-1))
 #define PERTURBATION(x) gaussian(x, 0, 0.2)
 //#define PERTURBATION(x) (-1.5015*sqrt(x*x - 1.5*1.5 + 1.5015*1.5015));
 
@@ -58,14 +58,14 @@ void guess_integrand(f64* out, f64* in, u32 len, void* data) {
     }
 }
 
-void guess_a(f64* out, u32 len) {
+void guess_a(f64* out, u32 len, u32 comp) {
     static struct integration_settings settings = {
         .abs_error_tol = 1e-10,
         .rel_error_tol = 1e-10,
         .max_evals = 1e5,
     };
     struct guess_integrand_params params = {
-        .xoffset = 0.25,
+        .xoffset = 1,
     };
     settings.userdata = &params;
     for (u32 i = 0; i < len; ++i) {
@@ -76,14 +76,14 @@ void guess_a(f64* out, u32 len) {
 	f64_normalize(out, out, len);
 }
 
-void guess_b(f64* out, u32 len) {
+void guess_b(f64* out, u32 len, u32 comp) {
     static struct integration_settings settings = {
         .abs_error_tol = 1e-10,
         .rel_error_tol = 1e-10,
         .max_evals = 1e5,
     };
     struct guess_integrand_params params = {
-        .xoffset = -0.25,
+        .xoffset = -1,
     };
     settings.userdata = &params;
     for (u32 i = 0; i < len; ++i) {
@@ -96,7 +96,8 @@ void guess_b(f64* out, u32 len) {
 
 void perturbation(const u32 len, f64 out[static len],
                                 f64 in_x[static len], const u32 component_count,
-                                f64 in_u[static len*component_count]) {
+                                f64 in_u[static len*component_count],
+								void* userdata) {
     assert(component_count == 0);
     for (u32 i = 0; i < len; ++i) {
         out[i] = PERTURBATION(in_x[i]);
@@ -269,51 +270,51 @@ int main() {
 			memcpy(&bmf_state_coeff[(2*i+1)*res.coeff_count], &eres.eigenvectors[1*res.coeff_count], res.coeff_count*sizeof(f64));
 		}
 
-		//f64 best_E = INFINITY;
-		//u32 best_na0 = 0;
-		//u32 best_nb0 = 0;
-		//FILE* datafile = fopen("output/bestmf_data", "w");
-		//for (u32 na0 = 0; na0 <= PARTICLE_COUNT; na0 += 5) {
-		//	for (u32 nb0 = 0; nb0 <= PARTICLE_COUNT; nb0 += 5) {
-		//		//u32 nb0 = 0;
-		//		u32 na1 = PARTICLE_COUNT-na0;
-		//		u32 nb1 = PARTICLE_COUNT-nb0;
+		f64 best_E = INFINITY;
+		u32 best_na0 = 0;
+		u32 best_nb0 = 0;
+		FILE* datafile = fopen("output/bestmf_data", "w");
+		for (u32 na0 = 0; na0 <= PARTICLE_COUNT; na0 += 5) {
+			for (u32 nb0 = 0; nb0 <= PARTICLE_COUNT; nb0 += 5) {
+				//u32 nb0 = 0;
+				u32 na1 = PARTICLE_COUNT-na0;
+				u32 nb1 = PARTICLE_COUNT-nb0;
 
-		//		bmf_occupation[0] = na0;
-		//		bmf_occupation[1] = na1;
-		//		bmf_occupation[2] = nb0;
-		//		bmf_occupation[3] = nb1;
+				bmf_occupation[0] = na0;
+				bmf_occupation[1] = na1;
+				bmf_occupation[2] = nb0;
+				bmf_occupation[3] = nb1;
 
-		//		f64 E = best_meanfield_energy_new(
-		//				4,
-		//				bmf_occupation,
-		//				bmf_coupling,
-		//				res.coeff_count,
-		//				bmf_state_coeff);
+				f64 E = best_meanfield_energy_new(
+						4,
+						bmf_occupation,
+						bmf_coupling,
+						res.coeff_count,
+						bmf_state_coeff);
 
-		//		//f64 E2 = best_meanfield_energy( res.coeff_count,
-		//		//							   &bmf_state_coeff[0],
-		//		//							   &bmf_state_coeff[res.coeff_count],
-		//		//							   na0, na1,
-		//		//							   GAA);
+				//f64 E2 = best_meanfield_energy( res.coeff_count,
+				//							   &bmf_state_coeff[0],
+				//							   &bmf_state_coeff[res.coeff_count],
+				//							   na0, na1,
+				//							   GAA);
 
-		//		fprintf(datafile, "%lf\t%lf\t%lf\n",
-		//				(f64)na0/(f64)PARTICLE_COUNT,
-		//				(f64)nb0/(f64)PARTICLE_COUNT,
-		//				E/(f64)(2.0*PARTICLE_COUNT)
-		//				//,E2/(f64)(PARTICLE_COUNT)
-		//				);
+				fprintf(datafile, "%lf\t%lf\t%lf\n",
+						(f64)na0/(f64)PARTICLE_COUNT,
+						(f64)nb0/(f64)PARTICLE_COUNT,
+						E/(f64)(2.0*PARTICLE_COUNT)
+						//,E2/(f64)(PARTICLE_COUNT)
+						);
 
-		//		if (E < best_E) {
-		//			best_E = E;
-		//			best_na0 = na0;
-		//			best_nb0 = nb0;
-		//		}
-		//	}
-		//}
-		//fclose(datafile);
+				if (E < best_E) {
+					best_E = E;
+					best_na0 = na0;
+					best_nb0 = nb0;
+				}
+			}
+		}
+		fclose(datafile);
 
-		//printf("Best energy: %lf for [%u,%u]\n", best_E/(2.0*PARTICLE_COUNT), best_na0, best_nb0);
+		printf("Best energy: %lf for [%u,%u]\n", best_E/(2.0*PARTICLE_COUNT), best_na0, best_nb0);
 
 		plot_update_until_closed();
 		plot_shutdown();

@@ -25,6 +25,7 @@
 
 #define MAX_COMP_COUNT 16
 static f64 gs[MAX_COMP_COUNT*MAX_COMP_COUNT] = {0};
+static f64 gs_w_particle_count[MAX_COMP_COUNT*MAX_COMP_COUNT] = {0};
 static f64 xoffset[MAX_COMP_COUNT] = {0};
 
 static const char* guess_items[] = {
@@ -88,11 +89,11 @@ static i32 ui_states_to_include = 5;
 
 void log_callback(enum sbmf_log_level log_level, const char* msg) {
 	switch (log_level) {
-		case SBMF_LOG_LEVEL_INFO: 		printf("[info] "); break;
-		case SBMF_LOG_LEVEL_WARNING: 	printf("[warning] "); break;
-		case SBMF_LOG_LEVEL_ERROR: 		printf("[error] "); break;
-		case SBMF_LOG_LEVEL_PANIC: 		printf("[panic] "); break;
-		default: printf("[other] "); break;
+		case SBMF_LOG_LEVEL_INFO: 		printf("[info] "); 		break;
+		case SBMF_LOG_LEVEL_WARNING: 	printf("[warning] "); 	break;
+		case SBMF_LOG_LEVEL_ERROR: 		printf("[error] "); 	break;
+		case SBMF_LOG_LEVEL_PANIC: 		printf("[panic] "); 	break;
+		default: 						printf("[other] "); 	break;
 	};
 	printf("%s\n", msg);
 }
@@ -185,15 +186,15 @@ void* find_groundstate_thread(void* params) {
 		struct comp_info* p = comp_info_head;
 		u32 iter = 0;
 		while (p) {
-			//for (u32 i = 0; i < comp_count; ++i) {
-			//	gs_w_particle_count[iter*MAX_COMP_COUNT] =
-			//		gs[iter*MAX_COMP_COUNT] *
-			//		((iter == i) ? (p->particle_count-1) : p->particle_count);
-			//}
+			for (u32 i = 0; i < comp_count; ++i) {
+				gs_w_particle_count[iter*MAX_COMP_COUNT] =
+					gs[iter*MAX_COMP_COUNT] *
+					((iter == i) ? (p->particle_count-1) : p->particle_count);
+			}
 
 			comps[iter] = (struct gp2c_component) {
 				.op = operator,
-				.userdata = &gs[iter*MAX_COMP_COUNT],
+				.userdata = &gs_w_particle_count[iter*MAX_COMP_COUNT],
 			};
 
 			switch (p->cur_guess) {
@@ -296,7 +297,7 @@ void update() {
 			u32 iter = 0;
 			while (p) {
 				snprintf(buf, 64, "comp. %u", iter);
-				if (igInputScalarN(buf, ImGuiDataType_Double, &gs[iter*MAX_COMP_COUNT], comp_count, 0, 0, "%.1lf", 0)) {
+				if (igInputScalarN(buf, ImGuiDataType_Double, &gs[iter*MAX_COMP_COUNT], comp_count, 0, 0, "%.3lf", 0)) {
 				}
 				p = p->next;
 				iter++;
@@ -397,6 +398,52 @@ void update() {
 					}
 				}
 				if (igButton("find bestmf occupations", (ImVec2){0,0})) {
+					u32 states_per_comp = 2;
+					u32 len = states_per_comp*comp_count;
+					f64 coupling[len*len];
+					{
+						// 2 comps 2 states per comp
+						// g11 g11 g12 g12 		- first  state in comp 1
+						// g11 g11 g12 g12		- second state in comp 1
+						// g21 g21 g22 g22		- first  state in comp 2
+						// g21 g21 g22 g22		- second state in comp 2
+						//
+						// 2 comps 3 states per comp
+						// g11 g11 g11 g12 g12 g12
+						// g11 g11 g11 g12 g12 g12
+						// g11 g11 g11 g12 g12 g12
+						// g21 g21 g21 g22 g22 g22
+						// g21 g21 g21 g22 g22 g22
+						// g21 g21 g21 g22 g22 g22
+
+						for (u32 i = 0; i < len; ++i) {
+							u32 state_i = i / states_per_comp;
+							for (u32 j = 0; j < len; ++j) {
+								u32 state_j = j / states_per_comp;
+								f64 g = gs[state_i*MAX_COMP_COUNT + state_j];
+								//printf("[%u,%u]  ", state_i,state_j);
+								//printf("%.3lf  ", g);
+							}
+							printf("\n");
+						}
+					}
+					f64 bestmf_coeffs[len*gp2c_res.coeff_count];
+					for (u32 i = 0; i < len; ++i) {
+						u32 comp = i / states_per_comp;
+						u32 state  = i % comp_count;
+						{
+							struct comp_info* p = comp_info_head;
+							u32 iter = 0;
+							while (p) {
+								if (iter == comp)
+									break;
+								p = p->next;
+								iter++;
+							}
+
+							memcpy(&bestmf_coeffs[i*gp2c_res.coeff_count], &p->excited_states.eigenvectors[state*p->excited_states.points_per_eigenvector], gp2c_res.coeff_count);
+						}
+					}
 				}
 
 				struct comp_info* p = comp_info_head;

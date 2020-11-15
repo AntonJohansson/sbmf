@@ -3,6 +3,7 @@
 #include <sbmf/math/harmonic_oscillator.h>
 #include <sbmf/math/functions.h>
 #include <sbmf/methods/best_meanfield.h>
+#include <sbmf/math/find_eigenpairs.h>
 
 #include <plot/plot.h>
 #define CIMGUI_DEFINE_ENUMS_AND_STRUCTS
@@ -13,6 +14,13 @@
 #include <stdlib.h>
 #include <string.h>
 #include <pthread.h>
+
+#if 1
+#define PERTURBATION(x) \
+	gaussian(x, 0.0, 0.2)
+#else
+#define PERTURBATION(x) 0
+#endif
 
 
 #define MAX_COMP_COUNT 16
@@ -36,6 +44,8 @@ struct comp_info {
 	/* per particle energies */
 	f64 gp_chem_pot;
 	f64 gp_full_energy;
+
+	struct eigen_result_real excited_states;
 };
 
 static u32 comp_count = 0;
@@ -71,7 +81,7 @@ static pthread_mutex_t mutex;
 
 
 static bool has_excited_states = false;
-struct eig_result_real excited_states;
+static i32 ui_states_to_include = 5;
 
 
 
@@ -143,7 +153,7 @@ void operator(const u32 len, f64 out[static len],
 			  f64 wf[static len*component_count],
 			  void* userdata) {
 	for (u32 i = 0; i < len; ++i) {
-		out[i] = gaussian(in[i], 0.0, 0.2);
+		out[i] = PERTURBATION(in[i]);
 		for (u32 j = 0; j < component_count; ++j) {
 			f64* g = userdata;
 			f64 c = fabs(wf[j*len + i]);
@@ -309,6 +319,71 @@ void update() {
 
 		if (gp2c_have_groundstate) {
 			if (igCollapsingHeaderTreeNodeFlags("Excited states", 0)) {
+				if (igInputInt("states to include", &ui_states_to_include, 1,8,0)) {
+					if (ui_states_to_include < 1)
+						ui_states_to_include = 1;
+				}
+				if (igButton("calc. excited states", (ImVec2){0,0})) {
+					struct comp_info* p = comp_info_head;
+					u32 index = 0;
+					while (p) {
+						p->excited_states = find_eigenpairs_sparse_real(gp2c_res.hamiltonian[index], ui_states_to_include, EV_SMALLEST_MAG);
+						p = p->next;
+						index++;
+					}
+
+					/* Plot the result */
+					{
+						plot_clear();
+
+						for (u32 i = 0; i < N; ++i) {
+							f64 x = sp.points[i];
+							data[i] = (f32) ho_potential(&x,1,0) + PERTURBATION(x);
+						}
+						push_line_plot(&(plot_push_desc){
+								.space = &sp,
+								.data = data,
+								.label = "potential",
+								});
+
+
+						f64 sample_in[N];
+						for (u32 i = 0; i < N; ++i) {
+							sample_in[i] = (f64) sp.points[i];
+						}
+
+						struct comp_info* p = comp_info_head;
+						u32 iter = 0;
+						while (p) {
+							for (u32 j = 0; j < p->excited_states.num_eigenpairs; ++j) {
+								f64 sample_out[N];
+								gp2c_settings.basis.sample(p->excited_states.points_per_eigenvector,
+										&p->excited_states.eigenvectors[j*p->excited_states.points_per_eigenvector],
+										N, sample_out, sample_in);
+
+								for (u32 i = 0; i < N; ++i) {
+									f64 c = fabs(sample_out[i]);
+									data[i] = c*c;
+								}
+								push_line_plot(&(plot_push_desc){
+										.space = &sp,
+										.data = data,
+										.label = plot_snprintf("comp %u state %u", iter, j),
+										.offset = p->excited_states.eigenvalues[j],
+										});
+							}
+
+							p = p->next;
+							iter++;
+						}
+
+						for (u32 i = 0; i < gp2c_res.component_count; ++i) {
+
+						}
+					}
+
+					has_excited_states = true;
+				}
 			}
 			if (igCollapsingHeaderTreeNodeFlags("groundstate calcs.", 0)) {
 				if (igButton("calc. gp energy per particle", (ImVec2){0,0})) {
@@ -359,7 +434,7 @@ void update() {
 
 						for (u32 i = 0; i < N; ++i) {
 							f64 x = sp.points[i];
-							data[i] = (f32) ho_potential(&x,1,0) + gaussian(x,0,0.2);
+							data[i] = (f32) ho_potential(&x,1,0) + PERTURBATION(x);
 						}
 						push_line_plot(&(plot_push_desc){
 								.space = &sp,
@@ -414,7 +489,7 @@ void update() {
 
 		for (u32 i = 0; i < N; ++i) {
 			f64 x = sp.points[i];
-			data[i] = (f32) ho_potential(&x,1,0) + gaussian(x,0,0.2);
+			data[i] = (f32) ho_potential(&x,1,0) + PERTURBATION(x);
 		}
 		push_line_plot(&(plot_push_desc){
 				.space = &sp,

@@ -10,11 +10,11 @@
 #include <stdio.h>
 
 #define PARTICLE_COUNT 100
-#define GAA (-2.0/((f64)PARTICLE_COUNT-1))
-#define GAB (+1.0/((f64)PARTICLE_COUNT))
-#define GBB (-2.0/((f64)PARTICLE_COUNT-1))
-#define PERTURBATION(x) gaussian(x, 0, 0.2)
-//#define PERTURBATION(x) (-1.5015*sqrt(x*x - 1.5*1.5 + 1.5015*1.5015));
+#define GAA (-4.0/((f64)PARTICLE_COUNT-1))
+#define GAB (+0.0/((f64)PARTICLE_COUNT))
+#define GBB (-4.0/((f64)PARTICLE_COUNT-1))
+//#define PERTURBATION(x) gaussian(x, 0, 0.2)
+#define PERTURBATION(x) (-1.5015*sqrt(x*x - 1.5*1.5 + 1.5015*1.5015));
 
 void op_a(const u32 len, f64 out[static len],
                                 f64 in_x[static len], const u32 component_count,
@@ -193,11 +193,11 @@ int main() {
     struct gp2c_component components[2] = {
         [0] = {
             .op = op_a,
-            .guess = guess_a
+            //.guess = guess_a
         },
         [1] = {
             .op = op_b,
-            .guess = guess_b
+            //.guess = guess_b
         },
     };
 

@@ -1,5 +1,6 @@
 #include <sbmf/sbmf.h>
 #include <sbmf/methods/gp2c.h>
+#include <sbmf/methods/gp2c_gsl.h>
 #include <sbmf/math/harmonic_oscillator.h>
 #include <sbmf/math/functions.h>
 #include <sbmf/methods/best_meanfield.h>
@@ -16,8 +17,8 @@
 #include <pthread.h>
 
 #if 1
-#define PERTURBATION(x) \
-	gaussian(x, 0.0, 0.2)
+#define PERTURBATION(x) gaussian(x, 0.0, 0.2)
+//#define PERTURBATION(x) 2 + (-1.5015*sqrt(x*x - 1.5*1.5 + 1.5015*1.5015));
 #else
 #define PERTURBATION(x) 0
 #endif

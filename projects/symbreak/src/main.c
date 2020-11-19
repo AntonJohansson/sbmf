@@ -9,11 +9,12 @@
 
 #include <stdio.h>
 
-#define PARTICLE_COUNT 100
-#define GAA (-1.0/((f64)PARTICLE_COUNT-1))
-#define GAB (+0.5/((f64)PARTICLE_COUNT))
-#define GBB (-1.0/((f64)PARTICLE_COUNT-1))
-#define PERTURBATION(x) gaussian(x, 0, 0.2)
+#define PARTICLE_COUNT 1000
+#define GAA (+1.0/((f64)PARTICLE_COUNT-1))
+#define GAB (+2.0/((f64)PARTICLE_COUNT))
+#define GBB (+1.0/((f64)PARTICLE_COUNT-1))
+#define PERTURBATION(x) 0.5*gaussian(x, 0, 0.1)
+//#define PERTURBATION(x) 0.0
 //#define PERTURBATION(x) (-1.5015*sqrt(x*x - 1.5*1.5 + 1.5015*1.5015));
 
 void op_a(const u32 len, f64 out[static len],
@@ -235,7 +236,7 @@ int main() {
         .ho_potential_perturbation = perturbation,
         .gk = gk15,
 		.basis = ho_basis,
-		.zero_threshold = 1e-10,
+		.zero_threshold = 1e-10, /* ? */
 		//.dbgcallback = debug_callback,
 		//.measure_every = 1,
     };
@@ -251,6 +252,49 @@ int main() {
     };
 
 	struct gp2c_result res = gp2c(settings, 2, components);
+
+#if 1
+	{
+		const u32 N = 256;
+		plot_init(800, 600, "gp2c");
+		f32 potdata[N], adata[N], bdata[N];
+		sample_space sp = make_linspace(1, -5, 5, N);
+
+		for (u32 i = 0; i < N; ++i) {
+			f64 x = sp.points[i];
+			potdata[i] = (f32) ho_potential(&x,1,0) + PERTURBATION(x);
+		}
+		push_line_plot(&(plot_push_desc){
+				.space = &sp,
+				.data = potdata,
+				.label = "potential",
+				});
+
+		f64 sample_in[N];
+		for (u32 i = 0; i < N; ++i) {
+			sample_in[i] = (f64) sp.points[i];
+		}
+
+		for (u32 i = 0; i < res.component_count; ++i) {
+			f64 sample_out[N];
+			ho_sample(res.coeff_count, &res.coeff[i*res.coeff_count], N, sample_out, sample_in);
+
+			f32 data[N];
+			for (u32 k = 0; k < N; ++k) {
+				data[k] = fabs(sample_out[k])*fabs(sample_out[k]);
+			}
+			push_line_plot(&(plot_push_desc){
+					.space = &sp,
+					.data = data,
+					.label = plot_snprintf("comp: %u", i),
+					.offset = res.energy[i],
+					});
+		}
+
+		plot_update_until_closed();
+		plot_shutdown();
+	}
+#endif
 
 	for (u32 i = 0; i < res.component_count; ++i) {
 		printf("[%u] gp single particle energy: %lf\n", i, res.energy[i]);
@@ -290,7 +334,7 @@ int main() {
 		}
 	}
 
-#if 1
+#if 0
 	{
 		const u32 N = 256;
 		plot_init(800, 600, "gp2c");
@@ -370,6 +414,15 @@ int main() {
 	}
 #endif
 
+
+
+
+
+
+
+	f64 pt1_coeffs[res.coeff_count];
+	memcpy(pt1_coeffs, res.coeff, res.coeff_count*sizeof(f64));
+
 	printf("Trying perturbation theory for comp 0\n");
 	{
 		const u32 NA = PARTICLE_COUNT;
@@ -405,6 +458,15 @@ int main() {
 						- ((NA-2)*ENERGY(0,0) + ENERGY(0,i) + ENERGY(0,j))
 						- NB*ENERGY(1,0)
 						);
+
+				f64 scaling = tmp/(
+						NA*ENERGY(0,0)+NB*ENERGY(1,0)
+						- ((NA-2)*ENERGY(0,0) + ENERGY(0,i) + ENERGY(0,j))
+						- NB*ENERGY(1,0)
+						);
+				for (u32 k = 0; k < res.coeff_count; ++k) {
+					pt1_coeffs[k] += scaling*((&PHI(0,i))[k] + (&PHI(0,j))[k]);
+				}
 				/* B comp */
 				tmp = factor * GBB*sqrt(NB*(NB-1))*V(l, &PHI(1,i), &PHI(1,j), &PHI(1,0), &PHI(1,0));
 				E2 += tmp*tmp/(
@@ -425,6 +487,17 @@ int main() {
 						- ((NA-1)*ENERGY(0,0) + ENERGY(0,i))
 						- ((NB-1)*ENERGY(1,0) + ENERGY(1,j))
 						);
+
+
+				f64 scaling = tmp/(
+						NA*ENERGY(0,0) + NB*ENERGY(1,0)
+						- ((NA-1)*ENERGY(0,0) + ENERGY(0,i))
+						- ((NB-1)*ENERGY(1,0) + ENERGY(1,j))
+						);
+				for (u32 k = 0; k < res.coeff_count; ++k) {
+					pt1_coeffs[k] += scaling*((&PHI(0,i))[k]);
+				}
+
 			}
 		}
 
@@ -433,6 +506,48 @@ int main() {
 		printf("E2: %.2e\t%.2lf\n", E2, E2/(NA+NB));
 		printf("E0+E1+E2 = %.2e\t%.2lf\n", E0+E1+E2, (E0+E1+E2)/(NA+NB));
 	}
+
+	f64_normalize(pt1_coeffs, pt1_coeffs, res.coeff_count);
+
+#if 0
+	{
+		const u32 N = 256;
+		plot_init(800, 600, "gp2c");
+		f32 potdata[N], adata[N], bdata[N];
+		sample_space sp = make_linspace(1, -5, 5, N);
+
+		for (u32 i = 0; i < N; ++i) {
+			f64 x = sp.points[i];
+			potdata[i] = (f32) ho_potential(&x,1,0) + PERTURBATION(x);
+		}
+		push_line_plot(&(plot_push_desc){
+				.space = &sp,
+				.data = potdata,
+				.label = "potential",
+				});
+
+		f64 sample_in[N];
+		for (u32 i = 0; i < N; ++i) {
+			sample_in[i] = (f64) sp.points[i];
+		}
+
+		f64 sample_out[N];
+		ho_sample(res.coeff_count, pt1_coeffs, N, sample_out, sample_in);
+
+		f32 data[N];
+		for (u32 k = 0; k < N; ++k) {
+			data[k] = fabs(sample_out[k])*fabs(sample_out[k]);
+		}
+		push_line_plot(&(plot_push_desc){
+				.space = &sp,
+				.data = data,
+				.label = plot_snprintf("?"),
+				});
+
+		plot_update_until_closed();
+		plot_shutdown();
+	}
+#endif
 
 	sbmf_shutdown();
 }

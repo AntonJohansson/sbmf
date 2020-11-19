@@ -388,6 +388,7 @@ describe(item_vs_gp2c) {
 			.error_tol = 1e-9,
 			.gk = gk15,
 			.basis = ho_basis,
+			.zero_threshold=1e-10,
 		};
 
 		struct gss_result item_res = item(item_settings, non_linear_hamiltonian_pot, item_guess);

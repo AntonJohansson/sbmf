@@ -6,12 +6,14 @@ PROJ_SRCS = \
 	src/sbmf/sbmf.c \
 	src/sbmf/methods/quadgk_vec.c \
 	src/sbmf/methods/item.c \
-	src/sbmf/methods/gp2c.c \
-	src/sbmf/methods/gp2c_gsl.c \
+	src/sbmf/methods/nlse_solver.c \
+	src/sbmf/methods/grosspitaevskii.c \
 	src/sbmf/methods/best_meanfield.c \
 	src/sbmf/math/find_eigenpairs.c \
 	src/sbmf/math/matrix.c \
 	src/sbmf/debug/profile.c
+
+	#src/sbmf/methods/gp2c_gsl.c \
 
 PROJ_OBJS = $(patsubst %.c, $(BUILDDIR)/%.o, $(PROJ_SRCS))
 

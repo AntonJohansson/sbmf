@@ -28,8 +28,9 @@
 #include <sbmf/sbmf.h>
 #include <sbmf/methods/quadgk_vec.h>
 #include <sbmf/methods/item.h>
-#include <sbmf/methods/gp2c.h>
-#include <sbmf/methods/gp2c_gsl.h>
+#include <sbmf/methods/nlse_solver.h>
+#include <sbmf/methods/grosspitaevskii.h>
+//#include <sbmf/methods/gp2c_gsl.h>
 #include <sbmf/methods/best_meanfield.h>
 #include <sbmf/math/functions.h>
 #include <sbmf/math/harmonic_oscillator.h>
@@ -365,7 +366,7 @@ void non_linear_hamiltonian_vec_pot(const u32 len, f64 out[static len],
 	}
 }
 
-describe(item_vs_gp2c) {
+describe(item_vs_gp) {
 	before_each() { sbmf_init(); }
 	after_each() { sbmf_shutdown(); }
 
@@ -382,8 +383,9 @@ describe(item_vs_gp2c) {
 			.error_tol = 1e-9,
 			.dt = 1e-4,
 		};
-		struct gp2c_settings gp2c_settings = {
-			.num_basis_functions = 32,
+
+		struct nlse_settings nlse_settings = {
+			.num_basis_funcs = 32,
 			.max_iterations = 1e9,
 			.error_tol = 1e-9,
 			.gk = gk15,
@@ -393,15 +395,15 @@ describe(item_vs_gp2c) {
 
 		struct gss_result item_res = item(item_settings, non_linear_hamiltonian_pot, item_guess);
 
-		struct gp2c_result gp2c_res = gp2c(gp2c_settings, 1, &(struct gp2c_component) {
+		struct nlse_result nlse_res = nlse_solver(nlse_settings, 1, &(struct nlse_component) {
 					.op = non_linear_hamiltonian_vec_pot,
 				});
 
-		f64 gp2c_sample[N];
-		gp2c_settings.basis.sample(gp2c_res.coeff_count, gp2c_res.coeff, N, gp2c_sample, space.points);
+		f64 nlse_sample[N];
+		nlse_settings.basis.sample(nlse_res.coeff_count, nlse_res.coeff, N, nlse_sample, space.points);
 
 		for (u32 i = 0; i < N; ++i) {
-			f64 c1 = fabs(gp2c_sample[i]);
+			f64 c1 = fabs(nlse_sample[i]);
 			f64 c2 = cabs(item_res.wavefunction[i]);
 			asserteq(fabs(c1*c1 - c2*c2) < 1e-2, true);
 		}
@@ -504,83 +506,83 @@ void perturbation(const u32 len, f64 out[static len],
 }
 
 
-describe(2comp) {
-	before_each() { sbmf_init(); }
-	after_each()  { sbmf_shutdown(); }
-
-	it ("?") {
-		struct gp2c_settings gp2c_settings = {
-			.num_basis_functions = 16,
-			.max_iterations = 1e9,
-			.error_tol = 1e-9,
-			.gk = gk15,
-			.basis = ho_basis,
-			.ho_potential_perturbation = perturbation,
-		};
-
-		struct gp2c_component comps[2] = {
-			[0] = {
-				.op = op_2comp_a,
-			},
-			[1] = {
-				.op = op_2comp_b,
-			},
-		};
-
-		struct gp2c_result gp2c_res = gp2c(gp2c_settings, 2, comps);
-
-#if 1
-		{
-			const f64 L = 10.0;
-			const u32 N = 512;
-
-			plot_init(800, 600, "2comp");
-			f32 pdata[N];
-			sample_space sp = make_linspace(1, -L/2.0, L/2.0, N);
-
-			for (u32 i = 0; i < N; ++i) {
-				f64 x = sp.points[i];
-				pdata[i] = (f32) ho_potential(&x,1,0) + gaussian(x,0,0.2);
-			}
-			push_line_plot(&(plot_push_desc){
-					.space = &sp,
-					.data = pdata,
-					.label = "potential",
-					});
-
-			f64 sample_in[N];
-			for (u32 i = 0; i < N; ++i) {
-				sample_in[i] = (f64) sp.points[i];
-			}
-
-			for (u32 i = 0; i < gp2c_res.component_count; ++i) {
-				f64 sample_out[N];
-				gp2c_settings.basis.sample(gp2c_res.coeff_count, &gp2c_res.coeff[i*gp2c_res.coeff_count], N, sample_out, sample_in);
-
-				for (u32 i = 0; i < N; ++i) {
-					f64 c = fabs(sample_out[i]);
-					pdata[i] = c*c;
-				}
-				push_line_plot(&(plot_push_desc){
-						.space = &sp,
-						.data = pdata,
-						.label = plot_snprintf("comp %u", i),
-						.offset = gp2c_res.energy[i],
-						});
-			}
-
-
-			plot_update_until_closed();
-			plot_shutdown();
-		}
-#endif
-	}
-}
-
-
-
-
-
+//describe(2comp) {
+//	before_each() { sbmf_init(); }
+//	after_each()  { sbmf_shutdown(); }
+//
+//	it ("?") {
+//		struct gp2c_settings gp2c_settings = {
+//			.num_basis_functions = 16,
+//			.max_iterations = 1e9,
+//			.error_tol = 1e-9,
+//			.gk = gk15,
+//			.basis = ho_basis,
+//			.ho_potential_perturbation = perturbation,
+//		};
+//
+//		struct gp2c_component comps[2] = {
+//			[0] = {
+//				.op = op_2comp_a,
+//			},
+//			[1] = {
+//				.op = op_2comp_b,
+//			},
+//		};
+//
+//		struct gp2c_result gp2c_res = gp2c(gp2c_settings, 2, comps);
+//
+//#if 1
+//		{
+//			const f64 L = 10.0;
+//			const u32 N = 512;
+//
+//			plot_init(800, 600, "2comp");
+//			f32 pdata[N];
+//			sample_space sp = make_linspace(1, -L/2.0, L/2.0, N);
+//
+//			for (u32 i = 0; i < N; ++i) {
+//				f64 x = sp.points[i];
+//				pdata[i] = (f32) ho_potential(&x,1,0) + gaussian(x,0,0.2);
+//			}
+//			push_line_plot(&(plot_push_desc){
+//					.space = &sp,
+//					.data = pdata,
+//					.label = "potential",
+//					});
+//
+//			f64 sample_in[N];
+//			for (u32 i = 0; i < N; ++i) {
+//				sample_in[i] = (f64) sp.points[i];
+//			}
+//
+//			for (u32 i = 0; i < gp2c_res.component_count; ++i) {
+//				f64 sample_out[N];
+//				gp2c_settings.basis.sample(gp2c_res.coeff_count, &gp2c_res.coeff[i*gp2c_res.coeff_count], N, sample_out, sample_in);
+//
+//				for (u32 i = 0; i < N; ++i) {
+//					f64 c = fabs(sample_out[i]);
+//					pdata[i] = c*c;
+//				}
+//				push_line_plot(&(plot_push_desc){
+//						.space = &sp,
+//						.data = pdata,
+//						.label = plot_snprintf("comp %u", i),
+//						.offset = gp2c_res.energy[i],
+//						});
+//			}
+//
+//
+//			plot_update_until_closed();
+//			plot_shutdown();
+//		}
+//#endif
+//	}
+//}
+//
+//
+//
+//
+//
 
 
 

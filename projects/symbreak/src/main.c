@@ -1,5 +1,5 @@
 #include <sbmf/sbmf.h>
-#include <sbmf/methods/gp2c.h>
+#include <sbmf/methods/grosspitaevskii.h>
 #include <sbmf/methods/best_meanfield.h>
 #include <sbmf/math/functions.h>
 #include <sbmf/math/harmonic_oscillator.h>
@@ -17,89 +17,10 @@
 //#define PERTURBATION(x) 0.0
 //#define PERTURBATION(x) (-1.5015*sqrt(x*x - 1.5*1.5 + 1.5015*1.5015));
 
-void op_a(const u32 len, f64 out[static len],
-                                f64 in_x[static len], const u32 component_count,
-                                f64 in_u[static len*component_count],
-								void* userdata) {
-    for (u32 i = 0; i < len; ++i) {
-        f64 ca = fabs(in_u[i]);
-        f64 cb = fabs(in_u[len + i]);
-        out[i] =
-            + GAA*(PARTICLE_COUNT-1)*ca*ca
-            + GAB*(PARTICLE_COUNT)*cb*cb;
-    }
-}
-
-void op_b(const u32 len, f64 out[static len],
-                                f64 in_x[static len], const u32 component_count,
-                                f64 in_u[static len*component_count],
-								void* userdata) {
-    for (u32 i = 0; i < len; ++i) {
-        f64 ca = fabs(in_u[i]);
-        f64 cb = fabs(in_u[len + i]);
-        out[i] =
-            + GBB*(PARTICLE_COUNT-1)*cb*cb
-            + GAB*(PARTICLE_COUNT)*ca*ca;
-    }
-}
-
-struct guess_integrand_params {
-    u32 n;
-    f64 xoffset;
-};
-
-void guess_integrand(f64* out, f64* in, u32 len, void* data) {
-    struct guess_integrand_params* params = data;
-
-	f64 eig;
-	ho_eigenfunc(params->n, 1, &eig, in);
-
-    for (u32 i = 0; i < len; ++i) {
-        out[i] = eig * gaussian(in[i], params->xoffset, 0.2);
-    }
-}
-
-void guess_a(f64* out, u32 len, u32 comp) {
-    static struct integration_settings settings = {
-        .abs_error_tol = 1e-10,
-        .rel_error_tol = 1e-10,
-        .max_evals = 1e5,
-    };
-    struct guess_integrand_params params = {
-        .xoffset = 1,
-    };
-    settings.userdata = &params;
-    for (u32 i = 0; i < len; ++i) {
-        params.n = i;
-        struct integration_result res = quadgk_vec(guess_integrand, -INFINITY, INFINITY, settings);
-        out[i] = res.integral;
-    }
-	f64_normalize(out, out, len);
-}
-
-void guess_b(f64* out, u32 len, u32 comp) {
-    static struct integration_settings settings = {
-        .abs_error_tol = 1e-10,
-        .rel_error_tol = 1e-10,
-        .max_evals = 1e5,
-    };
-    struct guess_integrand_params params = {
-        .xoffset = -1,
-    };
-    settings.userdata = &params;
-    for (u32 i = 0; i < len; ++i) {
-        params.n = i;
-        struct integration_result res = quadgk_vec(guess_integrand, -INFINITY, INFINITY, settings);
-        out[i] = res.integral;
-    }
-	f64_normalize(out, out, len);
-}
-
 void perturbation(const u32 len, f64 out[static len],
                                 f64 in_x[static len], const u32 component_count,
                                 f64 in_u[static len*component_count],
 								void* userdata) {
-    assert(component_count == 0);
     for (u32 i = 0; i < len; ++i) {
         out[i] = PERTURBATION(in_x[i]);
     }
@@ -115,41 +36,6 @@ void perturbation(const u32 len, f64 out[static len],
 
 
 
-
-
-void debug_callback(struct gp2c_settings settings, struct gp2c_result res) {
-
-  plot_init(800,600,"debug");
-
-  const u32 N = 256;
-  f32 adata[N];
-  sample_space sp = make_linspace(1, -5, 5, N);
-
-  f64 sample_in[N];
-  for (u32 i = 0; i < N; ++i) {
-      sample_in[i] = (f64) sp.points[i];
-  }
-
-  for (u32 i = 0; i < res.component_count; ++i) {
-	  f64 sample_out[N];
-	  ho_sample(res.coeff_count, &res.coeff[i*res.coeff_count], N, sample_out, sample_in);
-
-	  for (u32 i = 0; i < N; ++i) {
-		  f64 ca = fabs(sample_out[i]);
-		  adata[i] = ca*ca;
-	  }
-
-	  push_line_plot(&(plot_push_desc){
-			  .space = &sp,
-			  .data = adata,
-			  .label = plot_snprintf("comp %u", i),
-			  });
-  }
-
-
-  plot_update_until_closed();
-  plot_shutdown();
-}
 
 
 
@@ -218,7 +104,14 @@ f64 V(const u32 coeff_count, f64 i[static coeff_count],
 
 
 
-
+void gaussian0(f64* out, f64* in, u32 len, void* data) {
+	for (u32 i = 0; i < len; ++i)
+		out[i] = gaussian(in[i] + 1.0, 0.0, 0.2);
+}
+void gaussian1(f64* out, f64* in, u32 len, void* data) {
+	for (u32 i = 0; i < len; ++i)
+		out[i] = gaussian(in[i] - 1.0, 0.0, 0.2);
+}
 
 
 
@@ -229,29 +122,32 @@ int main() {
 
 	printf("gab^2 < gaa*gbb | %lf < %lf\n", GAB*GAB, GAA*GBB);
 
-	struct gp2c_settings settings = {
-        .num_basis_functions = 16,
-        .max_iterations = 1e8,
-        .error_tol = 1e-9,
-        .ho_potential_perturbation = perturbation,
-        .gk = gk15,
+	struct gp_settings settings = {
+        .pot = perturbation,
+
+        .num_basis_funcs = 16,
 		.basis = ho_basis,
-		.zero_threshold = 1e-10, /* ? */
-		//.dbgcallback = debug_callback,
-		//.measure_every = 1,
-    };
-    struct gp2c_component components[2] = {
-        [0] = {
-            .op = op_a,
-            .guess = guess_a
-        },
-        [1] = {
-            .op = op_b,
-            .guess = guess_b
-        },
+
+		.component_count = 2,
+		.occupations = (u32[]){100,100},
+		.guesses = (struct nlse_guess[]) {
+			[0] = {
+				.type = SPATIAL_GUESS,
+				.data.spatial_guess = gaussian0,
+			},
+			[1] = {
+				.type = SPATIAL_GUESS,
+				.data.spatial_guess = gaussian1,
+			},
+		},
+		.g0 = (f64[]){
+			0.02,  0.001,
+			0.001, 0.02
+		},
     };
 
-	struct gp2c_result res = gp2c(settings, 2, components);
+	struct nlse_result res = grosspitaevskii(settings);
+	printf("full gp energy: %lf\n", full_energy(settings, res));
 
 #if 1
 	{

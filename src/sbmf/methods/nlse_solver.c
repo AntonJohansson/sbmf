@@ -1,4 +1,4 @@
-#include <sbmf/methods/gp2c.h>
+#include <sbmf/methods/nlse_solver.h>
 #include <sbmf/sbmf.h>
 #include <sbmf/math/find_eigenpairs.h>
 #include <sbmf/math/harmonic_oscillator.h>
@@ -13,7 +13,7 @@ struct integrand_params {
 	u32 coeff_count;
 	f64* coeff;
 
-	gp2c_operator_func* op;
+	nlse_operator_func* op;
 	void* op_userdata;
 
 	struct basis basis;
@@ -26,6 +26,29 @@ static void sbmf_log_integration_result(integration_result res) {
 	sbmf_log_info("converged: %s", (res.converged) ? "yes" : "no");
 }
 
+/* functions to handle spatial guesses */
+
+struct guess_integrand_params {
+    u32 n;
+	nlse_spatial_guess_func* func;
+	struct basis b;
+};
+
+void guess_integrand(f64* out, f64* in, u32 len, void* data) {
+    struct guess_integrand_params* params = data;
+
+    f64 eig;
+	params->b.eigenfunc(params->n, 1, &eig, in);
+
+	f64 sample[len];
+	params->func(sample, in, len, NULL);
+
+    for (u32 i = 0; i < len; ++i) {
+        out[i] = eig * sample[i];
+    }
+}
+
+/* function to sample linear and non-linear matrix elements */
 static void linear_me_integrand(f64* out, f64* in, u32 len, void* data) {
 	struct integrand_params* params = data;
 
@@ -63,12 +86,12 @@ static void nonlinear_me_integrand(f64* out, f64* in, u32 len, void* data) {
 	}
 }
 
-struct gp2c_result gp2c(struct gp2c_settings settings, const u32 component_count, struct gp2c_component component[static component_count]) {
-	const u32 N = settings.num_basis_functions;
+struct nlse_result nlse_solver(struct nlse_settings settings, const u32 component_count, struct nlse_component component[static component_count]) {
+	const u32 N = settings.num_basis_funcs;
 	const u32 matrix_element_count = N*(N+1)/2;
 
 	/* Setup results struct */
-	struct gp2c_result res = {
+	struct nlse_result res = {
 		.iterations = 0,
 		.component_count = component_count,
 		.coeff_count = N,
@@ -93,15 +116,39 @@ struct gp2c_result gp2c(struct gp2c_settings settings, const u32 component_count
 
 	/* Setup intial guess values for coeffs */
 	for (u32 i = 0; i < component_count; ++i) {
-		if (component[i].guess) {
-			component[i].guess(&res.coeff[i*res.coeff_count], res.coeff_count, i);
-		} else {
-			for (u32 j = 0; j < res.coeff_count; ++j) {
-				res.coeff[i*res.coeff_count + j] = 0;
+		switch (component[i].guess.type) {
+			case DEFAULT_GUESS: {
+				for (u32 j = 0; j < res.coeff_count; ++j) {
+					res.coeff[i*res.coeff_count + j] = 0;
+				}
+				/* Initialize the i:th component to the i:th eigenfunction */
+				res.coeff[i*res.coeff_count + i] = 1;
+				break;
 			}
-			/* Initialize the i:th component to the i:th eigenfunction */
-			res.coeff[i*res.coeff_count + i] = 1;
-		}
+			case SPATIAL_GUESS: {
+				struct guess_integrand_params p = {
+					.func = component[i].guess.data.spatial_guess,
+					.b = settings.basis,
+				};
+				int_settings.userdata = &p;
+				f64* out = &res.coeff[i*res.coeff_count];
+				for (u32 j = 0; j < component_count; ++j) {
+					p.n = j;
+					integration_result r = quadgk_vec(guess_integrand, -INFINITY, INFINITY, int_settings);
+					out[j] = r.integral;
+				}
+				f64_normalize(out, out, res.coeff_count);
+
+				break;
+			}
+			case COEFF_GUESS: {
+				component[i].guess.data.coeff_guess(&res.coeff[i*res.coeff_count], res.coeff_count, i);
+				break;
+			}
+			default:
+				sbmf_log_error("nlse_sovler: component %u has invalid guess!", i);
+				return res;
+		};
 	}
 
 	struct integrand_params params = {
@@ -134,8 +181,8 @@ struct gp2c_result gp2c(struct gp2c_settings settings, const u32 component_count
 	/* Construct linear hamiltonian */
 	struct hermitian_bandmat linear_hamiltonian = hermitian_bandmat_new_zero(N,N);
 	{
-		if (settings.ho_potential_perturbation) {
-			params.op = settings.ho_potential_perturbation;
+		if (settings.spatial_pot_perturbation) {
+			params.op = settings.spatial_pot_perturbation;
 #pragma omp parallel for firstprivate(params, int_settings) shared(res)
 			for (u32 i = 0; i < matrix_element_count; ++i) {
 				u32 r = matrix_element_rows[i];
@@ -234,7 +281,7 @@ struct gp2c_result gp2c(struct gp2c_settings settings, const u32 component_count
 		}
 
 		/* Break condition */
-		sbmf_log_info("gp2c finished iterations %u", res.iterations);
+		sbmf_log_info("nlse finished iterations %u", res.iterations);
 		bool should_exit = true;
 		for (u32 i = 0; i < component_count; ++i) {
 			if (res.error[i] > settings.error_tol)

@@ -71,47 +71,52 @@ struct nlse_result grosspitaevskii(struct gp_settings settings) {
 
 
 struct full_energy_integrand_params {
-	struct nlse_result* res;
-	struct gp_settings* settings;
+	u32 coeff_count;
+	f64* coeff_a;
+	f64* coeff_b;
+	struct basis basis;
 };
 
+struct full_energy_integrand_pot_params {
+	u32 coeff_count;
+	f64* coeff_a;
+	nlse_operator_func* V;
+	struct basis basis;
+};
 
+/* Integrand of the form a*V*a */
+void full_energy_integrand_pot(f64* out, f64* in, u32 len, void* data) {
+	struct full_energy_integrand_pot_params* p = data;
+
+	f64 sample[len];
+	p->basis.sample(p->coeff_count, p->coeff_a, len, sample, in);
+
+	f64 pot[len];
+	p->V(len, pot, in, 0, NULL, NULL);
+
+	for (u32 i = 0; i < len; ++i) {
+		out[i] = sample[i]*sample[i]*pot[i];
+	}
+}
+
+/* Integrand of the form |a|^2|b|^2 */
 void full_energy_integrand(f64* out, f64* in, u32 len, void* data) {
 	struct full_energy_integrand_params* p = data;
 
-	const u32 comp_count = p->settings->component_count;
+	f64 sample_a[len];
+	p->basis.sample(p->coeff_count, p->coeff_a, len, sample_a, in);
 
-	f64 pot[len];
-	p->settings->pot(len, pot, in, 0, NULL, NULL);
+	f64 sample_b[len];
+	p->basis.sample(p->coeff_count, p->coeff_b, len, sample_b, in);
 
-	f64 samples[comp_count * len];
-	for (u32 i = 0; i < comp_count; ++i) {
-		p->settings->basis.sample(p->res->coeff_count, &p->res->coeff[i*p->res->coeff_count], len, &samples[i*len], in);
-	}
-
-	for (u32 i = 0; i < comp_count; ++i) {
-		for (u32 j = 0; j < len; ++j) {
-			f64 c = fabs(samples[i*len + j]);
-			out[i] += p->settings->occupations[i]*pot[j]*c*c;
-		}
-
-		for (u32 j = 0; j < comp_count; ++j) {
-			f64 factor;
-			if (i == j)
-				factor = 0.5*p->settings->occupations[i]*(p->settings->occupations[j]-1);
-			else
-				factor = p->settings->occupations[i]*p->settings->occupations[j];
-
-			for (u32 k = 0; k < len; ++k) {
-				f64 c = fabs(samples[j*len + k]);
-				out[k] += p->settings->g0[i*comp_count + j] * factor * c*c*c*c;
-			}
-		}
+	for (u32 i = 0; i < len; ++i) {
+		out[i] = sample_a[i]*sample_a[i]*sample_b[i]*sample_b[i];
 	}
 }
 
 f64 full_energy(struct gp_settings settings, struct nlse_result res) {
 	f64 E = 0.0;
+
 	for (u32 i = 0; i < settings.component_count; ++i) {
 		for (u32 j = 0; j < res.coeff_count; ++j) {
 			f64 c = fabs(res.coeff[i*res.coeff_count + j]);
@@ -120,18 +125,48 @@ f64 full_energy(struct gp_settings settings, struct nlse_result res) {
 	}
 
 	struct full_energy_integrand_params p = {
-		.settings = &settings,
-		.res = &res,
+		.coeff_count = res.coeff_count,
+		.basis = settings.basis,
+	};
+
+	struct full_energy_integrand_pot_params ppot = {
+		.coeff_count = res.coeff_count,
+		.V = settings.pot,
+		.basis = settings.basis,
 	};
 
 	integration_settings int_settings = {
 		.max_evals = 1e5,
 		.abs_error_tol = 1e-10,
-		.userdata = &p,
+		.userdata = &ppot,
 	};
 
-	integration_result ires = quadgk_vec(full_energy_integrand, -INFINITY, INFINITY, int_settings);
-	E += ires.integral;
+	/* pot terms */
+	if (settings.pot) {
+		for (u32 i = 0; i < res.component_count; ++i) {
+			ppot.coeff_a = &res.coeff[i*res.coeff_count];
+			integration_result ires = quadgk_vec(full_energy_integrand_pot, -INFINITY, INFINITY, int_settings);
+			E += settings.occupations[i]*ires.integral;
+		}
+	}
+
+	/* |a|^2|b|^2 terms */
+	int_settings.userdata = &p;
+	for (u32 i = 0; i < res.component_count; ++i) {
+		for (u32 j = 0; j < res.component_count; ++j) {
+			f64 factor = 0.0;
+			if (i == j)
+				factor = 0.5*(settings.occupations[i]-1);
+			else
+				factor = settings.occupations[j];
+
+
+			p.coeff_a = &res.coeff[i*res.coeff_count];
+			p.coeff_b = &res.coeff[j*res.coeff_count];
+			integration_result ires = quadgk_vec(full_energy_integrand, -INFINITY, INFINITY, int_settings);
+			E += settings.g0[i*res.component_count + j] * settings.occupations[i] * factor * ires.integral;
+		}
+	}
 
 	return E;
 }

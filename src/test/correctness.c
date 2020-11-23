@@ -1133,6 +1133,24 @@ void bestmf_gp2c_op_a(const u32 len, f64 out[static len],
 //}
 
 
+describe(check_full_energy_calc) {
+	before_each(){sbmf_init();}
+	after_each(){sbmf_shutdown();}
+
+	it ("does it") {
+		struct gp_settings settings = {
+			.num_basis_funcs = 16,
+			.basis = ho_basis,
+			.component_count = 1,
+			.occupations = (u32[]){2},
+			.g0 = (f64[]){0.0},
+		};
+
+		struct nlse_result res = grosspitaevskii(settings);
+		asserteq(f64_compare(res.energy[0], 0.5, 1e-5), true);
+		asserteq(f64_compare(full_energy(settings, res), 1.0, 1e-5), true);
+	}
+}
 
 
 

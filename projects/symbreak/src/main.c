@@ -9,12 +9,14 @@
 
 #include <stdio.h>
 
-#define PARTICLE_COUNT 1000
-#define GAA (+1.0/((f64)PARTICLE_COUNT-1))
-#define GAB (+2.0/((f64)PARTICLE_COUNT))
-#define GBB (+1.0/((f64)PARTICLE_COUNT-1))
-#define PERTURBATION(x) 0.5*gaussian(x, 0, 0.1)
-//#define PERTURBATION(x) 0.0
+#define NA 1000
+#define NB 0
+#define GAA (+2.0/((f64)NA-1))
+#define GAB (+0.0/((f64)NB))
+#define GBA (+0.0/((f64)NA))
+#define GBB (+0.0/((f64)NB-1))
+//#define PERTURBATION(x) 0.5*gaussian(x, 0, 0.1)
+#define PERTURBATION(x) 0.0
 //#define PERTURBATION(x) (-1.5015*sqrt(x*x - 1.5*1.5 + 1.5015*1.5015));
 
 void perturbation(const u32 len, f64 out[static len],
@@ -128,26 +130,26 @@ int main() {
         .num_basis_funcs = 16,
 		.basis = ho_basis,
 
-		.component_count = 2,
-		.occupations = (u32[]){100,100},
-		.guesses = (struct nlse_guess[]) {
-			[0] = {
-				.type = SPATIAL_GUESS,
-				.data.spatial_guess = gaussian0,
-			},
-			[1] = {
-				.type = SPATIAL_GUESS,
-				.data.spatial_guess = gaussian1,
-			},
-		},
+		.component_count = 1,
+		.occupations = (u32[]){NA,NB},
+		//.guesses = (struct nlse_guess[]) {
+		//	[0] = {
+		//		.type = SPATIAL_GUESS,
+		//		.data.spatial_guess = gaussian0,
+		//	},
+		//	[1] = {
+		//		.type = SPATIAL_GUESS,
+		//		.data.spatial_guess = gaussian1,
+		//	},
+		//},
 		.g0 = (f64[]){
-			0.02,  0.001,
-			0.001, 0.02
+			GAA, GAB,
+			GBA, GBB
 		},
     };
 
 	struct nlse_result res = grosspitaevskii(settings);
-	printf("full gp energy: %lf\n", full_energy(settings, res));
+	printf("full energy per particle: %lf\n", full_energy(settings, res)/(settings.occupations[0] + settings.occupations[1]));
 
 #if 1
 	{
@@ -194,9 +196,6 @@ int main() {
 
 	for (u32 i = 0; i < res.component_count; ++i) {
 		printf("[%u] gp single particle energy: %lf\n", i, res.energy[i]);
-
-		f64 E = gp_energy_per_particle(PARTICLE_COUNT, GAA, res.coeff_count, &res.coeff[i*res.coeff_count]);
-		printf("[%u] full energy per particle: %lf\n", i, E);
 	}
 
 	const u32 states_to_include = 5;
@@ -316,26 +315,27 @@ int main() {
 
 
 
-	f64 pt1_coeffs[res.coeff_count];
-	memcpy(pt1_coeffs, res.coeff, res.coeff_count*sizeof(f64));
+	f64 pt1_coeffs_a[res.coeff_count];
+	memcpy(pt1_coeffs_a, res.coeff, res.coeff_count*sizeof(f64));
+
+	//f64 pt1_coeffs_b[res.coeff_count];
+	//memcpy(pt1_coeffs_b, &res.coeff[res.coeff_count], res.coeff_count*sizeof(f64));
 
 	printf("Trying perturbation theory for comp 0\n");
 	{
-		const u32 NA = PARTICLE_COUNT;
-		const u32 NB = PARTICLE_COUNT;
 		const u32 l = res.coeff_count;
 
 #define PHI(i,j) 	states[i].eigenvectors[j*res.coeff_count]
 #define ENERGY(i,j) states[i].eigenvalues[j]
 
 		/* <0|Hmf|0> */
-		f64 E0 = NA*ENERGY(0,0) + NB*ENERGY(1,0);
+		f64 E0 = NA*ENERGY(0,0);// + NB*ENERGY(1,0);
 
 		/* <0|V|0> */
 
 		f64 E1 = 	-0.5*GAA*NA*(NA-1)*V(l, &PHI(0,0), &PHI(0,0), &PHI(0,0), &PHI(0,0))
-					-0.5*GBB*NB*(NB-1)*V(l, &PHI(1,0), &PHI(1,0), &PHI(1,0), &PHI(1,0))
-					        -GAB*NA*NB*V(l, &PHI(0,0), &PHI(1,0), &PHI(0,0), &PHI(1,0));
+					;//-0.5*GBB*NB*(NB-1)*V(l, &PHI(1,0), &PHI(1,0), &PHI(1,0), &PHI(1,0))
+					 //        -GAB*NA*NB*V(l, &PHI(0,0), &PHI(1,0), &PHI(0,0), &PHI(1,0));
 
 		/* sum |<k|V|0>|^2/(E0-Ek) */
 		f64 E2 = 0.0;
@@ -349,53 +349,47 @@ int main() {
 				f64 tmp;
 				/* A comp */
 				tmp = factor * GAA*sqrt(NA*(NA-1))*V(l, &PHI(0,i), &PHI(0,j), &PHI(0,0), &PHI(0,0));
-				E2 += tmp*tmp/(
-						NA*ENERGY(0,0)+NB*ENERGY(1,0)
-						- ((NA-2)*ENERGY(0,0) + ENERGY(0,i) + ENERGY(0,j))
-						- NB*ENERGY(1,0)
-						);
+				E2 += tmp*tmp/(2*ENERGY(0,0) - (ENERGY(0,i) + ENERGY(0,j)));
 
-				f64 scaling = tmp/(
-						NA*ENERGY(0,0)+NB*ENERGY(1,0)
-						- ((NA-2)*ENERGY(0,0) + ENERGY(0,i) + ENERGY(0,j))
-						- NB*ENERGY(1,0)
-						);
+				f64 scaling = tmp/(2*ENERGY(0,0) - (ENERGY(0,i) + ENERGY(0,j)));
 				for (u32 k = 0; k < res.coeff_count; ++k) {
-					pt1_coeffs[k] += scaling*((&PHI(0,i))[k] + (&PHI(0,j))[k]);
+					pt1_coeffs_a[k] += scaling*((&PHI(0,i))[k] + (&PHI(0,j))[k]);
+					//pt1_coeffs_b[k] += scaling*((&PHI(1,i))[k] + (&PHI(1,j))[k]);
 				}
 				/* B comp */
-				tmp = factor * GBB*sqrt(NB*(NB-1))*V(l, &PHI(1,i), &PHI(1,j), &PHI(1,0), &PHI(1,0));
-				E2 += tmp*tmp/(
-						NA*ENERGY(0,0)+NB*ENERGY(1,0)
-						- NA*ENERGY(0,0)
-						- ((NB-2)*ENERGY(1,0) + ENERGY(1,i) + ENERGY(1,j))
-						);
+				//tmp = factor * GBB*sqrt(NB*(NB-1))*V(l, &PHI(1,i), &PHI(1,j), &PHI(1,0), &PHI(1,0));
+				//E2 += tmp*tmp/(
+				//		NA*ENERGY(0,0)+NB*ENERGY(1,0)
+				//		- NA*ENERGY(0,0)
+				//		- ((NB-2)*ENERGY(1,0) + ENERGY(1,i) + ENERGY(1,j))
+				//		);
 			}
 		}
 
 		/* Double substitutions (separate components) */
-		for (u32 i = 1; i < states_to_include; ++i) {
-			for (u32 j = 1; j < states_to_include; ++j) {
-				f64 tmp;
-				tmp = GAB*sqrt(NA*NB)*V(l, &PHI(0,i), &PHI(1,j), &PHI(0,0), &PHI(1,0));
-				E2 += tmp*tmp/(
-						NA*ENERGY(0,0) + NB*ENERGY(1,0)
-						- ((NA-1)*ENERGY(0,0) + ENERGY(0,i))
-						- ((NB-1)*ENERGY(1,0) + ENERGY(1,j))
-						);
+		//for (u32 i = 1; i < states_to_include; ++i) {
+		//	for (u32 j = 1; j < states_to_include; ++j) {
+		//		f64 tmp;
+		//		tmp = GAB*sqrt(NA*NB)*V(l, &PHI(0,i), &PHI(1,j), &PHI(0,0), &PHI(1,0));
+		//		E2 += tmp*tmp/(
+		//				NA*ENERGY(0,0) + NB*ENERGY(1,0)
+		//				- ((NA-1)*ENERGY(0,0) + ENERGY(0,i))
+		//				- ((NB-1)*ENERGY(1,0) + ENERGY(1,j))
+		//				);
 
 
-				f64 scaling = tmp/(
-						NA*ENERGY(0,0) + NB*ENERGY(1,0)
-						- ((NA-1)*ENERGY(0,0) + ENERGY(0,i))
-						- ((NB-1)*ENERGY(1,0) + ENERGY(1,j))
-						);
-				for (u32 k = 0; k < res.coeff_count; ++k) {
-					pt1_coeffs[k] += scaling*((&PHI(0,i))[k]);
-				}
+		//		f64 scaling = tmp/(
+		//				NA*ENERGY(0,0) + NB*ENERGY(1,0)
+		//				- ((NA-1)*ENERGY(0,0) + ENERGY(0,i))
+		//				- ((NB-1)*ENERGY(1,0) + ENERGY(1,j))
+		//				);
+		//		for (u32 k = 0; k < res.coeff_count; ++k) {
+		//			pt1_coeffs_a[k] += scaling*((&PHI(0,i))[k]);
+		//			//pt1_coeffs_b[k] += scaling*((&PHI(1,i))[k]);
+		//		}
 
-			}
-		}
+		//	}
+		//}
 
 		printf("E0: %.2e\t%.2lf\n", E0, E0/(NA+NB));
 		printf("E1: %.2e\t%.2lf\n", E1, E1/(NA+NB));
@@ -403,9 +397,10 @@ int main() {
 		printf("E0+E1+E2 = %.2e\t%.2lf\n", E0+E1+E2, (E0+E1+E2)/(NA+NB));
 	}
 
-	f64_normalize(pt1_coeffs, pt1_coeffs, res.coeff_count);
+	f64_normalize(pt1_coeffs_a, pt1_coeffs_a, res.coeff_count);
+	//f64_normalize(pt1_coeffs_b, pt1_coeffs_b, res.coeff_count);
 
-#if 0
+#if 1
 	{
 		const u32 N = 256;
 		plot_init(800, 600, "gp2c");
@@ -427,18 +422,28 @@ int main() {
 			sample_in[i] = (f64) sp.points[i];
 		}
 
-		f64 sample_out[N];
-		ho_sample(res.coeff_count, pt1_coeffs, N, sample_out, sample_in);
+		f64 sample_a[N];
+		ho_sample(res.coeff_count, pt1_coeffs_a, N, sample_a, sample_in);
 
-		f32 data[N];
+		//f64 sample_b[N];
+		//ho_sample(res.coeff_count, pt1_coeffs_b, N, sample_b, sample_in);
+
+		f32 data_a[N], data_b[N];
 		for (u32 k = 0; k < N; ++k) {
-			data[k] = fabs(sample_out[k])*fabs(sample_out[k]);
+			data_a[k] = fabs(sample_a[k])*fabs(sample_a[k]);
+			//data_b[k] = fabs(sample_b[k])*fabs(sample_b[k]);
 		}
 		push_line_plot(&(plot_push_desc){
 				.space = &sp,
-				.data = data,
-				.label = plot_snprintf("?"),
+				.data = data_a,
+				.label = plot_snprintf("a ?"),
 				});
+
+		//push_line_plot(&(plot_push_desc){
+		//		.space = &sp,
+		//		.data = data_b,
+		//		.label = plot_snprintf("b ?"),
+		//		});
 
 		plot_update_until_closed();
 		plot_shutdown();

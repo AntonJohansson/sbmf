@@ -37,14 +37,14 @@ struct guess_integrand_params {
 void guess_integrand(f64* out, f64* in, u32 len, void* data) {
     struct guess_integrand_params* params = data;
 
-    f64 eig;
-	params->b.eigenfunc(params->n, 1, &eig, in);
+    f64 eig[len];
+	params->b.eigenfunc(params->n, len, eig, in);
 
 	f64 sample[len];
 	params->func(sample, in, len, NULL);
 
     for (u32 i = 0; i < len; ++i) {
-        out[i] = eig * sample[i];
+        out[i] = eig[i] * sample[i];
     }
 }
 
@@ -221,6 +221,13 @@ struct nlse_result nlse_solver(struct nlse_settings settings, const u32 componen
 	for (; res.iterations < settings.max_iterations; ++res.iterations) {
 		memcpy(old_coeff, res.coeff, res.component_count * res.coeff_count * sizeof(f64));
 
+		/* Call debug callback if requested by user */
+		if (settings.measure_every > 0 &&
+				settings.debug_callback &&
+				res.iterations % settings.measure_every == 0) {
+			settings.debug_callback(settings, res);
+		}
+
 		for (u32 i = 0; i < component_count; ++i) {
 			params.op = component[i].op;
 			params.op_userdata = component[i].userdata;
@@ -258,7 +265,7 @@ struct nlse_result nlse_solver(struct nlse_settings settings, const u32 componen
 
 		for (u32 i = 0; i < component_count; ++i) {
 			/* Solve for first eigenvector (ground state) */
-			struct eigen_result_real eigres = find_eigenpairs_sparse_real(res.hamiltonian[i], 1, EV_SMALLEST_MAG);
+			struct eigen_result_real eigres = find_eigenpairs_sparse_real(res.hamiltonian[i], 1, EV_SMALLEST);
 
 			/* Copy energies */
 			res.energy[i] = eigres.eigenvalues[0];
@@ -290,13 +297,6 @@ struct nlse_result nlse_solver(struct nlse_settings settings, const u32 componen
 		}
 		if (should_exit)
 			break;
-
-#if 1
-		/* Call debug callback if requested by user */
-		if (settings.measure_every > 0 && settings.dbgcallback && res.iterations % settings.measure_every == 0) {
-			settings.dbgcallback(settings, res);
-		}
-#endif
 	}
 
 	return res;

@@ -10,11 +10,11 @@
 #include <stdio.h>
 
 #define NA 1000
-#define NB 0
-#define GAA (+2.0/((f64)NA-1))
-#define GAB (+0.0/((f64)NB))
-#define GBA (+0.0/((f64)NA))
-#define GBB (+0.0/((f64)NB-1))
+#define NB 1000
+#define GAA (+1.0/((f64)NA-1))
+#define GAB (+2.0/((f64)NB))
+#define GBA (+2.0/((f64)NA))
+#define GBB (+1.0/((f64)NB-1))
 //#define PERTURBATION(x) 0.5*gaussian(x, 0, 0.1)
 #define PERTURBATION(x) 0.0
 //#define PERTURBATION(x) (-1.5015*sqrt(x*x - 1.5*1.5 + 1.5015*1.5015));
@@ -33,7 +33,47 @@ void perturbation(const u32 len, f64 out[static len],
 
 
 
+void debug_callback(struct nlse_settings settings, struct nlse_result res) {
+	const u32 N = 256;
+	plot_init(800, 600, "gp2c");
 
+	f32 potdata[N], adata[N], bdata[N];
+	sample_space sp = make_linspace(1, -5, 5, N);
+
+	for (u32 i = 0; i < N; ++i) {
+		f64 x = sp.points[i];
+		potdata[i] = (f32) ho_potential(&x,1,0) + PERTURBATION(x);
+	}
+	push_line_plot(&(plot_push_desc){
+			.space = &sp,
+			.data = potdata,
+			.label = "potential",
+			});
+
+	f64 sample_in[N];
+	for (u32 i = 0; i < N; ++i) {
+		sample_in[i] = (f64) sp.points[i];
+	}
+
+	for (u32 i = 0; i < res.component_count; ++i) {
+		f64 sample_out[N];
+		ho_sample(res.coeff_count, &res.coeff[i*res.coeff_count], N, sample_out, sample_in);
+
+		f32 data[N];
+		for (u32 k = 0; k < N; ++k) {
+			data[k] = fabs(sample_out[k])*fabs(sample_out[k]);
+		}
+		push_line_plot(&(plot_push_desc){
+				.space = &sp,
+				.data = data,
+				.label = plot_snprintf("comp: %u", i),
+				.offset = res.energy[i],
+				});
+	}
+
+	plot_update_until_closed();
+	plot_shutdown();
+}
 
 
 
@@ -130,22 +170,24 @@ int main() {
         .num_basis_funcs = 16,
 		.basis = ho_basis,
 
-		.component_count = 1,
+		.component_count = 2,
 		.occupations = (u32[]){NA,NB},
-		//.guesses = (struct nlse_guess[]) {
-		//	[0] = {
-		//		.type = SPATIAL_GUESS,
-		//		.data.spatial_guess = gaussian0,
-		//	},
-		//	[1] = {
-		//		.type = SPATIAL_GUESS,
-		//		.data.spatial_guess = gaussian1,
-		//	},
-		//},
+		.guesses = (struct nlse_guess[]) {
+			[0] = {
+				.type = SPATIAL_GUESS,
+				.data.spatial_guess = gaussian0,
+			},
+			[1] = {
+				.type = SPATIAL_GUESS,
+				.data.spatial_guess = gaussian1,
+			},
+		},
 		.g0 = (f64[]){
 			GAA, GAB,
 			GBA, GBB
 		},
+		.debug_callback = debug_callback,
+		.measure_every = 10,
     };
 
 	struct nlse_result res = grosspitaevskii(settings);

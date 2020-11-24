@@ -27,7 +27,10 @@ struct nlse_result grosspitaevskii(struct gp_settings settings) {
 		.num_basis_funcs = settings.num_basis_funcs,
 		.basis = settings.basis,
 
-		.zero_threshold = 1e-10,
+		.zero_threshold = 1e-14,
+
+		.debug_callback = settings.debug_callback,
+		.measure_every = settings.measure_every,
 	};
 
 

@@ -31,7 +31,7 @@ struct nlse_settings {
 	nlse_operator_func* spatial_pot_perturbation;
 
 	u32 measure_every;
-	nlse_debug_callback* dbgcallback;
+	nlse_debug_callback* debug_callback;
 
 	nlse_callback* post_normalize_callback;
 

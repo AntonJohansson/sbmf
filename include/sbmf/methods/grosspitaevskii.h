@@ -12,6 +12,9 @@ struct gp_settings {
 	u32* occupations; 				/* [static component_count] */
 	struct nlse_guess* guesses; 	/* [static component_count] */
 	f64* g0; 						/* [static component_count*component_count] */
+
+	nlse_debug_callback* debug_callback;
+	u32 measure_every;
 };
 
 struct nlse_result grosspitaevskii(struct gp_settings settings);

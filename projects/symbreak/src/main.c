@@ -11,12 +11,16 @@
 
 #define NA 1000
 #define NB 1000
-#define GAA (+1.0/((f64)NA-1))
-#define GAB (+2.0/((f64)NB))
-#define GBA (+2.0/((f64)NA))
-#define GBB (+1.0/((f64)NB-1))
-//#define PERTURBATION(x) 0.5*gaussian(x, 0, 0.1)
-#define PERTURBATION(x) 0.0
+
+#define GAA (+2.00/((f64)NA-1))
+#define GAB (+3.00/((f64)NB))
+#define GBA (+3.00/((f64)NA))
+#define GBB (+2.00/((f64)NB-1))
+
+#define USE_GAUSSIAN_GUESS 0
+
+#define PERTURBATION(x) 0.5*gaussian(x, 0, 0.1)
+//#define PERTURBATION(x) 0.0
 //#define PERTURBATION(x) (-1.5015*sqrt(x*x - 1.5*1.5 + 1.5015*1.5015));
 
 void perturbation(const u32 len, f64 out[static len],
@@ -34,6 +38,7 @@ void perturbation(const u32 len, f64 out[static len],
 
 
 void debug_callback(struct nlse_settings settings, struct nlse_result res) {
+#if 1
 	const u32 N = 256;
 	plot_init(800, 600, "gp2c");
 
@@ -71,8 +76,35 @@ void debug_callback(struct nlse_settings settings, struct nlse_result res) {
 				});
 	}
 
+	f32 g[] = {
+		1, 2,
+		2, 1
+	};
+
+	for (u32 i = 0; i < res.component_count; ++i) {
+		f32 data[N];
+		memset(data, 0, N*sizeof(f32));
+
+		for (u32 j = 0; j < res.component_count; ++j) {
+			f64 sample_out[N];
+			ho_sample(res.coeff_count, &res.coeff[j*res.coeff_count], N, sample_out, sample_in);
+
+			for (u32 k = 0; k < N; ++k) {
+				data[k] += g[i*2 + j]*fabs(sample_out[k])*fabs(sample_out[k]);
+			}
+		}
+
+		push_line_plot(&(plot_push_desc){
+				.space = &sp,
+				.data = data,
+				.label = plot_snprintf("%u ?", i),
+				.offset = res.energy[i],
+				});
+	}
+
 	plot_update_until_closed();
 	plot_shutdown();
+#endif
 }
 
 
@@ -172,6 +204,7 @@ int main() {
 
 		.component_count = 2,
 		.occupations = (u32[]){NA,NB},
+#if USE_GAUSSIAN_GUESS
 		.guesses = (struct nlse_guess[]) {
 			[0] = {
 				.type = SPATIAL_GUESS,
@@ -182,12 +215,14 @@ int main() {
 				.data.spatial_guess = gaussian1,
 			},
 		},
+#endif
 		.g0 = (f64[]){
 			GAA, GAB,
 			GBA, GBB
 		},
+		.zero_threshold = 1e-10,
 		.debug_callback = debug_callback,
-		.measure_every = 10,
+		.measure_every = 11,
     };
 
 	struct nlse_result res = grosspitaevskii(settings);
@@ -442,7 +477,7 @@ int main() {
 	f64_normalize(pt1_coeffs_a, pt1_coeffs_a, res.coeff_count);
 	//f64_normalize(pt1_coeffs_b, pt1_coeffs_b, res.coeff_count);
 
-#if 1
+#if 0
 	{
 		const u32 N = 256;
 		plot_init(800, 600, "gp2c");

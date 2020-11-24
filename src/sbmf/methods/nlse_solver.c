@@ -132,7 +132,7 @@ struct nlse_result nlse_solver(struct nlse_settings settings, const u32 componen
 				};
 				int_settings.userdata = &p;
 				f64* out = &res.coeff[i*res.coeff_count];
-				for (u32 j = 0; j < component_count; ++j) {
+				for (u32 j = 0; j < res.coeff_count; ++j) {
 					p.n = j;
 					integration_result r = quadgk_vec(guess_integrand, -INFINITY, INFINITY, int_settings);
 					out[j] = r.integral;
@@ -217,9 +217,12 @@ struct nlse_result nlse_solver(struct nlse_settings settings, const u32 componen
 		assert(hermitian_bandmat_is_valid(linear_hamiltonian));
 	}
 
+	f64 old_energy[res.component_count];
+
 	/* Do the actual iterations */
 	for (; res.iterations < settings.max_iterations; ++res.iterations) {
 		memcpy(old_coeff, res.coeff, res.component_count * res.coeff_count * sizeof(f64));
+		memcpy(old_energy, res.energy, res.component_count*sizeof(f64));
 
 		/* Call debug callback if requested by user */
 		if (settings.measure_every > 0 &&
@@ -274,14 +277,13 @@ struct nlse_result nlse_solver(struct nlse_settings settings, const u32 componen
 				res.coeff[i*res.coeff_count + j] = eigres.eigenvectors[j];
 			}
 			f64_normalize(&res.coeff[i*res.coeff_count], &res.coeff[i*res.coeff_count], res.coeff_count);
-			//f64_normalize(&res.coeff[i*res.coeff_count], &eigres.eigenvectors[0], res.coeff_count);
 		}
 
 		/* Calculate error */
 		for (u32 i = 0; i < component_count; ++i) {
 			f64 sum = 0.0;
 			for (u32 j = 0; j < res.coeff_count; ++j) {
-				f64 diff = fabs(res.coeff[i*res.coeff_count + j]) - fabs(old_coeff[i*res.coeff_count + j]);
+				f64 diff = fabs(res.coeff[i*res.coeff_count + j] - old_coeff[i*res.coeff_count + j]);
 				sum += diff*diff;
 			}
 			res.error[i] = sqrt(sum);

@@ -15,6 +15,8 @@ struct gp_settings {
 
 	nlse_debug_callback* debug_callback;
 	u32 measure_every;
+
+	f64 zero_threshold;
 };
 
 struct nlse_result grosspitaevskii(struct gp_settings settings);

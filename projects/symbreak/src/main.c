@@ -9,18 +9,18 @@
 
 #include <stdio.h>
 
-#define NA 1000
-#define NB 1000
+#define NA 4
+#define NB 4
 
-#define GAA (+2.00/((f64)NA-1))
-#define GAB (+3.00/((f64)NB))
-#define GBA (+3.00/((f64)NA))
-#define GBB (+2.00/((f64)NB-1))
+#define GAA (+1/((f64)NA-1))
+#define GAB (+2.00/((f64)NB))
+#define GBA (+2.00/((f64)NA))
+#define GBB (+1/((f64)NB-1))
 
-#define USE_GAUSSIAN_GUESS 0
+#define USE_GAUSSIAN_GUESS 1
 
-#define PERTURBATION(x) 0.5*gaussian(x, 0, 0.1)
-//#define PERTURBATION(x) 0.0
+//#define PERTURBATION(x) gaussian(x, 0, 0.2)
+#define PERTURBATION(x) 0.0
 //#define PERTURBATION(x) (-1.5015*sqrt(x*x - 1.5*1.5 + 1.5015*1.5015));
 
 void perturbation(const u32 len, f64 out[static len],
@@ -76,31 +76,31 @@ void debug_callback(struct nlse_settings settings, struct nlse_result res) {
 				});
 	}
 
-	f32 g[] = {
-		1, 2,
-		2, 1
-	};
+	//f32 g[] = {
+	//	1, 2,
+	//	2, 1
+	//};
 
-	for (u32 i = 0; i < res.component_count; ++i) {
-		f32 data[N];
-		memset(data, 0, N*sizeof(f32));
+	//for (u32 i = 0; i < res.component_count; ++i) {
+	//	f32 data[N];
+	//	memset(data, 0, N*sizeof(f32));
 
-		for (u32 j = 0; j < res.component_count; ++j) {
-			f64 sample_out[N];
-			ho_sample(res.coeff_count, &res.coeff[j*res.coeff_count], N, sample_out, sample_in);
+	//	for (u32 j = 0; j < res.component_count; ++j) {
+	//		f64 sample_out[N];
+	//		ho_sample(res.coeff_count, &res.coeff[j*res.coeff_count], N, sample_out, sample_in);
 
-			for (u32 k = 0; k < N; ++k) {
-				data[k] += g[i*2 + j]*fabs(sample_out[k])*fabs(sample_out[k]);
-			}
-		}
+	//		for (u32 k = 0; k < N; ++k) {
+	//			data[k] += g[i*2 + j]*fabs(sample_out[k])*fabs(sample_out[k]);
+	//		}
+	//	}
 
-		push_line_plot(&(plot_push_desc){
-				.space = &sp,
-				.data = data,
-				.label = plot_snprintf("%u ?", i),
-				.offset = res.energy[i],
-				});
-	}
+	//	push_line_plot(&(plot_push_desc){
+	//			.space = &sp,
+	//			.data = data,
+	//			.label = plot_snprintf("%u ?", i),
+	//			.offset = res.energy[i],
+	//			});
+	//}
 
 	plot_update_until_closed();
 	plot_shutdown();
@@ -222,11 +222,11 @@ int main() {
 		},
 		.zero_threshold = 1e-10,
 		.debug_callback = debug_callback,
-		.measure_every = 11,
+		.measure_every = 0,
     };
 
 	struct nlse_result res = grosspitaevskii(settings);
-	printf("full energy per particle: %lf\n", full_energy(settings, res)/(settings.occupations[0] + settings.occupations[1]));
+	printf("\nfull energy per particle: %lf\n", full_energy(settings, res)/(settings.occupations[0] + settings.occupations[1]));
 
 #if 1
 	{
@@ -274,6 +274,7 @@ int main() {
 	for (u32 i = 0; i < res.component_count; ++i) {
 		printf("[%u] gp single particle energy: %lf\n", i, res.energy[i]);
 	}
+	printf("\n");
 
 	const u32 states_to_include = 5;
 
@@ -468,10 +469,12 @@ int main() {
 		//	}
 		//}
 
-		printf("E0: %.2e\t%.2lf\n", E0, E0/(NA+NB));
-		printf("E1: %.2e\t%.2lf\n", E1, E1/(NA+NB));
-		printf("E2: %.2e\t%.2lf\n", E2, E2/(NA+NB));
-		printf("E0+E1+E2 = %.2e\t%.2lf\n", E0+E1+E2, (E0+E1+E2)/(NA+NB));
+		printf("\nPT energy          PT energy per particle\n");
+		printf("E0: %.2e             %lf\n", E0, E0/(NA+NB));
+		printf("E1: %.2e             %lf\n", E1, E1/(NA+NB));
+		printf("E2: %.2e             %lf\n", E2, E2/(NA+NB));
+		printf("E0+E1+E2 = %.2e      %lf\n", E0+E1+E2, (E0+E1+E2)/(NA+NB));
+		printf("\n");
 	}
 
 	f64_normalize(pt1_coeffs_a, pt1_coeffs_a, res.coeff_count);

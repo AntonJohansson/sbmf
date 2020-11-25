@@ -1,0 +1,10 @@
+gaussian guess + dwp + 0.25 self 3 	 other => split ssb
+gaussian guess + dwp + 0.25 self 1.5 other => split ssb
+
+gaussian guess  + dwp + 0.25 self 1 other => symmetric groundstate => oscillating 					do oscillating states have lower energy?
+symmetric guess + dwp + 0.25 self 1 other => symmetric groundstate
+
+gaussian guess + dwp + 2 self 3 other => oscillating
+symmetric guess + dwp + 2 self 3 other => oscillating
+
+oscillating seems to happen when the lowest energy state is symmetric and we start with an asymmetric guess!

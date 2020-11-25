@@ -1,4 +1,4 @@
-PROJECT = bestmf_fig1
+PROJECT = bestmf_test
 
 SRCS = src/main.c
 

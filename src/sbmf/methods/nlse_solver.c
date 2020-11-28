@@ -7,10 +7,7 @@
 #include <assert.h> /* Not the correct way to handle this */
 #include <omp.h>
 
-struct integrand_params {
-	u32 n[2];
-	u32 component_count;
-	u32 coeff_count;
+struct integrand_params { u32 n[2]; u32 component_count; u32 coeff_count;
 	f64* coeff;
 
 	nlse_operator_func* op;
@@ -99,6 +96,7 @@ struct nlse_result nlse_solver(struct nlse_settings settings, const u32 componen
 		.error = (f64*) sbmf_stack_push(component_count*sizeof(f64)),
 		.energy = (f64*) sbmf_stack_push(component_count*sizeof(f64)),
 		.hamiltonian = (struct hermitian_bandmat*) sbmf_stack_push(component_count * sizeof(struct hermitian_bandmat)),
+		.converged = false,
 	};
 	for (u32 i = 0; i < component_count; ++i) {
 		res.hamiltonian[i] = hermitian_bandmat_new(N,N);
@@ -109,8 +107,8 @@ struct nlse_result nlse_solver(struct nlse_settings settings, const u32 componen
 
 	integration_settings int_settings = {
 		.gk = (settings.gk.gauss_size > 0) ? settings.gk : gk7,
-		.abs_error_tol = 1e-15,
-		.rel_error_tol = 1e-15,
+		.abs_error_tol = 1e-10,
+		.rel_error_tol = 1e-10,
 		.max_evals = settings.max_iterations,
 	};
 
@@ -279,11 +277,15 @@ struct nlse_result nlse_solver(struct nlse_settings settings, const u32 componen
 			f64_normalize(&res.coeff[i*res.coeff_count], &res.coeff[i*res.coeff_count], res.coeff_count);
 		}
 
+		if (settings.post_normalize_callback) {
+			settings.post_normalize_callback(settings, res);
+		}
+
 		/* Calculate error */
 		for (u32 i = 0; i < component_count; ++i) {
 			f64 sum = 0.0;
 			for (u32 j = 0; j < res.coeff_count; ++j) {
-				f64 diff = fabs(res.coeff[i*res.coeff_count + j] - old_coeff[i*res.coeff_count + j]);
+				f64 diff = fabs(res.coeff[i*res.coeff_count + j]) - fabs(old_coeff[i*res.coeff_count + j]);
 				sum += diff*diff;
 			}
 			res.error[i] = sqrt(sum);
@@ -297,8 +299,11 @@ struct nlse_result nlse_solver(struct nlse_settings settings, const u32 componen
 				should_exit = false;
 			sbmf_log_info("\t[%u] -- error: %.2e, energy: %.2e", i, res.error[i], res.energy[i]);
 		}
-		if (should_exit)
+
+		if (should_exit) {
+			res.converged = true;
 			break;
+		}
 	}
 
 	return res;

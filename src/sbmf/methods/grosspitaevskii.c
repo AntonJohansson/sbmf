@@ -1,6 +1,6 @@
 #include <sbmf/methods/grosspitaevskii.h>
 
-void operator(const u32 len, f64 out[static len],
+static void operator(const u32 len, f64 out[static len],
 			  f64 in[static len], const u32 component_count,
 			  f64 wf[static len*component_count],
 			  void* userdata) {
@@ -15,50 +15,37 @@ void operator(const u32 len, f64 out[static len],
 	}
 }
 
-struct nlse_result grosspitaevskii(struct gp_settings settings) {
-	struct nlse_settings nlse_settings = {
-		.max_iterations = 1e7,
-		.error_tol = 1e-10,
-
-		.spatial_pot_perturbation = settings.pot,
-
-		.gk = gk15,
-
-		.num_basis_funcs = settings.num_basis_funcs,
-		.basis = settings.basis,
-
-		.zero_threshold = settings.zero_threshold,
-
-		.debug_callback = settings.debug_callback,
-		.measure_every = settings.measure_every,
-	};
-
+struct nlse_result grosspitaevskii(struct nlse_settings settings,
+		const u32 comp_count,
+		u32 occupations[static comp_count],
+		struct nlse_guess guesses[static comp_count],
+		f64 g0[static comp_count*comp_count]) {
 
 	/* Construct new g matrix including occupations factors */
-	f64 g[settings.component_count * settings.component_count];
-	for (u32 i = 0; i < settings.component_count; ++i) {
-		for (u32 j = 0; j < settings.component_count; ++j) {
+	f64 g[comp_count * comp_count];
+	for (u32 i = 0; i < comp_count; ++i) {
+		for (u32 j = 0; j < comp_count; ++j) {
 			f64 factor = 1.0;
 			if (i == j) {
-				factor = (settings.occupations[i]-1);
+				factor = (occupations[i]-1);
 			} else {
-				factor = settings.occupations[j];
+				factor = occupations[j];
 			}
-			g[i*settings.component_count + j] = factor*settings.g0[i*settings.component_count + j];
+			g[i*comp_count + j] = factor*g0[i*comp_count + j];
 		}
 	}
 
-	struct nlse_component comps[settings.component_count];
-	for (u32 i = 0; i < settings.component_count; ++i) {
-		if (settings.guesses)
-			comps[i].guess = settings.guesses[i];
+	struct nlse_component comps[comp_count];
+	for (u32 i = 0; i < comp_count; ++i) {
+		if (guesses)
+			comps[i].guess = guesses[i];
 		else
 			comps[i].guess.type = DEFAULT_GUESS;
 		comps[i].op = operator;
-		comps[i].userdata = &g[i*settings.component_count];
+		comps[i].userdata = &g[i*comp_count];
 	}
 
-	struct nlse_result res = nlse_solver(nlse_settings, settings.component_count, comps);
+	struct nlse_result res = nlse_solver(settings, comp_count, comps);
 
 	return res;
 }
@@ -168,6 +155,68 @@ f64 full_energy(struct gp_settings settings, struct nlse_result res) {
 			p.coeff_b = &res.coeff[j*res.coeff_count];
 			integration_result ires = quadgk_vec(full_energy_integrand, -INFINITY, INFINITY, int_settings);
 			E += settings.g0[i*res.component_count + j] * settings.occupations[i] * factor * ires.integral;
+		}
+	}
+
+	return E;
+}
+
+f64 full_energy_naked(struct nlse_settings settings,
+		const u32 coeff_count, const u32 comp_count,
+		f64 coeff[static coeff_count*comp_count],
+		u32 occupations[static comp_count],
+		f64 g0[static comp_count*comp_count]
+		) {
+	f64 E = 0.0;
+
+	for (u32 i = 0; i < comp_count;++i) {
+		for (u32 j = 0; j < coeff_count; ++j) {
+			f64 c = fabs(coeff[i*coeff_count + j]);
+			E += occupations[i]*settings.basis.eigenval(j)*c*c;
+		}
+	}
+
+	struct full_energy_integrand_params p = {
+		.coeff_count = coeff_count,
+		.basis = settings.basis,
+	};
+
+	struct full_energy_integrand_pot_params ppot = {
+		.coeff_count = coeff_count,
+		.V = settings.spatial_pot_perturbation,
+		.basis = settings.basis,
+	};
+
+	integration_settings int_settings = {
+		.max_evals = 1e5,
+		.abs_error_tol = 1e-10,
+		.userdata = &ppot,
+	};
+
+	/* pot terms */
+	if (settings.spatial_pot_perturbation) {
+		for (u32 i = 0; i < comp_count; ++i) {
+			ppot.coeff_a = &coeff[i*coeff_count];
+			integration_result ires = quadgk_vec(full_energy_integrand_pot, -INFINITY, INFINITY, int_settings);
+			E += occupations[i]*ires.integral;
+		}
+	}
+
+	/* |a|^2|b|^2 terms */
+	int_settings.userdata = &p;
+	for (u32 i = 0; i < comp_count; ++i) {
+		for (u32 j = 0; j < comp_count; ++j) {
+			f64 factor = 0.0;
+			if (i == j)
+				factor = 0.5*(occupations[i]-1);
+			else
+				factor = occupations[j];
+
+
+			p.coeff_a = &coeff[i*coeff_count];
+			p.coeff_b = &coeff[j*coeff_count];
+			integration_result ires = quadgk_vec(full_energy_integrand, -INFINITY, INFINITY, int_settings);
+			E += g0[i*comp_count + j] * occupations[i] * factor * ires.integral;
 		}
 	}
 

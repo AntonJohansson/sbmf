@@ -33,7 +33,8 @@ struct nlse_settings {
 	u32 measure_every;
 	nlse_debug_callback* debug_callback;
 
-	nlse_callback* post_normalize_callback;
+	void* post_normalize_userdata;
+	nlse_debug_callback* post_normalize_callback;
 
 	/* Choice of GK rule used for numerical integration internally */
 	struct gk_data gk;
@@ -77,6 +78,7 @@ struct nlse_result {
 	f64* error;
 	f64* energy;
 	struct hermitian_bandmat* hamiltonian;
+	bool converged;
 };
 
 struct nlse_result nlse_solver(struct nlse_settings settings, const u32 component_count, struct nlse_component components[static component_count]);

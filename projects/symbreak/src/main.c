@@ -76,32 +76,6 @@ void debug_callback(struct nlse_settings settings, struct nlse_result res) {
 				});
 	}
 
-	//f32 g[] = {
-	//	1, 2,
-	//	2, 1
-	//};
-
-	//for (u32 i = 0; i < res.component_count; ++i) {
-	//	f32 data[N];
-	//	memset(data, 0, N*sizeof(f32));
-
-	//	for (u32 j = 0; j < res.component_count; ++j) {
-	//		f64 sample_out[N];
-	//		ho_sample(res.coeff_count, &res.coeff[j*res.coeff_count], N, sample_out, sample_in);
-
-	//		for (u32 k = 0; k < N; ++k) {
-	//			data[k] += g[i*2 + j]*fabs(sample_out[k])*fabs(sample_out[k]);
-	//		}
-	//	}
-
-	//	push_line_plot(&(plot_push_desc){
-	//			.space = &sp,
-	//			.data = data,
-	//			.label = plot_snprintf("%u ?", i),
-	//			.offset = res.energy[i],
-	//			});
-	//}
-
 	plot_update_until_closed();
 	plot_shutdown();
 #endif

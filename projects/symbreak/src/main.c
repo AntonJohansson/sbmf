@@ -9,18 +9,18 @@
 
 #include <stdio.h>
 
-#define NA 4
-#define NB 4
+#define NA 1000
+#define NB 1000
 
-#define GAA (+1/((f64)NA-1))
-#define GAB (+2.00/((f64)NB))
-#define GBA (+2.00/((f64)NA))
-#define GBB (+1/((f64)NB-1))
+#define GAA (-2.0/((f64)NA-1))
+#define GAB (+1.00/((f64)NB))
+#define GBA (+1.00/((f64)NA))
+#define GBB (-2.0/((f64)NB-1))
 
 #define USE_GAUSSIAN_GUESS 1
 
-//#define PERTURBATION(x) gaussian(x, 0, 0.2)
-#define PERTURBATION(x) 0.0
+#define PERTURBATION(x) gaussian(x, 0, 0.2)
+//#define PERTURBATION(x) 0.0
 //#define PERTURBATION(x) (-1.5015*sqrt(x*x - 1.5*1.5 + 1.5015*1.5015));
 
 void perturbation(const u32 len, f64 out[static len],
@@ -170,37 +170,44 @@ int main() {
 
 	printf("gab^2 < gaa*gbb | %lf < %lf\n", GAB*GAB, GAA*GBB);
 
-	struct gp_settings settings = {
-        .pot = perturbation,
+#if USE_GAUSSIAN_GUESS
+	struct nlse_guess guesses[] = {
+		[0] = {
+			.type = SPATIAL_GUESS,
+			.data.spatial_guess = gaussian0,
+		},
+		[1] = {
+			.type = SPATIAL_GUESS,
+			.data.spatial_guess = gaussian1,
+		},
+	};
+#else
+	struct nlse_guess* guesses = NULL;
+#endif
+
+	f64 g0[] = {
+		GAA, GAB,
+		GBA, GBB
+	};
+
+	u32 occupations[] = {NA,NB};
+
+	struct nlse_settings settings = {
+        .spatial_pot_perturbation = perturbation,
+		.max_iterations = 1e5,
+		.error_tol = 1e-9,
 
         .num_basis_funcs = 16,
 		.basis = ho_basis,
 
-		.component_count = 2,
-		.occupations = (u32[]){NA,NB},
-#if USE_GAUSSIAN_GUESS
-		.guesses = (struct nlse_guess[]) {
-			[0] = {
-				.type = SPATIAL_GUESS,
-				.data.spatial_guess = gaussian0,
-			},
-			[1] = {
-				.type = SPATIAL_GUESS,
-				.data.spatial_guess = gaussian1,
-			},
-		},
-#endif
-		.g0 = (f64[]){
-			GAA, GAB,
-			GBA, GBB
-		},
 		.zero_threshold = 1e-10,
 		.debug_callback = debug_callback,
 		.measure_every = 0,
     };
 
-	struct nlse_result res = grosspitaevskii(settings);
-	printf("\nfull energy per particle: %lf\n", full_energy(settings, res)/(settings.occupations[0] + settings.occupations[1]));
+	struct nlse_result res = grosspitaevskii(settings, 2, occupations, guesses, g0);
+	printf("\nfull energy per particle: %lf\n",
+			full_energy_naked(settings, res.coeff_count, 2, res.coeff, occupations, g0)/(occupations[0] + occupations[1]));
 
 #if 1
 	{

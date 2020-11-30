@@ -106,8 +106,8 @@ static void compute_wavefunctions(struct nlse_settings settings, const u32 parti
 				out[coeff_count + i] = scaling_p2 * (coeff[i] + coeff[coeff_count+i]);
 		}
 
-		//f64_normalize(p, p, res.coeff_count);
-		//f64_normalize(&p[res.coeff_count], &p[res.coeff_count], res.coeff_count);
+		//f64_normalize(out, out, coeff_count);
+		//f64_normalize(&out[coeff_count], &out[coeff_count], coeff_count);
 }
 
 
@@ -193,5 +193,63 @@ struct bestmf_result best_meanfield(struct nlse_settings settings, const u32 par
 		.coeff = p,
 		.n1 = n1,
 		.n2 = n2,
+	};
+}
+
+struct bestmf_2comp_result best_meanfield_2comp(struct nlse_settings settings,
+		const u32 particle_count,
+		f64 g0[static 2*2],
+		struct nlse_guess* guesses) {
+	f64 g[4*4] = {
+		0.75*g0[0]*(particle_count - 1), 0.25*g0[0]*(particle_count - 1), 0.50*g0[1]*particle_count,     0.50*g0[1]*particle_count,
+		0.25*g0[0]*(particle_count - 1), 0.75*g0[0]*(particle_count - 1), 0.50*g0[1]*particle_count,     0.50*g0[1]*particle_count,
+		0.50*g0[2]*particle_count,       0.50*g0[2]*particle_count,       0.75*g0[3]*(particle_count-1), 0.25*g0[3]*(particle_count-1),
+		0.50*g0[2]*particle_count,       0.50*g0[2]*particle_count,       0.25*g0[3]*(particle_count-1), 0.75*g0[3]*(particle_count-1),
+	};
+
+	struct nlse_component comps[4];
+	for (u32 i = 0; i < 4; ++i) {
+		if (guesses)
+			comps[i].guess = guesses[i];
+		comps[i].op = operator;
+		comps[i].userdata = &g[i*4];
+	}
+
+	struct nlse_result res = nlse_solver(settings, 4, comps);
+
+	u32 n1, n2;
+	compute_occupations(settings, particle_count, res.coeff_count, res.coeff, &n1, &n2);
+
+	u32 n3, n4;
+	compute_occupations(settings, particle_count, res.coeff_count, &res.coeff[2*res.coeff_count], &n3, &n4);
+
+	f64* p = (f64*)sbmf_stack_push(4*res.coeff_count*sizeof(f64));
+	memset(p, 0, 4*res.coeff_count*sizeof(f64));
+	compute_wavefunctions(settings, particle_count, res.coeff_count, res.coeff, n1, n2, p);
+	compute_wavefunctions(settings, particle_count, res.coeff_count, &res.coeff[2*res.coeff_count], n3, n4, &p[2*res.coeff_count]);
+
+	f64 E = full_energy_naked(settings,
+			res.coeff_count, res.component_count,
+			p,
+			(u32[]){
+				(u32)n1, particle_count - (u32)n1,
+				(u32)n3, particle_count - (u32)n3
+				},
+			(f64[]){
+				g0[0],g0[0],g0[1],g0[1],
+				g0[0],g0[0],g0[1],g0[1],
+				g0[2],g0[2],g0[3],g0[3],
+				g0[2],g0[2],g0[3],g0[3]
+				});
+
+	return (struct bestmf_2comp_result) {
+		.energy = E,
+		.coeff_count = res.coeff_count,
+		.comp_count = res.component_count,
+		.coeff = p,
+		.n1 = n1,
+		.n2 = n2,
+		.n3 = n3,
+		.n4 = n4,
 	};
 }

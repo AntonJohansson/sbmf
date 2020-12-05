@@ -14,12 +14,12 @@
 #define NA 4
 #define NB 4
 
-#define GAA (+1.00/((f64)NA-1))
-#define GAB (+2.00/((f64)NB))
-#define GBA (+2.00/((f64)NA))
-#define GBB (+1.00/((f64)NB-1))
+#define GAA (-2.00/((f64)NA-1))
+#define GAB (+1.00/((f64)NB))
+#define GBA (+1.00/((f64)NA))
+#define GBB (-2.00/((f64)NB-1))
 
-#define USE_GAUSSIAN_GUESS 0
+#define USE_GAUSSIAN_GUESS 1
 
 #define PERTURBATION(x) 2*gaussian(x, 0, 0.2)
 //#define PERTURBATION(x) 0.0
@@ -94,6 +94,8 @@ int main() {
 		.error_tol = 1e-10,
         .spatial_pot_perturbation = perturbation,
 
+		.gk = gk15,
+
         .num_basis_funcs = 4,
 		.basis = ho_basis,
 
@@ -113,6 +115,23 @@ int main() {
 		.zero_threshold = 1e-10,
     };
 
+
+#if USE_GAUSSIAN_GUESS
+    struct nlse_guess guesses[] = {
+        [0] = {
+            .type = SPATIAL_GUESS,
+            .data.spatial_guess = gaussian0,
+        },
+        [1] = {
+            .type = SPATIAL_GUESS,
+            .data.spatial_guess = gaussian1,
+        },
+    };
+#else
+    struct nlse_guess* guesses = NULL;
+#endif
+
+
 	f64 g0[] = {
 		GAA, GAB,
 		GBA, GBB
@@ -121,7 +140,7 @@ int main() {
 
 	u32 comp_count = 2;
 
-	u32 bs[] = {4, 8, 12, 16, 24};//, 12, 16, 24, 32, 48, 64, 96, 128};
+	u32 bs[] = {4, 8, 12, 16, 24, 32, 48, 64, /*96,*/ /*128*/};
 
 	for (u32 i = 0; i < sizeof(bs)/sizeof(bs[0]); ++i) {
 		FILE* fd = fopen("out", "a");
@@ -135,7 +154,7 @@ int main() {
 			struct nlse_result res = grosspitaevskii(settings,
 													comp_count,
 													occupations,
-													NULL,
+													guesses,
 													g0);
 
 			struct timespec t1 = current_time();

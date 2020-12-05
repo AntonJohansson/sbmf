@@ -9,17 +9,17 @@
 
 #include <stdio.h>
 
-#define NA 1000
-#define NB 1000
+#define NA 4
+#define NB 4
 
 #define GAA (-2.0/((f64)NA-1))
-#define GAB (+1.00/((f64)NB))
-#define GBA (+1.00/((f64)NA))
+#define GAB (+1.0/((f64)NB))
+#define GBA (+1.0/((f64)NA))
 #define GBB (-2.0/((f64)NB-1))
 
 #define USE_GAUSSIAN_GUESS 1
 
-#define PERTURBATION(x) gaussian(x, 0, 0.2)
+#define PERTURBATION(x) 2*gaussian(x, 0, 0.2)
 //#define PERTURBATION(x) 0.0
 //#define PERTURBATION(x) (-1.5015*sqrt(x*x - 1.5*1.5 + 1.5015*1.5015));
 

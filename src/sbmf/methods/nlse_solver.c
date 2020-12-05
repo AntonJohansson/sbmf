@@ -4,8 +4,12 @@
 #include <sbmf/math/harmonic_oscillator.h>
 #include <sbmf/math/functions.h>
 
-#include <assert.h> /* Not the correct way to handle this */
+#include <gsl/gsl_integration.h>
 #include <omp.h>
+
+#include <assert.h> /* Not the correct way to handle this */
+
+#define USE_GSL_INTEGRATION 0
 
 struct integrand_params { u32 n[2]; u32 component_count; u32 coeff_count;
 	f64* coeff;
@@ -82,6 +86,30 @@ static void nonlinear_me_integrand(f64* out, f64* in, u32 len, void* data) {
 		out[i] = eig1[i]*eig2[i]*op[i];
 	}
 }
+
+#if USE_GSL_INTEGRATION
+static f64 nonlinear_me_integrand_gsl(f64 in, void* data) {
+	struct integrand_params* params = data;
+
+	f64 eig1;
+	f64 eig2;
+	params->basis.eigenfunc(params->n[0], 1, &eig1, &in);
+	params->basis.eigenfunc(params->n[1], 1, &eig2, &in);
+
+	f64 sample[params->component_count];
+	for (u32 i = 0; i < params->component_count; ++i) {
+		params->basis.sample(params->coeff_count, &params->coeff[i*params->coeff_count], 1, &sample[i], &in);
+	}
+
+	f64 op;
+	params->op(1, &op, &in, params->component_count, sample, params->op_userdata);
+
+	return eig1*eig2*op;
+}
+#endif
+
+
+
 
 struct nlse_result nlse_solver(struct nlse_settings settings, const u32 component_count, struct nlse_component component[static component_count]) {
 	const u32 N = settings.num_basis_funcs;
@@ -215,12 +243,18 @@ struct nlse_result nlse_solver(struct nlse_settings settings, const u32 componen
 		assert(hermitian_bandmat_is_valid(linear_hamiltonian));
 	}
 
-	f64 old_energy[res.component_count];
+#if USE_GSL_INTEGRATION
+	const u32 num_threads = omp_get_max_threads();
+	gsl_integration_workspace* ws[num_threads];
+	/* Create gsl workspaces if necessary */
+	for (u32 i = 0; i < num_threads; ++i) {
+		ws[i] = gsl_integration_workspace_alloc(settings.max_iterations);
+	}
+#endif
 
 	/* Do the actual iterations */
 	for (; res.iterations < settings.max_iterations; ++res.iterations) {
 		memcpy(old_coeff, res.coeff, res.component_count * res.coeff_count * sizeof(f64));
-		memcpy(old_energy, res.energy, res.component_count*sizeof(f64));
 
 		/* Call debug callback if requested by user */
 		if (settings.measure_every > 0 &&
@@ -229,6 +263,9 @@ struct nlse_result nlse_solver(struct nlse_settings settings, const u32 componen
 			settings.debug_callback(settings, res);
 		}
 
+		/*
+		 * Construct all the Hamiltonians
+		 */
 		for (u32 i = 0; i < component_count; ++i) {
 			params.op = component[i].op;
 			params.op_userdata = component[i].userdata;
@@ -242,7 +279,16 @@ struct nlse_result nlse_solver(struct nlse_settings settings, const u32 componen
 				params.n[0] = r;
 				params.n[1] = c;
 
+#if USE_GSL_INTEGRATION
+				integration_result int_res;
+				gsl_function F;
+				F.function = nonlinear_me_integrand_gsl;
+				F.params = &params;
+				gsl_integration_qagi(&F, 1e-10, 1e-7, settings.max_iterations, ws[omp_get_thread_num()], &int_res.integral, &int_res.error);
+				int_res.converged = true;
+#else
 				integration_result int_res = quadgk_vec(nonlinear_me_integrand, -INFINITY, INFINITY, int_settings);
+#endif
 
 				/* Check if the resultant integral is less than what we can resolve,
 				 * if so, zero it.
@@ -264,6 +310,10 @@ struct nlse_result nlse_solver(struct nlse_settings settings, const u32 componen
 			assert(hermitian_bandmat_is_valid(res.hamiltonian[i]));
 		}
 
+		/*
+		 * Solve and normalize all the Hamiltonian
+		 * eigenvalue problems
+		 */
 		for (u32 i = 0; i < component_count; ++i) {
 			/* Solve for first eigenvector (ground state) */
 			struct eigen_result_real eigres = find_eigenpairs_sparse_real(res.hamiltonian[i], 1, EV_SMALLEST);
@@ -305,6 +355,13 @@ struct nlse_result nlse_solver(struct nlse_settings settings, const u32 componen
 			break;
 		}
 	}
+
+#if USE_GSL_INTEGRATION
+	/* free gsl workspaces if necessary */
+	for (u32 i = 0; i < num_threads; ++i) {
+		gsl_integration_workspace_free(ws[i]);
+	}
+#endif
 
 	return res;
 }

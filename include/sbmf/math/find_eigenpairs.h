@@ -33,6 +33,7 @@ struct eigen_result_real {
  * upper tridiagonal matrix.
  */
 struct eigen_result find_eigenpairs_full(struct complex_hermitian_bandmat bm);
+struct eigen_result_real find_eigenpairs_full_real(struct hermitian_bandmat bm);
 
 /* Find _some_ eigenpairs (specified by the enum which_eigenpairs)
  * for a dense, upper tridiagonal matrix.

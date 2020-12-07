@@ -10,17 +10,18 @@
 #include <stdio.h>
 
 #define NA 4
-#define NB 4
+#define NB 0
 
-#define GAA (-2.0/((f64)NA-1))
+#define GAA (1.0/3.0)
+//#define GAA ((1.0/3.0)/((f64)NA-1))
 #define GAB (+1.0/((f64)NB))
 #define GBA (+1.0/((f64)NA))
 #define GBB (-2.0/((f64)NB-1))
 
-#define USE_GAUSSIAN_GUESS 1
+#define USE_GAUSSIAN_GUESS 0
 
-#define PERTURBATION(x) 2*gaussian(x, 0, 0.2)
-//#define PERTURBATION(x) 0.0
+//#define PERTURBATION(x) 2*gaussian(x, 0, 0.2)
+#define PERTURBATION(x) 0.0
 //#define PERTURBATION(x) (-1.5015*sqrt(x*x - 1.5*1.5 + 1.5015*1.5015));
 
 void perturbation(const u32 len, f64 out[static len],
@@ -137,8 +138,9 @@ f64 V(const u32 coeff_count, f64 i[static coeff_count],
 	};
 
     struct integration_settings settings = {
-        .abs_error_tol = 1e-10,
+        .abs_error_tol = 1e-12,
         .rel_error_tol = 1e-10,
+		.gk = gk15,
         .max_evals = 1e5,
 		.userdata = &p,
     };
@@ -197,7 +199,7 @@ int main() {
 		.max_iterations = 1e5,
 		.error_tol = 1e-9,
 
-        .num_basis_funcs = 16,
+        .num_basis_funcs = 55,
 		.basis = ho_basis,
 
 		.zero_threshold = 1e-10,
@@ -205,9 +207,11 @@ int main() {
 		.measure_every = 0,
     };
 
-	struct nlse_result res = grosspitaevskii(settings, 2, occupations, guesses, g0);
+	const u32 component_count = 1;
+
+	struct nlse_result res = grosspitaevskii(settings, component_count, occupations, guesses, g0);
 	printf("\nfull energy per particle: %lf\n",
-			full_energy_naked(settings, res.coeff_count, 2, res.coeff, occupations, g0)/(occupations[0] + occupations[1]));
+			full_energy_naked(settings, res.coeff_count, component_count, res.coeff, occupations, g0)/(occupations[0] + occupations[1]));
 
 #if 1
 	{
@@ -257,7 +261,7 @@ int main() {
 	}
 	printf("\n");
 
-	const u32 states_to_include = 5;
+	const u32 states_to_include = 50;
 
 	u32 bmf_occupation[4];
 
@@ -279,10 +283,11 @@ int main() {
 	struct eigen_result_real states[res.component_count];
 
 	for (u32 i = 0; i < res.component_count; ++i) {
-		states[i] = find_eigenpairs_sparse_real(res.hamiltonian[i], states_to_include, EV_SMALLEST_MAG);
+		//states[i] = find_eigenpairs_sparse_real(res.hamiltonian[i], states_to_include, EV_SMALLEST_MAG);
+		states[i] = find_eigenpairs_full_real(res.hamiltonian[i]);
 
 		for (u32 j = 0; j < states_to_include; ++j) {
-			f64_normalize(&states[i].eigenvectors[j*res.coeff_count], &states[i].eigenvectors[j*res.coeff_count], res.coeff_count);
+			//f64_normalize(&states[i].eigenvectors[j*res.coeff_count], &states[i].eigenvectors[j*res.coeff_count], res.coeff_count);
 			//bmf_state_energy[2*i+j] = eres.eigenvalues[j];
 			//memcpy(&bmf_state_coeff[(2*i+j)*res.coeff_count], &eres.eigenvectors[j*res.coeff_count], res.coeff_count*sizeof(f64));
 		}
@@ -410,11 +415,12 @@ int main() {
 				tmp = factor * GAA*sqrt(NA*(NA-1))*V(l, &PHI(0,i), &PHI(0,j), &PHI(0,0), &PHI(0,0));
 				E2 += tmp*tmp/(2*ENERGY(0,0) - (ENERGY(0,i) + ENERGY(0,j)));
 
-				f64 scaling = tmp/(2*ENERGY(0,0) - (ENERGY(0,i) + ENERGY(0,j)));
-				for (u32 k = 0; k < res.coeff_count; ++k) {
-					pt1_coeffs_a[k] += scaling*((&PHI(0,i))[k] + (&PHI(0,j))[k]);
-					//pt1_coeffs_b[k] += scaling*((&PHI(1,i))[k] + (&PHI(1,j))[k]);
-				}
+				//f64 scaling = tmp/(2*ENERGY(0,0) - (ENERGY(0,i) + ENERGY(0,j)));
+				//for (u32 k = 0; k < res.coeff_count; ++k) {
+				//	pt1_coeffs_a[k] += scaling*((&PHI(0,i))[k] + (&PHI(0,j))[k]);
+				//	//pt1_coeffs_b[k] += scaling*((&PHI(1,i))[k] + (&PHI(1,j))[k]);
+				//}
+
 				/* B comp */
 				//tmp = factor * GBB*sqrt(NB*(NB-1))*V(l, &PHI(1,i), &PHI(1,j), &PHI(1,0), &PHI(1,0));
 				//E2 += tmp*tmp/(
@@ -451,10 +457,11 @@ int main() {
 		//}
 
 		printf("\nPT energy          PT energy per particle\n");
-		printf("E0: %.2e             %lf\n", E0, E0/(NA+NB));
-		printf("E1: %.2e             %lf\n", E1, E1/(NA+NB));
-		printf("E2: %.2e             %lf\n", E2, E2/(NA+NB));
-		printf("E0+E1+E2 = %.2e      %lf\n", E0+E1+E2, (E0+E1+E2)/(NA+NB));
+		printf("E0: %.2e             %.20lf\n", E0, E0);
+		printf("E1: %.2e             %.20lf\n", E1, E1);
+		printf("E2: %.2e             %.20lf\n", E2, E2);
+		printf("E0+E1 = %.2e		 %.20lf\n", E0+E1, E0+E1);
+		printf("E0+E1+E2 = %.2e      %.20lf\n", E0+E1+E2, (E0+E1+E2));
 		printf("\n");
 	}
 

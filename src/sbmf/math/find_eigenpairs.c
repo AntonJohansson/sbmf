@@ -58,6 +58,55 @@ struct eigen_result find_eigenpairs_full(struct complex_hermitian_bandmat bm) {
 	return res;
 }
 
+struct eigen_result_real find_eigenpairs_full_real(struct hermitian_bandmat bm) {
+	f64* offdiag_elements = (f64*)sbmf_stack_push((bm.size-1)*sizeof(f64));
+	f64* colmaj_eigvecs = (f64*)sbmf_stack_push(bm.size*bm.size*sizeof(f64));
+
+	struct eigen_result_real res = {
+		.eigenvalues = (f64*)sbmf_stack_push(bm.size * sizeof(f64)),
+		.eigenvectors = (f64*)sbmf_stack_push(bm.size * bm.size * sizeof(f64)),
+		.num_eigenpairs = bm.size,
+		.points_per_eigenvector = bm.size,
+	};
+
+	f64 temp_eigvals[bm.size];
+
+	/* Start by reducing (complex hermitian) bandmatrix to tri-diagonal mat. */
+	{
+		i32 err = LAPACKE_dsbtrd(LAPACK_ROW_MAJOR, 'V', 'U',
+				bm.size,
+				bm.bandcount-1,
+				bm.data,
+				bm.size,
+				temp_eigvals, offdiag_elements, colmaj_eigvecs,
+				bm.size);
+
+		assert(err == 0); // @TODO, handle these errors better
+	}
+
+	/* Solve eigenvalue problem via QR factorisation of tridiagonal matrix. */
+	{
+		i32 err = LAPACKE_dsteqr(LAPACK_ROW_MAJOR, 'V',
+				bm.size,
+				temp_eigvals, offdiag_elements, colmaj_eigvecs,
+				bm.size);
+
+		assert(err == 0); // @TODO, handle these errors better
+	}
+
+	/* Convert eigenvectors to row-major, as we expected them to be.
+	 *TODO mat_transpose(out_eigvecs, colmaj_eigvecs, bm.size, bm.size);
+	 */
+	for (u32 r = 0; r < bm.size; ++r) {
+		res.eigenvalues[r] = temp_eigvals[r];
+		for (u32 c = 0; c < bm.size; ++c) {
+			res.eigenvectors[r + c*bm.size] = colmaj_eigvecs[c + r*bm.size];
+		}
+	}
+
+	return res;
+}
+
 /* Arpack helper functions to provide more helpful error messages. */
 static const char* arpack_znaupd_error_code_to_string(i32 err);
 static const char* arpack_zneupd_error_code_to_string(i32 err);

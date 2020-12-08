@@ -1,8 +1,3 @@
-#include <sbmf/methods/quadgk_vec.h>
-#include <sbmf/memory/prioqueue.h>
-#include <math.h> // INFINITY and isinf
-#include <stdio.h>
-
 typedef f64 coord_transform_input_func(f64 x, f64 a, f64 b);
 typedef f64 coord_transform_output_func(f64 x);
 

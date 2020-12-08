@@ -1,15 +1,15 @@
-#pragma once
+static inline void* xmalloc(u64 size_in_bytes) {
+	void* mem = malloc(size_in_bytes);
+	if(!mem) {
+		sbmf_log_panic("malloc(...) could not allocate %lu bytes.", size_in_bytes);
+	}
 
-#include <sbmf/types.h>
-#include <sbmf/memory/xmalloc.h>
-#include <assert.h>
+	return mem;
+}
 
-#ifndef SA_PRINT_DEBUG_INFO
-#define SA_PRINT_DEBUG_INFO 0
-#endif
-
-#define SA_PUSH(sa, type) \
-	(type*)sa_push(sa, sizeof(type))
+/*
+ * Very basic, non-expanding stack-allocator
+ */
 
 struct stack_allocator {
 	u32 top;
@@ -17,7 +17,7 @@ struct stack_allocator {
 	u8* memory;
 };
 
-static inline struct stack_allocator* sa_make(u32 size_in_bytes) {
+static struct stack_allocator* sa_make(u32 size_in_bytes) {
 	void* mem = xmalloc(sizeof(struct stack_allocator) + size_in_bytes);
 
 	struct stack_allocator* sa = (struct stack_allocator*) mem;
@@ -28,15 +28,11 @@ static inline struct stack_allocator* sa_make(u32 size_in_bytes) {
 	return sa;
 }
 
-static inline void sa_destroy(struct stack_allocator* sa) {
+static void sa_destroy(struct stack_allocator* sa) {
 	free(sa);
 }
 
-static inline u8* sa_push(struct stack_allocator* sa, u32 size_in_bytes) {
-#if SA_PRINT_DEBUG_INFO
-	sbmf_log_info("stack allocator %p (%u/%u bytes)\n\ttrying to allocate %u bytes\n", sa, sa->top, sa->size, size_in_bytes);
-#endif
-
+static u8* sa_push(struct stack_allocator* sa, u32 size_in_bytes) {
 	if (sa->top + size_in_bytes > sa->size) {
 		sbmf_log_panic("stack allocator %p out of memory (%u/%u bytes)\n\ttrying to allocate %u bytes\n", sa, sa->top, sa->size, size_in_bytes);
 	}

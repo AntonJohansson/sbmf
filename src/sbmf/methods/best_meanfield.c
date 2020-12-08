@@ -1,8 +1,4 @@
-#include <sbmf/methods/best_meanfield.h>
-#include <sbmf/methods/grosspitaevskii.h>
-#include <sbmf/math/functions.h>
-
-static void operator(const u32 len, f64 out[static len],
+static void bestmf_operator(const u32 len, f64 out[static len],
 			  f64 in[static len], const u32 component_count,
 			  f64 wf[static len*component_count],
 			  void* userdata) {
@@ -164,7 +160,7 @@ struct bestmf_result best_meanfield(struct nlse_settings settings, const u32 par
 	for (u32 i = 0; i < 2; ++i) {
 		if (guesses)
 			comps[i].guess = guesses[i];
-		comps[i].op = operator;
+		comps[i].op = bestmf_operator;
 		comps[i].userdata = &g[i*2];
 	}
 
@@ -211,7 +207,7 @@ struct bestmf_2comp_result best_meanfield_2comp(struct nlse_settings settings,
 	for (u32 i = 0; i < 4; ++i) {
 		if (guesses)
 			comps[i].guess = guesses[i];
-		comps[i].op = operator;
+		comps[i].op = bestmf_operator;
 		comps[i].userdata = &g[i*4];
 	}
 

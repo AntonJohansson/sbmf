@@ -1,6 +1,4 @@
-#include <sbmf/methods/grosspitaevskii.h>
-
-static void operator(const u32 len, f64 out[static len],
+static void gp_operator(const u32 len, f64 out[static len],
 			  f64 in[static len], const u32 component_count,
 			  f64 wf[static len*component_count],
 			  void* userdata) {
@@ -41,7 +39,7 @@ struct nlse_result grosspitaevskii(struct nlse_settings settings,
 			comps[i].guess = guesses[i];
 		else
 			comps[i].guess.type = DEFAULT_GUESS;
-		comps[i].op = operator;
+		comps[i].op = gp_operator;
 		comps[i].userdata = &g[i*comp_count];
 	}
 
@@ -102,63 +100,6 @@ void full_energy_integrand(f64* out, f64* in, u32 len, void* data) {
 	for (u32 i = 0; i < len; ++i) {
 		out[i] = sample_a[i]*sample_a[i]*sample_b[i]*sample_b[i];
 	}
-}
-
-f64 full_energy(struct gp_settings settings, struct nlse_result res) {
-	f64 E = 0.0;
-
-	for (u32 i = 0; i < settings.component_count; ++i) {
-		for (u32 j = 0; j < res.coeff_count; ++j) {
-			f64 c = fabs(res.coeff[i*res.coeff_count + j]);
-			E += settings.occupations[i]*settings.basis.eigenval(j)*c*c;
-		}
-	}
-
-	struct full_energy_integrand_params p = {
-		.coeff_count = res.coeff_count,
-		.basis = settings.basis,
-	};
-
-	struct full_energy_integrand_pot_params ppot = {
-		.coeff_count = res.coeff_count,
-		.V = settings.pot,
-		.basis = settings.basis,
-	};
-
-	integration_settings int_settings = {
-		.max_evals = 1e5,
-		.abs_error_tol = 1e-10,
-		.userdata = &ppot,
-	};
-
-	/* pot terms */
-	if (settings.pot) {
-		for (u32 i = 0; i < res.component_count; ++i) {
-			ppot.coeff_a = &res.coeff[i*res.coeff_count];
-			integration_result ires = quadgk_vec(full_energy_integrand_pot, -INFINITY, INFINITY, int_settings);
-			E += settings.occupations[i]*ires.integral;
-		}
-	}
-
-	/* |a|^2|b|^2 terms */
-	int_settings.userdata = &p;
-	for (u32 i = 0; i < res.component_count; ++i) {
-		for (u32 j = 0; j < res.component_count; ++j) {
-			f64 factor = 0.0;
-			if (i == j)
-				factor = 0.5*(settings.occupations[i]-1);
-			else
-				factor = settings.occupations[j];
-
-
-			p.coeff_a = &res.coeff[i*res.coeff_count];
-			p.coeff_b = &res.coeff[j*res.coeff_count];
-			integration_result ires = quadgk_vec(full_energy_integrand, -INFINITY, INFINITY, int_settings);
-			E += settings.g0[i*res.component_count + j] * settings.occupations[i] * factor * ires.integral;
-		}
-	}
-
-	return E;
 }
 
 f64 full_energy_naked(struct nlse_settings settings,

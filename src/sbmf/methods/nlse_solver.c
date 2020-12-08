@@ -1,15 +1,8 @@
-#include <sbmf/methods/nlse_solver.h>
-#include <sbmf/sbmf.h>
-#include <sbmf/math/find_eigenpairs.h>
-#include <sbmf/math/harmonic_oscillator.h>
-#include <sbmf/math/functions.h>
-
-#include <gsl/gsl_integration.h>
-#include <omp.h>
-
-#include <assert.h> /* Not the correct way to handle this */
-
 #define USE_GSL_INTEGRATION 0
+
+#if USE_GSL_INTEGRATION
+	#include <gsl/gsl_integration.h>
+#endif
 
 struct integrand_params { u32 n[2]; u32 component_count; u32 coeff_count;
 	f64* coeff;
@@ -197,7 +190,7 @@ struct nlse_result nlse_solver(struct nlse_settings settings, const u32 componen
 	u32 matrix_element_cols[matrix_element_count];
 	{
 		u32 matrix_element_index = 0;
-		COMPLEX_HERMITIAN_BANDMAT_FOREACH(res.hamiltonian[0], r,c) {
+		HERMITIAN_BANDMAT_FOREACH(res.hamiltonian[0], r,c) {
 			matrix_element_rows[matrix_element_index] = r;
 			matrix_element_cols[matrix_element_index] = c;
 			matrix_element_index++;

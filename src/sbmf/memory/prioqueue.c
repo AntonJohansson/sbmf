@@ -1,9 +1,3 @@
-#pragma once
-
-#include <sbmf/sbmf.h>
-#include <string.h> /* memcpy, memove */
-#include "bucketarray.h"
-
 #define PQ_PARENT(x) (((i32)x-1)/2)
 #define PQ_LEFT(x)	 (2*(i32)x+1)
 #define PQ_RIGHT(x)  (2*(i32)x+2)

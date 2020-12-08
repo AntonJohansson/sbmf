@@ -1,11 +1,3 @@
-#pragma once
-
-#include <sbmf/sbmf.h>
-#include "matrix.h"
-#include <sbmf/math/basis.h>
-
-#include <assert.h>
-
 static inline f128 factorial_128(const u32 n) {
 	f128 prod = 1.0;
 	f128 current_value = (f128) n;
@@ -17,7 +9,7 @@ static inline f128 factorial_128(const u32 n) {
 }
 
 /* Currently doesnt handle 2d/3d/... case */
-static void ho_eigenfunc(const u32 n, const u32 len, f64 out[static len], f64 in[static len]) {
+void ho_eigenfunc(const u32 n, const u32 len, f64 out[static len], f64 in[static len]) {
 	/*
 	 * HN = 2xH_{N-1} - 2(N-1)H_{N-2}
 	 * psiN = 1/sqrt(2^N * N!) * (1/pi^(1/4)) * exp(-x^2/2) * HN
@@ -48,7 +40,7 @@ static void ho_eigenfunc(const u32 n, const u32 len, f64 out[static len], f64 in
 }
 
 /* energy eigenvalue */
-static f64 ho_eigenval(const u32 n) {
+f64 ho_eigenval(const u32 n) {
 	/*
 	f64 sum = 0.0;
 	for (i32 i = 0; i < dims; ++i)
@@ -60,7 +52,7 @@ static f64 ho_eigenval(const u32 n) {
 }
 
 /* Currently doesnt handle 2d/3d/... case */
-static void ho_sample(const u32 coeff_count,
+void ho_sample(const u32 coeff_count,
 		f64 coeffs[static coeff_count],
 		const u32 len,
 		f64 out[static len],
@@ -77,7 +69,7 @@ static void ho_sample(const u32 coeff_count,
 	}
 }
 
-static struct basis ho_basis = {
+struct basis ho_basis = {
 	.eigenfunc = ho_eigenfunc,
 	.eigenval  = ho_eigenval,
 	.sample    = ho_sample
@@ -91,6 +83,7 @@ static struct basis ho_basis = {
 
 
 
+#if 0
 #include <gsl/gsl_sf_hermite.h>
 
 static void ho_gsl_eigenfunc(const u32 n, const u32 len, f64 out[static len], f64 in[static len]) {
@@ -126,6 +119,7 @@ static struct basis ho_gsl_basis = {
 	.eigenval  = ho_gsl_eigenval,
 	.sample    = ho_gsl_sample
 };
+#endif
 
 
 
@@ -154,7 +148,7 @@ static struct basis ho_gsl_basis = {
 
 
 
-static inline f64 ho_potential(f64* v, i32 n, c64 u) {
+f64 ho_potential(f64* v, i32 n, c64 u) {
 	SBMF_UNUSED(u);
 
 	f64 temp = 0.0;
@@ -165,7 +159,7 @@ static inline f64 ho_potential(f64* v, i32 n, c64 u) {
 }
 
 /* Currently doesnt handle 2d/3d/... case */
-static inline void ho_potential_vec(f64* out, f64* in, u32 len) {
+void ho_potential_vec(f64* out, f64* in, u32 len) {
 	for (u32 i = 0; i < len; ++i) {
 		out[i] = 0.5*in[i]*in[i];
 	}

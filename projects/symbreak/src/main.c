@@ -1,10 +1,4 @@
 #include <sbmf/sbmf.h>
-#include <sbmf/methods/grosspitaevskii.h>
-#include <sbmf/methods/best_meanfield.h>
-#include <sbmf/math/functions.h>
-#include <sbmf/math/harmonic_oscillator.h>
-#include <sbmf/math/find_eigenpairs.h>
-#include <sbmf/methods/perturbation_theory.h>
 
 #include <plot/plot.h>
 

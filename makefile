@@ -10,6 +10,7 @@ PROJ_SRCS = \
 	src/sbmf/methods/grosspitaevskii.c \
 	src/sbmf/methods/best_meanfield.c \
 	src/sbmf/math/find_eigenpairs.c \
+	src/sbmf/methods/perturbation_theory.c \
 	src/sbmf/math/matrix.c \
 	src/sbmf/debug/profile.c
 

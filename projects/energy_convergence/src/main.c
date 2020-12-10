@@ -1,9 +1,4 @@
 #include <sbmf/sbmf.h>
-#include <sbmf/methods/grosspitaevskii.h>
-#include <sbmf/methods/best_meanfield.h>
-#include <sbmf/math/functions.h>
-#include <sbmf/math/harmonic_oscillator.h>
-#include <sbmf/math/find_eigenpairs.h>
 
 #include <plot/plot.h>
 
@@ -14,10 +9,10 @@
 #define NA 4
 #define NB 4
 
-#define GAA (-2.00/((f64)NA-1))
-#define GAB (+1.00/((f64)NB))
-#define GBA (+1.00/((f64)NA))
-#define GBB (-2.00/((f64)NB-1))
+#define GAA (+1.00/((f64)NA-1))
+#define GAB (+4.00/((f64)NB))
+#define GBA (+4.00/((f64)NA))
+#define GBB (+1.00/((f64)NB-1))
 
 #define USE_GAUSSIAN_GUESS 1
 
@@ -99,19 +94,6 @@ int main() {
         .num_basis_funcs = 4,
 		.basis = ho_basis,
 
-//#if USE_GAUSSIAN_GUESS
-//		.guesses = (struct nlse_guess[]) {
-//			[0] = {
-//				.type = SPATIAL_GUESS,
-//				.data.spatial_guess = gaussian0,
-//			},
-//			[1] = {
-//				.type = SPATIAL_GUESS,
-//				.data.spatial_guess = gaussian1,
-//			},
-//		},
-//#endif
-
 		.zero_threshold = 1e-10,
     };
 
@@ -140,7 +122,7 @@ int main() {
 
 	u32 comp_count = 2;
 
-	u32 bs[] = {4, 8, 12, 16, 24, 32, 48, 64, /*96,*/ /*128*/};
+	u32 bs[] = {/*4, 8, 12, 16, 24, 32, 48, 64, 96,*/ 128};
 
 	for (u32 i = 0; i < sizeof(bs)/sizeof(bs[0]); ++i) {
 		FILE* fd = fopen("out", "a");

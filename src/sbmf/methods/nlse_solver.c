@@ -1,4 +1,4 @@
-#define USE_GSL_INTEGRATION 0
+#define USE_GSL_INTEGRATION 1
 
 #if USE_GSL_INTEGRATION
 	#include <gsl/gsl_integration.h>

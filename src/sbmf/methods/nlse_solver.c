@@ -1,4 +1,4 @@
-#define USE_GSL_INTEGRATION 1
+#define USE_GSL_INTEGRATION 0
 
 #if USE_GSL_INTEGRATION
 	#include <gsl/gsl_integration.h>
@@ -105,7 +105,12 @@ static f64 nonlinear_me_integrand_gsl(f64 in, void* data) {
 
 
 struct nlse_result nlse_solver(struct nlse_settings settings, const u32 component_count, struct nlse_component component[static component_count]) {
+	/* Lazy */
 	const u32 N = settings.num_basis_funcs;
+	/*
+	 * Unique number of me's that need to be calculated in
+	 * a symmetric matrix
+	 */
 	const u32 matrix_element_count = N*(N+1)/2;
 
 	/* Setup results struct */

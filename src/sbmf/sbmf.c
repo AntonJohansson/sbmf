@@ -7,20 +7,22 @@
 #include <cblas.h>
 #include <lapacke.h>
 #include <arpack/arpack.h>
-/*#include <arpack/debug_c.h>*/
+/* #include <arpack/debug_c.h> */
 
 /* c stdlib */
-#include <stdio.h>  /* sprintf */
+#include <stdio.h>  /* sprintf, fopen, fprintf, fread */
 #include <stdlib.h> /* malloc */
 #include <string.h> /* memcpy,memset */
 #include <stdarg.h>
 #include <assert.h>
-#include <float.h>
+#include <float.h>  /* isinf, isnan */
 
 /* unix headers */
 #include <signal.h>
 
-/* Getting into actual code */
+/*
+ * Getting into actual code
+ */
 
 void sbmf_log_info(const char* fmt, ...);
 void sbmf_log_warning(const char* fmt, ...);
@@ -31,13 +33,15 @@ void sbmf_log_panic(const char* fmt, ...);
 #include "global_state.c"
 #include "memory/bucketarray.c"
 #include "memory/prioqueue.c"
+#include "math/functions.c"
 #include "math/matrix.c"
 #include "math/find_eigenpairs.c"
 #include "math/basis.c"
-#include "methods/quadgk_vec.c"
+#include "methods/quadgk.c"
 #include "methods/nlse_solver.c"
 #include "methods/grosspitaevskii.c"
 #include "methods/best_meanfield.c"
+#include "methods/perturbation_theory.c"
 
 /*
  * Logging definitions

@@ -5,18 +5,18 @@
 #include <stdio.h>
 
 #define NA 4
-#define NB 4
+#define NB 0
 
-//#define GAA (1.0/3.0)
-#define GAA (+1.0/((f64)NA-1))
+#define GAA (1.0/3.0)
+//#define GAA (+1.0/((f64)NA-1))
 #define GAB (+4.0/((f64)NB))
 #define GBA (+4.0/((f64)NA))
 #define GBB (+1.0/((f64)NB-1))
 
 #define USE_GAUSSIAN_GUESS 0
 
-#define PERTURBATION(x) 2*gaussian(x, 0, 0.2)
-//#define PERTURBATION(x) 0.0
+//#define PERTURBATION(x) 2*gaussian(x, 0, 0.2)
+#define PERTURBATION(x) 0.0
 //#define PERTURBATION(x) (-1.5015*sqrt(x*x - 1.5*1.5 + 1.5015*1.5015));
 
 void perturbation(const u32 len, f64 out[static len],
@@ -117,8 +117,6 @@ int main() {
 	sbmf_set_log_callback(log_callback);
 	sbmf_init();
 
-	printf("gab^2 < gaa*gbb | %lf < %lf\n", GAB*GAB, GAA*GBB);
-
 #if USE_GAUSSIAN_GUESS
 	struct nlse_guess guesses[] = {
 		[0] = {
@@ -146,7 +144,7 @@ int main() {
 		.max_iterations = 1e5,
 		.error_tol = 1e-9,
 
-        .num_basis_funcs = 16,
+        .num_basis_funcs = 50,
 		.basis = ho_basis,
 
 		.zero_threshold = 1e-10,
@@ -155,11 +153,13 @@ int main() {
 		.gk=gk15
     };
 
-	const u32 component_count = 2;
+	const u32 component_count = 1;
 
 	struct nlse_result res = grosspitaevskii(settings, component_count, occupations, guesses, g0);
 	printf("\nfull energy per particle: %lf\n",
-			full_energy_naked(settings, res.coeff_count, component_count, res.coeff, occupations, g0)/(occupations[0] + occupations[1]));
+			full_energy(settings, res.coeff_count, component_count, res.coeff, occupations, g0));
+
+	nlse_write_to_binary_file("outbin", res);
 
 #if 1
 	{

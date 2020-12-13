@@ -470,7 +470,7 @@ static inline integration_result hadapt(integrand_vec* f, f64 start, f64 end,
 	return result;
 }
 
-integration_result quadgk_vec(integrand_vec* f, f64 start, f64 end, integration_settings settings) {
+integration_result quadgk(integrand_vec* f, f64 start, f64 end, integration_settings settings) {
 	/* If no gk rule is chosen, default to gk7 */
 	if (settings.gk.gauss_size == 0)
 		settings.gk = gk7;

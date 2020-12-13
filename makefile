@@ -1,31 +1,29 @@
 PROJECT = sbmf
-
 BUILDDIR = build
+INSTALLDIR = ~/.local
 
 PROJ_SRCS = src/sbmf/sbmf.c
-
 PROJ_OBJS = $(patsubst %.c, $(BUILDDIR)/%.o, $(PROJ_SRCS))
 
-PROJ_LIBS = \
-	-lm -fopenmp \
-	-l:third_party/lib/libarpack.a \
-	-l:third_party/lib/libopenblas.a \
-	-l:third_party/lib/libfftw3.a \
-	-lgfortran \
+PROJ_LIBS = 							\
+	-lm 								\
+	-fopenmp 							\
+	-l:third_party/lib/libarpack.a 		\
+	-l:third_party/lib/libopenblas.a 	\
+	-lgfortran 							\
 	-lgsl
 
 RELEASE_FLAGS = -O3
 DEBUG_FLAGS = -g \
 			  -fsanitize=address \
 			  -fsanitize=leak \
-			  #-fsanitize=thread \#
 			  -fsanitize=undefined \
 			  -fsanitize=bool \
 			  -fsanitize=enum \
 			  -fsanitize=float-cast-overflow \
 			  -fsanitize=signed-integer-overflow
 
-PROJ_FLAGS = -c -fpic -pedantic -Wall -Wextra -Isrc -Ithird_party/include -Iinclude
+PROJ_FLAGS = -c -fpic -pedantic -Wall -Wextra -Ithird_party/include -Iinclude
 
 .PHONY: release
 release: PROJ_FLAGS += $(RELEASE_FLAGS)
@@ -37,10 +35,10 @@ debug: $(BUILDDIR)/$(PROJECT).a
 
 .PHONY: install
 install:
-	mkdir -p ~/ .local/lib
-	mkdir -p ~/ .local/include/
-	cp $(BUILDDIR)/$(PROJECT).a ~/.local/lib/
-	cp -r include/sbmf ~/.local/include/
+	mkdir -p $(INSTALLDIR)/lib
+	mkdir -p $(INSTALLDIR)/include/
+	cp $(BUILDDIR)/$(PROJECT).a $(INSTALLDIR)/lib/
+	cp -r include/sbmf $(INSTALLDIR)/include/
 
 $(BUILDDIR):
 	mkdir -p $(shell find src -type d | sed -e "s/^/$(BUILDDIR)\//")
@@ -55,7 +53,6 @@ $(BUILDDIR)/$(PROJECT).a: $(BUILDDIR) $(PROJ_OBJS)
 	mkdir -p $(BUILDDIR)/tmp
 	ar x third_party/lib/libarpack.a --output=$(BUILDDIR)/tmp
 	ar x third_party/lib/libopenblas.a --output=$(BUILDDIR)/tmp
-	ar x third_party/lib/libfftw3.a --output=$(BUILDDIR)/tmp
 	ar rcs $@ $(PROJ_OBJS) $(BUILDDIR)/tmp/*.o
 	rm -r $(BUILDDIR)/tmp
 

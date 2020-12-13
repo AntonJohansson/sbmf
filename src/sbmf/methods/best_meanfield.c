@@ -65,7 +65,7 @@ static void compute_occupations(struct nlse_settings settings, const u32 particl
 			.userdata = &p,
 		};
 
-		integration_result ires = quadgk_vec(inner_product_integrand, -INFINITY, INFINITY, int_settings);
+		integration_result ires = quadgk(inner_product_integrand, -INFINITY, INFINITY, int_settings);
 
 		/*
 		 * <p1|p2> = (n2-n1)/N = (N-n1-n1)/N
@@ -81,6 +81,7 @@ static void compute_occupations(struct nlse_settings settings, const u32 particl
 static void compute_wavefunctions(struct nlse_settings settings, const u32 particle_count,
 						   const u32 coeff_count, f64 coeff[static coeff_count],
 						   const f64 n1, const f64 n2, f64* out) {
+		SBMF_UNUSED(settings);
 		/* P1 = sqrt(n1/N)p1 + sqrt(n2/N)p2
 		 * P2 = sqrt(n2/N)p2 - sqrt(n1/N)p1
 		 *
@@ -177,7 +178,7 @@ struct bestmf_result best_meanfield(struct nlse_settings settings, const u32 par
 	compute_wavefunctions(settings, particle_count, res.coeff_count, res.coeff, n1, n2, p);
 
 	sbmf_log_info("best_meanfield: finding energy");
-	f64 E = full_energy_naked(settings,
+	f64 E = full_energy(settings,
 			res.coeff_count, res.component_count,
 			p, (u32[]){(u32)n1, particle_count - (u32)n1},
 			(f64[]){g0,g0,g0,g0});
@@ -224,7 +225,7 @@ struct bestmf_2comp_result best_meanfield_2comp(struct nlse_settings settings,
 	compute_wavefunctions(settings, particle_count, res.coeff_count, res.coeff, n1, n2, p);
 	compute_wavefunctions(settings, particle_count, res.coeff_count, &res.coeff[2*res.coeff_count], n3, n4, &p[2*res.coeff_count]);
 
-	f64 E = full_energy_naked(settings,
+	f64 E = full_energy(settings,
 			res.coeff_count, res.component_count,
 			p,
 			(u32[]){

@@ -6,14 +6,6 @@ basedir=$(pwd)
 
 cd src
 
-# Build fftw
-tar xvzf $basedir/tars/fftw-3.3.8.tar.gz
-cd fftw-3.3.8
-./configure --prefix=$basedir
-make
-make install
-cd ..
-
 # Build BLAS CBLAS LAPACK LAPACKE from git
 git clone https://github.com/xianyi/openblas
 cd openblas

@@ -1,4 +1,4 @@
-PROJECT = symbreak
+PROJECT = pt
 
 SRCS = src/main.c
 

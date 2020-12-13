@@ -1,17 +1,15 @@
 PROJECT = sbmf
-
 BUILDDIR = build
 
 PROJ_SRCS = src/sbmf/sbmf.c
-
 PROJ_OBJS = $(patsubst %.c, $(BUILDDIR)/%.o, $(PROJ_SRCS))
 
-PROJ_LIBS = \
-	-lm -fopenmp \
-	-l:third_party/lib/libarpack.a \
-	-l:third_party/lib/libopenblas.a \
-	-l:third_party/lib/libfftw3.a \
-	-lgfortran \
+PROJ_LIBS = 							\
+	-lm 								\
+	-fopenmp 							\
+	-l:third_party/lib/libarpack.a 		\
+	-l:third_party/lib/libopenblas.a 	\
+	-lgfortran 							\
 	-lgsl
 
 RELEASE_FLAGS = -O3
@@ -55,7 +53,6 @@ $(BUILDDIR)/$(PROJECT).a: $(BUILDDIR) $(PROJ_OBJS)
 	mkdir -p $(BUILDDIR)/tmp
 	ar x third_party/lib/libarpack.a --output=$(BUILDDIR)/tmp
 	ar x third_party/lib/libopenblas.a --output=$(BUILDDIR)/tmp
-	ar x third_party/lib/libfftw3.a --output=$(BUILDDIR)/tmp
 	ar rcs $@ $(PROJ_OBJS) $(BUILDDIR)/tmp/*.o
 	rm -r $(BUILDDIR)/tmp
 

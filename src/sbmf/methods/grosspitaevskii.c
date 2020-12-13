@@ -102,7 +102,7 @@ void full_energy_integrand(f64* out, f64* in, u32 len, void* data) {
 	}
 }
 
-f64 full_energy_naked(struct nlse_settings settings,
+f64 full_energy(struct nlse_settings settings,
 		const u32 coeff_count, const u32 comp_count,
 		f64 coeff[static coeff_count*comp_count],
 		u32 occupations[static comp_count],
@@ -138,7 +138,7 @@ f64 full_energy_naked(struct nlse_settings settings,
 	if (settings.spatial_pot_perturbation) {
 		for (u32 i = 0; i < comp_count; ++i) {
 			ppot.coeff_a = &coeff[i*coeff_count];
-			integration_result ires = quadgk_vec(full_energy_integrand_pot, -INFINITY, INFINITY, int_settings);
+			integration_result ires = quadgk(full_energy_integrand_pot, -INFINITY, INFINITY, int_settings);
 			E += occupations[i]*ires.integral;
 		}
 	}
@@ -156,7 +156,7 @@ f64 full_energy_naked(struct nlse_settings settings,
 
 			p.coeff_a = &coeff[i*coeff_count];
 			p.coeff_b = &coeff[j*coeff_count];
-			integration_result ires = quadgk_vec(full_energy_integrand, -INFINITY, INFINITY, int_settings);
+			integration_result ires = quadgk(full_energy_integrand, -INFINITY, INFINITY, int_settings);
 			E += g0[i*comp_count + j] * occupations[i] * factor * ires.integral;
 		}
 	}

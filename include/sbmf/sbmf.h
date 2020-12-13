@@ -5,7 +5,7 @@
 #include <math.h>
 #include <stdbool.h>
 
-/* Redefinition of numerical types for personal reasons */
+/* Redefinition of numerical types for personal reasons lol */
 typedef int8_t 				i8;
 typedef uint8_t 			u8;
 typedef int16_t 			i16;
@@ -30,7 +30,10 @@ typedef long double complex c128;
 void sbmf_init();
 void sbmf_shutdown();
 
-/* Logging */
+/*
+ * Logging
+ */
+
 enum sbmf_log_level {
 	SBMF_LOG_LEVEL_INFO    = 0,
 	SBMF_LOG_LEVEL_WARNING = 1,
@@ -40,57 +43,46 @@ enum sbmf_log_level {
 
 typedef void sbmf_log_callback_func(enum sbmf_log_level, const char*);
 
+/* Sets a logging callback with the above definition, may be called anytime */
 void sbmf_set_log_callback(sbmf_log_callback_func* func);
 
 /*
  * Math functions
  */
 
-static inline f64 gaussian(f64 x, f64 mu, f64 sigma) {
-	return 1.0/(sigma*sqrt(2.0*M_PI)) * exp(-(x-mu)*(x-mu)/(2*sigma*sigma));
-}
-
-static inline void f64_normalize(f64* out, f64* data, u32 size) {
-	f64 sum = 0.0;
-
-#pragma omp parallel for shared(data) reduction(+: sum)
-	for (u32 i = 0; i < size; ++i) {
-		f64 absval = fabs(data[i]);
-		sum += absval*absval;
-	}
-
-	f64 scaling = 1.0/sqrt(sum);
-#pragma omp parallel for
-	for (u32 i = 0; i < size; ++i) {
-		out[i] = data[i] * scaling;
-	}
-}
+f64 gaussian(f64 x, f64 mu, f64 sigma);
+void f64_normalize(f64* out, f64* data, u32 size);
 
 /*
  * Matrix
  */
 
-struct hermitian_bandmat {
+struct symmetric_bandmat {
 	f64* data;
-	u32 bandcount; /* rows */
-	u32 size; /* cols */
+	u32 bandcount; 	/* rows */
+	u32 size; 		/* cols */
 };
 
-struct hermitian_bandmat hermitian_bandmat_new(u32 bandcount, u32 size);
-struct hermitian_bandmat hermitian_bandmat_new_zero(u32 bandcount, u32 size);
+struct symmetric_bandmat symmetric_bandmat_new(u32 bandcount, u32 size);
+struct symmetric_bandmat symmetric_bandmat_new_zero(u32 bandcount, u32 size);
 
 #define U32MIN(a,b) \
 	((a < b) ? a : b)
 
-#define HERMITIAN_BANDMAT_FOREACH(bm, r,c) 						\
+#define SYMMETRIC_BANDMAT_FOREACH(bm, r,c) 								\
 	for (u32 r = 0; r < bm.size; ++r)									\
 		for (u32 c = r; c < U32MIN(bm.size, r+bm.bandcount); ++c)
 
-static inline u32 hermitian_bandmat_index(struct hermitian_bandmat bm, u32 row, u32 col) {
+/* Computes index into band matrix array given row and column */
+static inline u32 symmetric_bandmat_index(struct symmetric_bandmat bm, u32 row, u32 col) {
 	return bm.size * (bm.bandcount - 1 + (row - col)) + col;
 }
 
-void hermitian_bandmat_mulv(f64* ans_vec, struct hermitian_bandmat bm, f64* vec);
+static inline u32 symmetric_bandmat_element_count(const u32 size) {
+	return size*(size+1)/2;
+}
+
+void symmetric_bandmat_mulv(f64* ans_vec, struct symmetric_bandmat bm, f64* vec);
 
 enum which_eigenpairs {
 	EV_LARGEST_MAG 		= 0,
@@ -111,15 +103,17 @@ struct eigen_result_real {
 	u32 points_per_eigenvector;
 };
 
-/* Find _all_ eigenpairs for a dense, symmetric,
+/*
+ * Find _all_ eigenpairs for a dense, symmetric,
  * upper tridiagonal matrix.
  */
-struct eigen_result_real find_eigenpairs_full_real(struct hermitian_bandmat bm);
+struct eigen_result_real find_eigenpairs_full_real(struct symmetric_bandmat bm);
 
-/* Find _some_ eigenpairs (specified by the enum which_eigenpairs)
+/*
+ * Find _some_ eigenpairs (specified by the enum which_eigenpairs)
  * for a dense, upper tridiagonal matrix.
  */
-struct eigen_result_real find_eigenpairs_sparse_real(struct hermitian_bandmat bm, u32 num_eigenvalues, enum which_eigenpairs which);
+struct eigen_result_real find_eigenpairs_sparse_real(struct symmetric_bandmat bm, u32 num_eigenvalues, enum which_eigenpairs which);
 
 /*
  * QUADGK
@@ -163,7 +157,7 @@ typedef struct integration_result {
 
 typedef void integrand_vec(f64*,f64*,u32,void*);
 
-integration_result quadgk_vec(integrand_vec* f, f64 start, f64 end, integration_settings settings);
+integration_result quadgk(integrand_vec* f, f64 start, f64 end, integration_settings settings);
 
 /*
  * Basis
@@ -252,13 +246,25 @@ struct nlse_settings {
 	 * allows for optimizations */
 	nlse_operator_func* spatial_pot_perturbation;
 
+	/*
+	 * Called every measure_every iterations, at the
+	 * beginning of each iteration.
+	 */
 	u32 measure_every;
 	nlse_debug_callback* debug_callback;
 
-	void* post_normalize_userdata;
+	/*
+	 * Called after each normalization of the eigenstates,
+	 * but before the error is calculated. Can be used to
+	 * enforce a particular structure on the states.
+	 */
+	const void* post_normalize_userdata;
 	nlse_debug_callback* post_normalize_callback;
 
-	/* Choice of GK rule used for numerical integration internally */
+	/*
+	 * Choice of GK rule used for numerical integration internally,
+	 * will be set to a default if not set
+	 */
 	struct gk_data gk;
 
 	/* Choice of basis to solve to problem in */
@@ -266,7 +272,7 @@ struct nlse_settings {
 	struct basis basis;
 
 	/* Everything below the zero_threshold is considered
-	 * 0 in the hamiltonian. */
+	 * 0 in the Hamiltonian. */
 	f64 zero_threshold;
 };
 
@@ -299,32 +305,20 @@ struct nlse_result {
 	f64* coeff;
 	f64* error;
 	f64* energy;
-	struct hermitian_bandmat* hamiltonian;
+	struct symmetric_bandmat* hamiltonian;
 	bool converged;
 };
 
+/* actual interface */
 struct nlse_result nlse_solver(struct nlse_settings settings, const u32 component_count, struct nlse_component components[static component_count]);
+
+/* basic serialization */
+void nlse_write_to_binary_file(const char* file, struct nlse_result res);
+struct nlse_result nlse_read_from_binary_file(const char* file);
 
 /*
  * Gross-pitaevskii solving
  */
-
-struct gp_settings {
-	nlse_operator_func* pot;
-
-	u32 num_basis_funcs;
-	struct basis basis;
-
-	u32 component_count;
-	u32* occupations; 				/* [static component_count] */
-	struct nlse_guess* guesses; 	/* [static component_count] */
-	f64* g0; 						/* [static component_count*component_count] */
-
-	nlse_debug_callback* debug_callback;
-	u32 measure_every;
-
-	f64 zero_threshold;
-};
 
 struct nlse_result grosspitaevskii(struct nlse_settings settings,
 		const u32 comp_count,
@@ -332,7 +326,7 @@ struct nlse_result grosspitaevskii(struct nlse_settings settings,
 		struct nlse_guess guesses[static comp_count],
 		f64 g0[static comp_count*comp_count]);
 
-f64 full_energy_naked(struct nlse_settings settings,
+f64 full_energy(struct nlse_settings settings,
 		const u32 coeff_count, const u32 comp_count,
 		f64 coeff[static coeff_count*comp_count],
 		u32 occupations[static comp_count],
@@ -375,7 +369,7 @@ struct bestmf_2comp_result best_meanfield_2comp(struct nlse_settings settings,
  */
 
 struct pt_result {
-	f64 E0, E1, E2;
+	f64 E0, E1, E2, E3;
 };
 
 struct pt_result rayleigh_schroedinger_pt(struct nlse_result res, f64* g0, u32* particle_count);

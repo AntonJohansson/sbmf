@@ -63,7 +63,7 @@ void sbmf_shutdown() {
 #define sbmf_stack_push(size_in_bytes) \
 	sbmf_stack_push_impl(size_in_bytes, __LINE__, __FILE__, __func__)
 
-u8* sbmf_stack_push_impl(u32 size_in_bytes, const u32 linenumber, const char file[], const char func[]) {
+void* sbmf_stack_push_impl(u32 size_in_bytes, const u32 linenumber, const char file[], const char func[]) {
 	u32 threadid = (u32)omp_get_thread_num();
 	assert(threadid < _state.thread_count);
 	SBMF_UNUSED(linenumber);
@@ -81,7 +81,7 @@ u8* sbmf_stack_push_impl(u32 size_in_bytes, const u32 linenumber, const char fil
 	//}
 
 	u8* ptr = sa_push(_state.thread_storage[threadid].stack, size_in_bytes);
-	return ptr;
+	return (void*)ptr;
 }
 
 u32 sbmf_stack_marker() {

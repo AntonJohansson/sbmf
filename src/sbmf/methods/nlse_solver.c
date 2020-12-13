@@ -107,11 +107,6 @@ static f64 nonlinear_me_integrand_gsl(f64 in, void* data) {
 struct nlse_result nlse_solver(struct nlse_settings settings, const u32 component_count, struct nlse_component component[static component_count]) {
 	/* Lazy */
 	const u32 N = settings.num_basis_funcs;
-	/*
-	 * Unique number of me's that need to be calculated in
-	 * a symmetric matrix
-	 */
-	const u32 matrix_element_count = N*(N+1)/2;
 
 	/* Setup results struct */
 	struct nlse_result res = {
@@ -121,11 +116,11 @@ struct nlse_result nlse_solver(struct nlse_settings settings, const u32 componen
 		.coeff = (f64*) sbmf_stack_push(component_count*(N*sizeof(f64))),
 		.error = (f64*) sbmf_stack_push(component_count*sizeof(f64)),
 		.energy = (f64*) sbmf_stack_push(component_count*sizeof(f64)),
-		.hamiltonian = (struct hermitian_bandmat*) sbmf_stack_push(component_count * sizeof(struct hermitian_bandmat)),
+		.hamiltonian = (struct symmetric_bandmat*) sbmf_stack_push(component_count * sizeof(struct symmetric_bandmat)),
 		.converged = false,
 	};
 	for (u32 i = 0; i < component_count; ++i) {
-		res.hamiltonian[i] = hermitian_bandmat_new(N,N);
+		res.hamiltonian[i] = symmetric_bandmat_new(N,N);
 	}
 
 	/* Place to store coeffs from previous iterations */
@@ -158,7 +153,7 @@ struct nlse_result nlse_solver(struct nlse_settings settings, const u32 componen
 				f64* out = &res.coeff[i*res.coeff_count];
 				for (u32 j = 0; j < res.coeff_count; ++j) {
 					p.n = j;
-					integration_result r = quadgk_vec(guess_integrand, -INFINITY, INFINITY, int_settings);
+					integration_result r = quadgk(guess_integrand, -INFINITY, INFINITY, int_settings);
 					out[j] = r.integral;
 				}
 				f64_normalize(out, out, res.coeff_count);
@@ -183,6 +178,12 @@ struct nlse_result nlse_solver(struct nlse_settings settings, const u32 componen
 		.basis = settings.basis,
 	};
 
+	/*
+	 * Unique number of me's that need to be calculated in
+	 * a symmetric matrix
+	 */
+	const u32 matrix_element_count = symmetric_bandmat_element_count(N);
+
 	/* Precompute indices for matrix elements
 	 * 	This way we get a single array looping
 	 * 	over the matrix which is easier to
@@ -195,7 +196,7 @@ struct nlse_result nlse_solver(struct nlse_settings settings, const u32 componen
 	u32 matrix_element_cols[matrix_element_count];
 	{
 		u32 matrix_element_index = 0;
-		HERMITIAN_BANDMAT_FOREACH(res.hamiltonian[0], r,c) {
+		SYMMETRIC_BANDMAT_FOREACH(res.hamiltonian[0], r,c) {
 			matrix_element_rows[matrix_element_index] = r;
 			matrix_element_cols[matrix_element_index] = c;
 			matrix_element_index++;
@@ -203,7 +204,7 @@ struct nlse_result nlse_solver(struct nlse_settings settings, const u32 componen
 	}
 
 	/* Construct linear hamiltonian */
-	struct hermitian_bandmat linear_hamiltonian = hermitian_bandmat_new_zero(N,N);
+	struct symmetric_bandmat linear_hamiltonian = symmetric_bandmat_new_zero(N,N);
 	{
 		if (settings.spatial_pot_perturbation) {
 			params.op = settings.spatial_pot_perturbation;
@@ -216,7 +217,7 @@ struct nlse_result nlse_solver(struct nlse_settings settings, const u32 componen
 				params.n[0] = r;
 				params.n[1] = c;
 
-				integration_result int_res = quadgk_vec(linear_me_integrand, -INFINITY, INFINITY, int_settings);
+				integration_result int_res = quadgk(linear_me_integrand, -INFINITY, INFINITY, int_settings);
 
 				if (fabs(int_res.integral) <= settings.zero_threshold)
 					int_res.integral = 0.0;
@@ -228,17 +229,17 @@ struct nlse_result nlse_solver(struct nlse_settings settings, const u32 componen
 				}
 				assert(int_res.converged);
 
-				u32 me_index = hermitian_bandmat_index(linear_hamiltonian, r,c);
+				u32 me_index = symmetric_bandmat_index(linear_hamiltonian, r,c);
 				linear_hamiltonian.data[me_index] = int_res.integral;
 			}
 		}
 
 		for (u32 i = 0; i < res.coeff_count; ++i) {
-			u32 me_index = hermitian_bandmat_index(linear_hamiltonian, i,i);
+			u32 me_index = symmetric_bandmat_index(linear_hamiltonian, i,i);
 			linear_hamiltonian.data[me_index] += settings.basis.eigenval(i);
 		}
 
-		assert(hermitian_bandmat_is_valid(linear_hamiltonian));
+		assert(symmetric_bandmat_is_valid(linear_hamiltonian));
 	}
 
 #if USE_GSL_INTEGRATION
@@ -285,7 +286,7 @@ struct nlse_result nlse_solver(struct nlse_settings settings, const u32 componen
 				gsl_integration_qagi(&F, 1e-10, 1e-7, settings.max_iterations, ws[omp_get_thread_num()], &int_res.integral, &int_res.error);
 				int_res.converged = true;
 #else
-				integration_result int_res = quadgk_vec(nonlinear_me_integrand, -INFINITY, INFINITY, int_settings);
+				integration_result int_res = quadgk(nonlinear_me_integrand, -INFINITY, INFINITY, int_settings);
 #endif
 
 				/* Check if the resultant integral is less than what we can resolve,
@@ -301,11 +302,11 @@ struct nlse_result nlse_solver(struct nlse_settings settings, const u32 componen
 				}
 				assert(int_res.converged);
 
-				u32 me_index = hermitian_bandmat_index(res.hamiltonian[i], r,c);
+				u32 me_index = symmetric_bandmat_index(res.hamiltonian[i], r,c);
 				res.hamiltonian[i].data[me_index] = linear_hamiltonian.data[me_index] + int_res.integral;
 			}
 
-			assert(hermitian_bandmat_is_valid(res.hamiltonian[i]));
+			assert(symmetric_bandmat_is_valid(res.hamiltonian[i]));
 		}
 
 		/*
@@ -360,6 +361,75 @@ struct nlse_result nlse_solver(struct nlse_settings settings, const u32 componen
 		gsl_integration_workspace_free(ws[i]);
 	}
 #endif
+
+	return res;
+}
+
+/*
+ * basic serialization
+ */
+
+void nlse_write_to_binary_file(const char* file, struct nlse_result res) {
+	FILE* fd = fopen(file, "w");
+	fwrite(&res.iterations, 	 sizeof(u32), 1, fd);
+	fwrite(&res.component_count, sizeof(u32), 1, fd);
+	fwrite(&res.coeff_count, 	 sizeof(u32), 1, fd);
+
+	fwrite(res.coeff,  sizeof(f64), res.coeff_count*res.component_count, fd);
+	fwrite(res.error,  sizeof(f64), res.component_count, fd);
+	fwrite(res.energy, sizeof(f64), res.component_count, fd);
+
+	for (u32 i = 0; i < res.component_count; ++i) {
+		fwrite(&res.hamiltonian[i].size, 	  sizeof(u32), 1, fd);
+		fwrite(&res.hamiltonian[i].bandcount, sizeof(u32), 1, fd);
+		u32 elements_written = fwrite(res.hamiltonian[i].data, sizeof(f64),
+				res.hamiltonian[i].bandcount*res.hamiltonian[i].size,
+				fd);
+		assert(elements_written == res.hamiltonian[i].bandcount*res.hamiltonian[i].size);
+	}
+	fwrite(&res.converged, sizeof(bool), 1, fd);
+	fclose(fd);
+}
+
+struct nlse_result nlse_read_from_binary_file(const char* file) {
+	struct nlse_result res;
+
+	FILE* fd = fopen(file, "r");
+	fread(&res.iterations, 	 	sizeof(u32), 1, fd);
+	fread(&res.component_count, sizeof(u32), 1, fd);
+	fread(&res.coeff_count,  	sizeof(u32), 1, fd);
+
+	res.coeff = sbmf_stack_push(sizeof(f64)*res.coeff_count*res.component_count);
+	fread(res.coeff,  sizeof(f64), res.coeff_count*res.component_count, fd);
+
+	res.error = sbmf_stack_push(sizeof(f64)*res.component_count);
+	fread(res.error,  sizeof(f64), res.component_count, fd);
+
+	res.energy = sbmf_stack_push(sizeof(f64)*res.component_count);
+	fread(res.energy, sizeof(f64), res.component_count, fd);
+
+	res.hamiltonian = sbmf_stack_push(res.component_count * sizeof(struct symmetric_bandmat));
+	for (u32 i = 0; i < res.component_count; ++i) {
+		u32 size, bandcount;
+		fread(&size, 	  sizeof(u32), 1, fd);
+		fread(&bandcount, sizeof(u32), 1, fd);
+		res.hamiltonian[i] = symmetric_bandmat_new(bandcount, size);
+		u32 bytes_written = fread(res.hamiltonian[i].data, sizeof(f64),
+				bandcount*size,
+				fd);
+		assert(bytes_written == bandcount*size);
+	}
+	fread(&res.converged, sizeof(bool), 1, fd);
+	fclose(fd);
+
+	sbmf_log_info("loaded:");
+	sbmf_log_info("    iterations: %u", res.iterations);
+	sbmf_log_info("    component_count: %u", res.component_count);
+	sbmf_log_info("    coeff_count: %u", res.coeff_count);
+	for (u32 i = 0; i < res.component_count; ++i) {
+		sbmf_log_info("    [%u]: size: %u", i, res.hamiltonian[i].size);
+		sbmf_log_info("    [%u]: bandcount: %u", i, res.hamiltonian[i].bandcount);
+	}
 
 	return res;
 }

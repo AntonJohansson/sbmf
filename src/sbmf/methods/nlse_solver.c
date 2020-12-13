@@ -132,9 +132,9 @@ struct nlse_result nlse_solver(struct nlse_settings settings, const u32 componen
 	f64* old_coeff = (f64*) sbmf_stack_push(component_count*(N*sizeof(f64)));
 
 	integration_settings int_settings = {
-		.gk = (settings.gk.gauss_size > 0) ? settings.gk : gk7,
+		.gk = (settings.gk.gauss_size > 0) ? settings.gk : gk15,
 		.abs_error_tol = 1e-10,
-		.rel_error_tol = 1e-10,
+		.rel_error_tol = 1e-7,
 		.max_evals = settings.max_iterations,
 	};
 

@@ -9,10 +9,10 @@
 #define NA 4
 #define NB 4
 
-#define GAA (+1.00/((f64)NA-1))
-#define GAB (+4.00/((f64)NB))
-#define GBA (+4.00/((f64)NA))
-#define GBB (+1.00/((f64)NB-1))
+#define GAA (-4.00/((f64)NA-1))
+#define GAB (+1.00/((f64)NB))
+#define GBA (+1.00/((f64)NA))
+#define GBB (-4.00/((f64)NB-1))
 
 #define USE_GAUSSIAN_GUESS 1
 
@@ -122,7 +122,7 @@ int main() {
 
 	u32 comp_count = 2;
 
-	u32 bs[] = {/*4, 8, 12, 16, 24, 32, 48, 64, 96,*/ 128};
+	u32 bs[] = {/*4, 8, 12, 16, 24, 32, 48, 64,*/ 96, 128};
 
 	for (u32 i = 0; i < sizeof(bs)/sizeof(bs[0]); ++i) {
 		FILE* fd = fopen("out", "a");

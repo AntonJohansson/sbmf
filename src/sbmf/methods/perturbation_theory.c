@@ -154,8 +154,9 @@ struct pt_result rayleigh_schroedinger_pt(struct nlse_result res, f64* g0, u32* 
 		 */
 
 		/* mm,mm */
+		sbmf_log_info("mm,mm");
 		for (u32 m = 1; m < states_to_include; ++m) {
-			sbmf_log_info("(%u,%u),(%u,%u)", m,m,m,m);
+			//sbmf_log_info("(%u,%u),(%u,%u)", m,m,m,m);
 			f64 v_AA_mmmm = V(L, &PHI(0,m), &PHI(0,m), &PHI(0,m), &PHI(0,m));
 			f64 v_AA_m0m0 = V(L, &PHI(0,m), &PHI(0,0), &PHI(0,m), &PHI(0,0));
 			f64 v_AA_0000 = V(L, &PHI(0,0), &PHI(0,0), &PHI(0,0), &PHI(0,0));
@@ -164,7 +165,7 @@ struct pt_result rayleigh_schroedinger_pt(struct nlse_result res, f64* g0, u32* 
 
 			/* Two double substitutions */
 			f64 me0 = 0.5*G0(0,0)*(2*v_AA_mmmm
-						+ 8*(particle_count[0]-1)*v_AA_m0m0
+						+ 8*(particle_count[0]-2)*v_AA_m0m0
 						+ (particle_count[0]-2)*(particle_count[0]-3)*v_AA_0000)
 					- G0(0,0)*(particle_count[0]-1)*(2*v_AA_m0m0 + (particle_count[0]-2)*v_AA_0000);
 					//- G0(0,1)*particle_count[0]*particle_count[1]*v_BA_0000;
@@ -180,12 +181,12 @@ struct pt_result rayleigh_schroedinger_pt(struct nlse_result res, f64* g0, u32* 
 			f64 Ediff = 2*ENERGY(0,0) - 2*ENERGY(0,m);
 			E3 += (me1*me0*me1)/(Ediff*Ediff);
 		}
-		sbmf_log_info("---------");
 
 		/* mn,mn */
+		sbmf_log_info("mn,mn");
 		for (u32 m = 1; m < states_to_include; ++m) {
 			for (u32 n = m+1; n < states_to_include; ++n) {
-				sbmf_log_info("(%u,%u),(%u,%u)", m,n,m,n);
+				//sbmf_log_info("(%u,%u),(%u,%u)", m,n,m,n);
 				f64 v_AA_mnmn = V(L, &PHI(0,m), &PHI(0,n), &PHI(0,m), &PHI(0,n));
 				f64 v_AA_m0m0 = V(L, &PHI(0,m), &PHI(0,0), &PHI(0,m), &PHI(0,0));
 				f64 v_AA_n0n0 = V(L, &PHI(0,n), &PHI(0,0), &PHI(0,n), &PHI(0,0));
@@ -196,8 +197,8 @@ struct pt_result rayleigh_schroedinger_pt(struct nlse_result res, f64* g0, u32* 
 				/* Two double substitutions */
 				f64 me0 = 0.5*G0(0,0)*(
 						4*v_AA_mnmn
-						+ 4*(particle_count[0]-1)*v_AA_m0m0
-						+ 4*(particle_count[0]-1)*v_AA_n0n0
+						+ 4*(particle_count[0]-2)*v_AA_m0m0
+						+ 4*(particle_count[0]-2)*v_AA_n0n0
 						+ (particle_count[0]-2)*(particle_count[0]-3)*v_AA_0000)
 					- G0(0,0)*(particle_count[0]-1)*(v_AA_m0m0 + v_AA_n0n0 + (particle_count[0]-2)*v_AA_0000);
 				//- G0(0,1)*particle_count[0]*particle_count[1]*v_BA_0000;
@@ -214,18 +215,18 @@ struct pt_result rayleigh_schroedinger_pt(struct nlse_result res, f64* g0, u32* 
 				E3 += (me1*me0*me1)/(Ediff*Ediff);
 			}
 		}
-		sbmf_log_info("---------");
 
 		/* mm,nn */
+		sbmf_log_info("mm,nn");
 		for (u32 m = 1; m < states_to_include; ++m) {
 			for (u32 n = m+1; n < states_to_include; ++n) {
-				sbmf_log_info("(%u,%u),(%u,%u)", m,m,n,n);
+				//sbmf_log_info("(%u,%u),(%u,%u)", m,m,n,n);
 				f64 v_AA_mmnn = V(L, &PHI(0,m), &PHI(0,m), &PHI(0,n), &PHI(0,n));
 				f64 v_AA_mm00 = V(L, &PHI(0,m), &PHI(0,m), &PHI(0,0), &PHI(0,0));
 				f64 v_AA_nn00 = V(L, &PHI(0,n), &PHI(0,n), &PHI(0,0), &PHI(0,0));
 
 				/* Two double substitutions */
-				f64 me0 = 0.5 * G0(0,0) * v_AA_mmnn;
+				f64 me0 = G0(0,0) * v_AA_mmnn;
 				/* One double substitution */
 				f64 me1;
 				{
@@ -245,13 +246,13 @@ struct pt_result rayleigh_schroedinger_pt(struct nlse_result res, f64* g0, u32* 
 				E3 += (me1*me0*me2)/(Ediff0*Ediff1);
 			}
 		}
-		sbmf_log_info("---------");
 		/* mm,mp */
+		sbmf_log_info("mm,mp");
 		for (u32 m = 1; m < states_to_include; ++m) {
 			for (u32 p = 1; p < states_to_include; ++p) {
 				if (m == p)
 					continue;
-				sbmf_log_info("(%u,%u),(%u,%u)", m,m,m,p);
+				//sbmf_log_info("(%u,%u),(%u,%u)", m,m,m,p);
 				f64 v_AA_m0p0 = V(L, &PHI(0,m), &PHI(0,0), &PHI(0,p), &PHI(0,0));
 				f64 v_AA_mmmp = V(L, &PHI(0,m), &PHI(0,m), &PHI(0,m), &PHI(0,p));
 				f64 v_AA_mm00 = V(L, &PHI(0,m), &PHI(0,m), &PHI(0,0), &PHI(0,0));
@@ -278,8 +279,8 @@ struct pt_result rayleigh_schroedinger_pt(struct nlse_result res, f64* g0, u32* 
 				E3 += (me1*me0*me2)/(Ediff0*Ediff1);
 			}
 		}
-		sbmf_log_info("---------");
 		/* mm,pq */
+		sbmf_log_info("mm,pq");
 		for (u32 m = 1; m < states_to_include; ++m) {
 			for (u32 p = 1; p < states_to_include; ++p) {
 				if (p == m)
@@ -288,13 +289,13 @@ struct pt_result rayleigh_schroedinger_pt(struct nlse_result res, f64* g0, u32* 
 				for (u32 q = p+1; q < states_to_include; ++q) {
 					if (q == m)
 						continue;
-					sbmf_log_info("(%u,%u),(%u,%u)", m,m,p,q);
+					//sbmf_log_info("(%u,%u),(%u,%u)", m,m,p,q);
 					f64 v_AA_mmpq = V(L, &PHI(0,m), &PHI(0,m), &PHI(0,p), &PHI(0,q));
 					f64 v_AA_mm00 = V(L, &PHI(0,m), &PHI(0,m), &PHI(0,0), &PHI(0,0));
 					f64 v_AA_pq00 = V(L, &PHI(0,p), &PHI(0,q), &PHI(0,0), &PHI(0,0));
 
 					/* Two double substitutions */
-					f64 me0 = G0(0,0) * v_AA_mmpq;
+					f64 me0 = (1.0/sqrt(2.0)) * G0(0,0) * v_AA_mmpq;
 					/* One double substitution */
 					f64 me1;
 					{
@@ -315,8 +316,9 @@ struct pt_result rayleigh_schroedinger_pt(struct nlse_result res, f64* g0, u32* 
 				}
 			}
 		}
-		sbmf_log_info("---------");
+
 		/* mp,mq */
+		sbmf_log_info("mp,mq");
 		for (u32 m = 1; m < states_to_include; ++m) {
 			for (u32 p = 1; p < states_to_include; ++p) {
 				if (p == m)
@@ -324,7 +326,7 @@ struct pt_result rayleigh_schroedinger_pt(struct nlse_result res, f64* g0, u32* 
 				for (u32 q = p+1; q < states_to_include; ++q) {
 					if (q == m)
 						continue;
-					sbmf_log_info("(%u,%u),(%u,%u)", m,p,m,q);
+					//sbmf_log_info("(%u,%u),(%u,%u)", m,p,m,q);
 					f64 v_AA_p0q0 = V(L, &PHI(0,p), &PHI(0,0), &PHI(0,q), &PHI(0,0));
 					f64 v_AA_mpmq = V(L, &PHI(0,m), &PHI(0,p), &PHI(0,m), &PHI(0,q));
 					f64 v_AA_mp00 = V(L, &PHI(0,m), &PHI(0,p), &PHI(0,0), &PHI(0,0));
@@ -352,13 +354,14 @@ struct pt_result rayleigh_schroedinger_pt(struct nlse_result res, f64* g0, u32* 
 				}
 			}
 		}
-		sbmf_log_info("---------");
+
 		/* mn,pq */
+		sbmf_log_info("mn,pq");
 		for (u32 m = 1; m < states_to_include; ++m) {
 			for (u32 n = m+1; n < states_to_include; ++n) {
 				for (u32 p = n+1; p < states_to_include; ++p) {
 					for (u32 q = p+1; q < states_to_include; ++q) {
-						sbmf_log_info("(%u,%u),(%u,%u)", m,n,p,q);
+						//sbmf_log_info("(%u,%u),(%u,%u)", m,n,p,q);
 						f64 v_AA_mnpq = V(L, &PHI(0,m), &PHI(0,n), &PHI(0,p), &PHI(0,q));
 						f64 v_AA_mn00 = V(L, &PHI(0,m), &PHI(0,n), &PHI(0,0), &PHI(0,0));
 						f64 v_AA_pq00 = V(L, &PHI(0,p), &PHI(0,q), &PHI(0,0), &PHI(0,0));
@@ -386,7 +389,6 @@ struct pt_result rayleigh_schroedinger_pt(struct nlse_result res, f64* g0, u32* 
 				}
 			}
 		}
-		sbmf_log_info("---------");
 
 		E3 -= E1 * E3_last_term;
 	}

@@ -132,6 +132,7 @@ f64 full_energy(struct nlse_settings settings,
 		.max_evals = 1e5,
 		.abs_error_tol = 1e-10,
 		.userdata = &ppot,
+		.gk = gk15
 	};
 
 	/* pot terms */

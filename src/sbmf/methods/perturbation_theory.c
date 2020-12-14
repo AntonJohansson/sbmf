@@ -135,7 +135,7 @@ struct pt_result rayleigh_schroedinger_pt(struct nlse_result res, f64* g0, u32* 
 				 */
 				for (u32 i = 1; i < states_to_include; ++i) {
 					for (u32 j = 1; j < states_to_include; ++j) {
-						f64 me = G0(A,B) * sqrt(particle_count[i] * particle_count[j])
+						f64 me = G0(A,B) * sqrt(particle_count[A] * particle_count[B])
 								* V(L, &PHI(A,i), &PHI(B,j), &PHI(A,0), &PHI(B,0));
 						f64 Ediff = ENERGY(A,0) + ENERGY(B,0) - (ENERGY(A,i) + ENERGY(B,j));
 						E2 += me*me/(Ediff);
@@ -147,6 +147,7 @@ struct pt_result rayleigh_schroedinger_pt(struct nlse_result res, f64* g0, u32* 
 	}
 
 	f64 E3 = 0.0;
+#if 0
 	{
 		/*
 		 * Loop over all <AmAn|V|ApAq>,
@@ -392,6 +393,7 @@ struct pt_result rayleigh_schroedinger_pt(struct nlse_result res, f64* g0, u32* 
 
 		E3 -= E1 * E3_last_term;
 	}
+#endif
 
 	return (struct pt_result) {
 		.E0 = E0,

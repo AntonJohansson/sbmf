@@ -113,10 +113,10 @@ struct nlse_result nlse_solver(struct nlse_settings settings, const u32 componen
 		.iterations = 0,
 		.component_count = component_count,
 		.coeff_count = N,
-		.coeff = (f64*) sbmf_stack_push(component_count*(N*sizeof(f64))),
-		.error = (f64*) sbmf_stack_push(component_count*sizeof(f64)),
-		.energy = (f64*) sbmf_stack_push(component_count*sizeof(f64)),
-		.hamiltonian = (struct symmetric_bandmat*) sbmf_stack_push(component_count * sizeof(struct symmetric_bandmat)),
+		.coeff 		 = sbmf_stack_push(component_count*(N*sizeof(f64))),
+		.error 		 = sbmf_stack_push(component_count*sizeof(f64)),
+		.energy 	 = sbmf_stack_push(component_count*sizeof(f64)),
+		.hamiltonian = sbmf_stack_push(component_count * sizeof(struct symmetric_bandmat)),
 		.converged = false,
 	};
 	for (u32 i = 0; i < component_count; ++i) {
@@ -124,7 +124,7 @@ struct nlse_result nlse_solver(struct nlse_settings settings, const u32 componen
 	}
 
 	/* Place to store coeffs from previous iterations */
-	f64* old_coeff = (f64*) sbmf_stack_push(component_count*(N*sizeof(f64)));
+	f64* old_coeff = sbmf_stack_push(component_count*(N*sizeof(f64)));
 
 	integration_settings int_settings = {
 		.gk = (settings.gk.gauss_size > 0) ? settings.gk : gk15,
@@ -253,7 +253,7 @@ struct nlse_result nlse_solver(struct nlse_settings settings, const u32 componen
 
 	/* Do the actual iterations */
 	for (; res.iterations < settings.max_iterations; ++res.iterations) {
-		memcpy(old_coeff, res.coeff, res.component_count * res.coeff_count * sizeof(f64));
+		memcpy(old_coeff, res.coeff, res.component_count * N * sizeof(f64));
 
 		/* Call debug callback if requested by user */
 		if (settings.measure_every > 0 &&

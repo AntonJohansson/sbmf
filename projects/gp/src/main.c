@@ -5,18 +5,18 @@
 #include <stdio.h>
 
 #define NA 4
-#define NB 0
+#define NB 4
 
-#define GAA (1.0/3.0)
-//#define GAA (+1.0/((f64)NA-1))
-#define GAB (+4.0/((f64)NB))
-#define GBA (+4.0/((f64)NA))
-#define GBB (+1.0/((f64)NB-1))
+//#define GAA (1.0/3.0)
+#define GAA (-2.0/((f64)NA-1))
+#define GAB (+1.0/((f64)NB))
+#define GBA (+1.0/((f64)NA))
+#define GBB (-2.0/((f64)NB-1))
 
-#define USE_GAUSSIAN_GUESS 0
+#define USE_GAUSSIAN_GUESS 1
 
-//#define PERTURBATION(x) 2*gaussian(x, 0, 0.2)
-#define PERTURBATION(x) 0.0
+#define PERTURBATION(x) 2*gaussian(x, 0, 0.2)
+//#define PERTURBATION(x) 0.0
 //#define PERTURBATION(x) (-1.5015*sqrt(x*x - 1.5*1.5 + 1.5015*1.5015));
 
 void perturbation(const u32 len, f64 out[static len],
@@ -103,11 +103,11 @@ void log_callback(enum sbmf_log_level log_level, const char* msg) {
 
 void gaussian0(f64* out, f64* in, u32 len, void* data) {
 	for (u32 i = 0; i < len; ++i)
-		out[i] = gaussian(in[i] + 1.0, 0.0, 0.2);
+		out[i] = gaussian(in[i] + 1.0, 0.0, 0.1);
 }
 void gaussian1(f64* out, f64* in, u32 len, void* data) {
 	for (u32 i = 0; i < len; ++i)
-		out[i] = gaussian(in[i] - 1.0, 0.0, 0.2);
+		out[i] = gaussian(in[i] - 1.0, 0.0, 0.1);
 }
 
 
@@ -144,19 +144,19 @@ int main() {
 		.max_iterations = 1e5,
 		.error_tol = 1e-9,
 
-        .num_basis_funcs = 50,
+        .num_basis_funcs = 16,
 		.basis = ho_basis,
 
-		.zero_threshold = 1e-10,
+		.zero_threshold = 1e-13,
 		.debug_callback = debug_callback,
 		.measure_every = 0,
 		.gk=gk15
     };
 
-	const u32 component_count = 1;
+	const u32 component_count = 2;
 
 	struct nlse_result res = grosspitaevskii(settings, component_count, occupations, guesses, g0);
-	printf("\nfull energy per particle: %lf\n",
+	printf("\nfull energy: %lf\n",
 			full_energy(settings, res.coeff_count, component_count, res.coeff, occupations, g0));
 
 	nlse_write_to_binary_file("outbin", res);

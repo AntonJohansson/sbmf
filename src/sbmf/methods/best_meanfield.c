@@ -161,6 +161,8 @@ struct bestmf_result best_meanfield(struct nlse_settings settings, const u32 par
 	for (u32 i = 0; i < 2; ++i) {
 		if (guesses)
 			comps[i].guess = guesses[i];
+		else
+			comps[i].guess.type = DEFAULT_GUESS;
 		comps[i].op = bestmf_operator;
 		comps[i].userdata = &g[i*2];
 	}
@@ -208,6 +210,8 @@ struct bestmf_2comp_result best_meanfield_2comp(struct nlse_settings settings,
 	for (u32 i = 0; i < 4; ++i) {
 		if (guesses)
 			comps[i].guess = guesses[i];
+		else
+			comps[i].guess.type = DEFAULT_GUESS;
 		comps[i].op = bestmf_operator;
 		comps[i].userdata = &g[i*4];
 	}

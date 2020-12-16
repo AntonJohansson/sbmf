@@ -45,7 +45,7 @@ static f64 V(const u32 coeff_count, f64 i[static coeff_count],
 	return res.integral;
 }
 
-struct pt_result rayleigh_schroedinger_pt(struct nlse_result res, f64* g0, u32* particle_count) {
+struct pt_result rayleigh_schroedinger_pt(struct nlse_result res, f64* g0, i32* particle_count) {
 	/* order of hamiltonians, that is include all states */
 	const u32 states_to_include = res.coeff_count;
 	sbmf_log_info("running rayleigh schödinger PT:\n    components: %u\n    states: %u\n", res.component_count, states_to_include);
@@ -437,6 +437,8 @@ struct pt_result rayleigh_schroedinger_pt(struct nlse_result res, f64* g0, u32* 
 		}
 
 		/* AmBn,AmBn */
+		sbmf_log_info("AmBn,AmBn; AmBm,AmBm");
+		sbmf_log_info("E3 before: %e", E3);
 		for (u32 A = 0; A < res.component_count; ++A) {
 			for (u32 B = A+1; B < res.component_count; ++B) {
 #pragma omp parallel for
@@ -450,7 +452,7 @@ struct pt_result rayleigh_schroedinger_pt(struct nlse_result res, f64* g0, u32* 
 						f64 v_AB_0000 = V(L, &PHI(A,0), &PHI(B,0), &PHI(A,0), &PHI(B,0));
 						f64 v_AB_mnmn = V(L, &PHI(A,m), &PHI(B,n), &PHI(A,m), &PHI(B,n));
 						f64 v_AB_m0m0 = V(L, &PHI(A,m), &PHI(B,0), &PHI(A,m), &PHI(B,0));
-						f64 v_AB_0n0n = V(L, &PHI(A,n), &PHI(B,0), &PHI(A,n), &PHI(B,0));
+						f64 v_AB_0n0n = V(L, &PHI(A,0), &PHI(B,n), &PHI(A,0), &PHI(B,n));
 
 						f64 me0 = 0;
 						me0 += 0.5*G0(A,A)*(-particle_count[A]*(particle_count[A]-1)*v_AA_0000
@@ -479,6 +481,8 @@ struct pt_result rayleigh_schroedinger_pt(struct nlse_result res, f64* g0, u32* 
 		}
 
 		/* AmBn,AmBp */
+		sbmf_log_info("AmBn,AmBp");
+		sbmf_log_info("E3 before: %e", E3);
 		for (u32 A = 0; A < res.component_count; ++A) {
 			for (u32 B = 0; B < res.component_count; ++B) {
 				if (B == A)
@@ -487,7 +491,9 @@ struct pt_result rayleigh_schroedinger_pt(struct nlse_result res, f64* g0, u32* 
 #pragma omp parallel for
 				for (u32 m = 1; m < states_to_include; ++m) {
 					for (u32 n = 1; n < states_to_include; ++n) {
+						if (n == m) continue;
 						for (u32 p = n+1; p < states_to_include; ++p) {
+							if (p == m) continue;
 							f64 v_BB_0n0p = V(L, &PHI(B,0), &PHI(B,n), &PHI(B,0), &PHI(B,p));
 							f64 v_AB_mnmp = V(L, &PHI(A,m), &PHI(B,n), &PHI(A,m), &PHI(B,p));
 							f64 v_AB_0n0p = V(L, &PHI(A,0), &PHI(B,n), &PHI(A,0), &PHI(B,p));
@@ -519,6 +525,8 @@ struct pt_result rayleigh_schroedinger_pt(struct nlse_result res, f64* g0, u32* 
 
 
 		/* AmBn,ApBq */
+		sbmf_log_info("AmBn,ApBq");
+		sbmf_log_info("E3 before: %e", E3);
 		for (u32 A = 0; A < res.component_count; ++A) {
 			for (u32 B = A+1; B < res.component_count; ++B) {
 

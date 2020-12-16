@@ -372,4 +372,4 @@ struct pt_result {
 	f64 E0, E1, E2, E3;
 };
 
-struct pt_result rayleigh_schroedinger_pt(struct nlse_result res, f64* g0, u32* particle_count);
+struct pt_result rayleigh_schroedinger_pt(struct nlse_result res, f64* g0, i32* particle_count);

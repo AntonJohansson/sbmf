@@ -2,13 +2,13 @@
 #include <stdio.h>
 
 #define NA 4
-#define NB 0
+#define NB 4
 
-#define GAA (1.0/3.0)
-//#define GAA (+1.0/((f64)NA-1))
-#define GAB (+4.0/((f64)NB))
-#define GBA (+4.0/((f64)NA))
-#define GBB (+1.0/((f64)NB-1))
+//#define GAA (1.0/3.0)
+#define GAA (-2.0/((f64)NA-1))
+#define GAB (+1.0/((f64)NB))
+#define GBA (+1.0/((f64)NA))
+#define GBB (-2.0/((f64)NB-1))
 
 void log_callback(enum sbmf_log_level log_level, const char* msg) {
 	printf("%s\n", msg);
@@ -37,14 +37,6 @@ int main() {
 		printf("E0+E1+E2:    %.15lf\n", ptres.E0+ptres.E1+ptres.E2);
 		printf("E0+E1+E2+E3: %.15lf\n", ptres.E0+ptres.E1+ptres.E2+ptres.E3);
 	}
-
-	/*	1111
-	 *	1112
-	 *	1122
-	 *	1212
-	 *	1222
-	 *	2222
-	 */
 
 	sbmf_shutdown();
 	return 0;

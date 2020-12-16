@@ -161,7 +161,7 @@ int main() {
 
 	nlse_write_to_binary_file("outbin", res);
 
-#if 1
+#if 0
 	{
 		const u32 N = 256;
 		plot_init(800, 600, "gp2c");
@@ -227,11 +227,13 @@ int main() {
 
 	{
 		struct pt_result ptres = rayleigh_schroedinger_pt(res, g0, occupations);
-		printf("E0:       %.15lf\n", ptres.E0);
-		printf("E1:       %.15lf\n", ptres.E1);
-		printf("E2:       %.15lf\n", ptres.E2);
-		printf("E0+E1:    %.15lf\n", ptres.E0+ptres.E1);
-		printf("E0+E1+E2: %.15lf\n", ptres.E0+ptres.E1+ptres.E2);
+		printf("E0:          %.15lf\n", ptres.E0);
+		printf("E1:          %.15lf\n", ptres.E1);
+		printf("E2:          %.15lf\n", ptres.E2);
+		printf("E3:          %.15lf\n", ptres.E3);
+		printf("E0+E1:       %.15lf\n", ptres.E0+ptres.E1);
+		printf("E0+E1+E2:    %.15lf\n", ptres.E0+ptres.E1+ptres.E2);
+		printf("E0+E1+E2+E3: %.15lf\n", ptres.E0+ptres.E1+ptres.E2+ptres.E3);
 	}
 
 	sbmf_shutdown();

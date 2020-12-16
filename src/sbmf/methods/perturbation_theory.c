@@ -147,7 +147,7 @@ struct pt_result rayleigh_schroedinger_pt(struct nlse_result res, f64* g0, u32* 
 	}
 
 	f64 E3 = 0.0;
-#if 0
+#if 1
 	{
 		/*
 		 * Loop over all <AmAn|V|ApAq>,
@@ -156,238 +156,410 @@ struct pt_result rayleigh_schroedinger_pt(struct nlse_result res, f64* g0, u32* 
 
 		/* mm,mm */
 		sbmf_log_info("mm,mm");
-		for (u32 m = 1; m < states_to_include; ++m) {
-			//sbmf_log_info("(%u,%u),(%u,%u)", m,m,m,m);
-			f64 v_AA_mmmm = V(L, &PHI(0,m), &PHI(0,m), &PHI(0,m), &PHI(0,m));
-			f64 v_AA_m0m0 = V(L, &PHI(0,m), &PHI(0,0), &PHI(0,m), &PHI(0,0));
-			f64 v_AA_0000 = V(L, &PHI(0,0), &PHI(0,0), &PHI(0,0), &PHI(0,0));
-			f64 v_AA_mm00 = V(L, &PHI(0,m), &PHI(0,m), &PHI(0,0), &PHI(0,0));
-			//f64 v_BA_0000 = V(L, &PHI(1,0), &PHI(0,0), &PHI(1,0), &PHI(0,0));
-
-			/* Two double substitutions */
-			f64 me0 = 0.5*G0(0,0)*(2*v_AA_mmmm
-						+ 8*(particle_count[0]-2)*v_AA_m0m0
-						+ (particle_count[0]-2)*(particle_count[0]-3)*v_AA_0000)
-					- G0(0,0)*(particle_count[0]-1)*(2*v_AA_m0m0 + (particle_count[0]-2)*v_AA_0000);
-					//- G0(0,1)*particle_count[0]*particle_count[1]*v_BA_0000;
-
-			/* One double substitution */
-			f64 me1;
-			{
-				f64 factor = (m == m) ? 1.0/sqrt(2.0) : 1.0;
-				me1 = factor * G0(0,0) * sqrt(particle_count[0] * (particle_count[0] - 1))
-					* v_AA_mm00;
-			}
-
-			f64 Ediff = 2*ENERGY(0,0) - 2*ENERGY(0,m);
-			E3 += (me1*me0*me1)/(Ediff*Ediff);
-		}
-
-		/* mn,mn */
-		sbmf_log_info("mn,mn");
-		for (u32 m = 1; m < states_to_include; ++m) {
-			for (u32 n = m+1; n < states_to_include; ++n) {
-				//sbmf_log_info("(%u,%u),(%u,%u)", m,n,m,n);
-				f64 v_AA_mnmn = V(L, &PHI(0,m), &PHI(0,n), &PHI(0,m), &PHI(0,n));
-				f64 v_AA_m0m0 = V(L, &PHI(0,m), &PHI(0,0), &PHI(0,m), &PHI(0,0));
-				f64 v_AA_n0n0 = V(L, &PHI(0,n), &PHI(0,0), &PHI(0,n), &PHI(0,0));
-				f64 v_AA_0000 = V(L, &PHI(0,0), &PHI(0,0), &PHI(0,0), &PHI(0,0));
-				f64 v_AA_mn00 = V(L, &PHI(0,m), &PHI(0,n), &PHI(0,0), &PHI(0,0));
-				//f64 v_BA_0000 = V(L, &PHI(1,0), &PHI(0,0), &PHI(1,0), &PHI(0,0));
+		for (u32 A = 0; A < res.component_count; ++A) {
+#pragma omp parallel for
+			for (u32 m = 1; m < states_to_include; ++m) {
+				//sbmf_log_info("(%u,%u),(%u,%u)", m,m,m,m);
+				f64 v_AA_mmmm = V(L, &PHI(A,m), &PHI(A,m), &PHI(A,m), &PHI(A,m));
+				f64 v_AA_m0m0 = V(L, &PHI(A,m), &PHI(A,0), &PHI(A,m), &PHI(A,0));
+				f64 v_AA_0000 = V(L, &PHI(A,0), &PHI(A,0), &PHI(A,0), &PHI(A,0));
+				f64 v_AA_mm00 = V(L, &PHI(A,m), &PHI(A,m), &PHI(A,0), &PHI(A,0));
 
 				/* Two double substitutions */
-				f64 me0 = 0.5*G0(0,0)*(
-						4*v_AA_mnmn
-						+ 4*(particle_count[0]-2)*v_AA_m0m0
-						+ 4*(particle_count[0]-2)*v_AA_n0n0
-						+ (particle_count[0]-2)*(particle_count[0]-3)*v_AA_0000)
-					- G0(0,0)*(particle_count[0]-1)*(v_AA_m0m0 + v_AA_n0n0 + (particle_count[0]-2)*v_AA_0000);
-				//- G0(0,1)*particle_count[0]*particle_count[1]*v_BA_0000;
+				f64 me0 = 0.5*G0(A,A)*(2*v_AA_mmmm
+							+ 8*(particle_count[A]-2)*v_AA_m0m0
+							+ (particle_count[A]-2)*(particle_count[A]-3)*v_AA_0000)
+						- G0(A,A)*(particle_count[A]-1)*(2*v_AA_m0m0 + (particle_count[A]-2)*v_AA_0000);
+
+				/* Handle intracomponent terms */
+				for (u32 B = 0; B < res.component_count; ++B) {
+					if (B == A)
+						continue;
+
+					f64 v_BA_0000 = V(L, &PHI(B,0), &PHI(A,0), &PHI(B,0), &PHI(A,0));
+					me0 -= G0(A,B)*particle_count[A]*particle_count[B]*v_BA_0000;
+				}
 
 				/* One double substitution */
 				f64 me1;
 				{
-					f64 factor = (m == n) ? 1.0/sqrt(2.0) : 1.0;
-					me1 = factor * G0(0,0) * sqrt(particle_count[0] * (particle_count[0] - 1))
-						* v_AA_mn00;
+					f64 factor = (m == m) ? 1.0/sqrt(2.0) : 1.0;
+					me1 = factor * G0(A,A) * sqrt(particle_count[A] * (particle_count[A] - 1))
+						* v_AA_mm00;
 				}
 
-				f64 Ediff = 2*ENERGY(0,0) - ENERGY(0,m) - ENERGY(0,n);
+				f64 Ediff = 2*ENERGY(A,0) - 2*ENERGY(A,m);
 				E3 += (me1*me0*me1)/(Ediff*Ediff);
+			}
+		}
+
+		/* mn,mn */
+		sbmf_log_info("mn,mn");
+		for (u32 A = 0; A < res.component_count; ++A) {
+#pragma omp parallel for
+			for (u32 m = 1; m < states_to_include; ++m) {
+				for (u32 n = m+1; n < states_to_include; ++n) {
+					//sbmf_log_info("(%u,%u),(%u,%u)", m,n,m,n);
+					f64 v_AA_mnmn = V(L, &PHI(A,m), &PHI(A,n), &PHI(A,m), &PHI(A,n));
+					f64 v_AA_m0m0 = V(L, &PHI(A,m), &PHI(A,0), &PHI(A,m), &PHI(A,0));
+					f64 v_AA_n0n0 = V(L, &PHI(A,n), &PHI(A,0), &PHI(A,n), &PHI(A,0));
+					f64 v_AA_0000 = V(L, &PHI(A,0), &PHI(A,0), &PHI(A,0), &PHI(A,0));
+					f64 v_AA_mn00 = V(L, &PHI(A,m), &PHI(A,n), &PHI(A,0), &PHI(A,0));
+
+					/* Two double substitutions */
+					f64 me0 = 0.5*G0(A,A)*(
+							4*v_AA_mnmn
+							+ 4*(particle_count[A]-2)*v_AA_m0m0
+							+ 4*(particle_count[A]-2)*v_AA_n0n0
+							+ (particle_count[A]-2)*(particle_count[A]-3)*v_AA_0000)
+						- G0(A,A)*(particle_count[A]-1)*(v_AA_m0m0 + v_AA_n0n0 + (particle_count[A]-2)*v_AA_0000);
+
+					/* Handle intercomponent term */
+					for (u32 B = 0; B < res.component_count; ++B) {
+						if (B == A)
+							continue;
+
+						f64 v_BA_0000 = V(L, &PHI(B,0), &PHI(A,0), &PHI(B,0), &PHI(A,0));
+						me0 -= G0(A,B)*particle_count[A]*particle_count[B]*v_BA_0000;
+					}
+
+					/* One double substitution */
+					f64 me1;
+					{
+						f64 factor = (m == n) ? 1.0/sqrt(2.0) : 1.0;
+						me1 = factor * G0(A,A) * sqrt(particle_count[A] * (particle_count[A] - 1))
+							* v_AA_mn00;
+					}
+
+					f64 Ediff = 2*ENERGY(A,0) - ENERGY(A,m) - ENERGY(A,n);
+					E3 += (me1*me0*me1)/(Ediff*Ediff);
+				}
 			}
 		}
 
 		/* mm,nn */
 		sbmf_log_info("mm,nn");
-		for (u32 m = 1; m < states_to_include; ++m) {
-			for (u32 n = m+1; n < states_to_include; ++n) {
-				//sbmf_log_info("(%u,%u),(%u,%u)", m,m,n,n);
-				f64 v_AA_mmnn = V(L, &PHI(0,m), &PHI(0,m), &PHI(0,n), &PHI(0,n));
-				f64 v_AA_mm00 = V(L, &PHI(0,m), &PHI(0,m), &PHI(0,0), &PHI(0,0));
-				f64 v_AA_nn00 = V(L, &PHI(0,n), &PHI(0,n), &PHI(0,0), &PHI(0,0));
-
-				/* Two double substitutions */
-				f64 me0 = G0(0,0) * v_AA_mmnn;
-				/* One double substitution */
-				f64 me1;
-				{
-					f64 factor = (m == m) ? 1.0/sqrt(2.0) : 1.0;
-					me1 = factor * G0(0,0) * sqrt(particle_count[0] * (particle_count[0] - 1))
-						* v_AA_mm00;
-				}
-				f64 me2;
-				{
-					f64 factor = (n == n) ? 1.0/sqrt(2.0) : 1.0;
-					me2 = factor * G0(0,0) * sqrt(particle_count[0] * (particle_count[0] - 1))
-						* v_AA_nn00;
-				}
-
-				f64 Ediff0 = 2*ENERGY(0,0) - ENERGY(0,m) - ENERGY(0,m);
-				f64 Ediff1 = 2*ENERGY(0,0) - ENERGY(0,n) - ENERGY(0,n);
-				E3 += (me1*me0*me2)/(Ediff0*Ediff1);
-			}
-		}
-		/* mm,mp */
-		sbmf_log_info("mm,mp");
-		for (u32 m = 1; m < states_to_include; ++m) {
-			for (u32 p = 1; p < states_to_include; ++p) {
-				if (m == p)
-					continue;
-				//sbmf_log_info("(%u,%u),(%u,%u)", m,m,m,p);
-				f64 v_AA_m0p0 = V(L, &PHI(0,m), &PHI(0,0), &PHI(0,p), &PHI(0,0));
-				f64 v_AA_mmmp = V(L, &PHI(0,m), &PHI(0,m), &PHI(0,m), &PHI(0,p));
-				f64 v_AA_mm00 = V(L, &PHI(0,m), &PHI(0,m), &PHI(0,0), &PHI(0,0));
-				f64 v_AA_mp00 = V(L, &PHI(0,m), &PHI(0,p), &PHI(0,0), &PHI(0,0));
-
-				/* Two double substitutions */
-				f64 me0 = G0(0,0) * ((particle_count[0]-3)*v_AA_m0p0 + sqrt(2)*v_AA_mmmp);
-				/* One double substitution */
-				f64 me1;
-				{
-					f64 factor = (m == m) ? 1.0/sqrt(2.0) : 1.0;
-					me1 = factor * G0(0,0) * sqrt(particle_count[0] * (particle_count[0] - 1))
-						* v_AA_mm00;
-				}
-				f64 me2;
-				{
-					f64 factor = (m == p) ? 1.0/sqrt(2.0) : 1.0;
-					me2 = factor * G0(0,0) * sqrt(particle_count[0] * (particle_count[0] - 1))
-						* v_AA_mp00;
-				}
-
-				f64 Ediff0 = 2*ENERGY(0,0) - ENERGY(0,m) - ENERGY(0,m);
-				f64 Ediff1 = 2*ENERGY(0,0) - ENERGY(0,m) - ENERGY(0,p);
-				E3 += (me1*me0*me2)/(Ediff0*Ediff1);
-			}
-		}
-		/* mm,pq */
-		sbmf_log_info("mm,pq");
-		for (u32 m = 1; m < states_to_include; ++m) {
-			for (u32 p = 1; p < states_to_include; ++p) {
-				if (p == m)
-					continue;
-
-				for (u32 q = p+1; q < states_to_include; ++q) {
-					if (q == m)
-						continue;
-					//sbmf_log_info("(%u,%u),(%u,%u)", m,m,p,q);
-					f64 v_AA_mmpq = V(L, &PHI(0,m), &PHI(0,m), &PHI(0,p), &PHI(0,q));
-					f64 v_AA_mm00 = V(L, &PHI(0,m), &PHI(0,m), &PHI(0,0), &PHI(0,0));
-					f64 v_AA_pq00 = V(L, &PHI(0,p), &PHI(0,q), &PHI(0,0), &PHI(0,0));
+		for (u32 A = 0; A < res.component_count; ++A) {
+#pragma omp parallel for
+			for (u32 m = 1; m < states_to_include; ++m) {
+				for (u32 n = m+1; n < states_to_include; ++n) {
+					//sbmf_log_info("(%u,%u),(%u,%u)", m,m,n,n);
+					f64 v_AA_mmnn = V(L, &PHI(A,m), &PHI(A,m), &PHI(A,n), &PHI(A,n));
+					f64 v_AA_mm00 = V(L, &PHI(A,m), &PHI(A,m), &PHI(A,0), &PHI(A,0));
+					f64 v_AA_nn00 = V(L, &PHI(A,n), &PHI(A,n), &PHI(A,0), &PHI(A,0));
 
 					/* Two double substitutions */
-					f64 me0 = (1.0/sqrt(2.0)) * G0(0,0) * v_AA_mmpq;
+					f64 me0 = G0(A,A) * v_AA_mmnn;
 					/* One double substitution */
 					f64 me1;
 					{
 						f64 factor = (m == m) ? 1.0/sqrt(2.0) : 1.0;
-						me1 = factor * G0(0,0) * sqrt(particle_count[0] * (particle_count[0] - 1))
+						me1 = factor * G0(A,A) * sqrt(particle_count[A] * (particle_count[A] - 1))
 							* v_AA_mm00;
 					}
 					f64 me2;
 					{
-						f64 factor = (p == q) ? 1.0/sqrt(2.0) : 1.0;
-						me2 = factor * G0(0,0) * sqrt(particle_count[0] * (particle_count[0] - 1))
-							* v_AA_pq00;
+						f64 factor = (n == n) ? 1.0/sqrt(2.0) : 1.0;
+						me2 = factor * G0(A,A) * sqrt(particle_count[A] * (particle_count[A] - 1))
+							* v_AA_nn00;
 					}
 
-					f64 Ediff0 = 2*ENERGY(0,0) - ENERGY(0,m) - ENERGY(0,m);
-					f64 Ediff1 = 2*ENERGY(0,0) - ENERGY(0,p) - ENERGY(0,q);
+					f64 Ediff0 = 2*ENERGY(A,0) - ENERGY(A,m) - ENERGY(A,m);
+					f64 Ediff1 = 2*ENERGY(A,0) - ENERGY(A,n) - ENERGY(A,n);
 					E3 += (me1*me0*me2)/(Ediff0*Ediff1);
+				}
+			}
+		}
+
+		/* mm,mp */
+		sbmf_log_info("mm,mp");
+		for (u32 A = 0; A < res.component_count; ++A) {
+#pragma omp parallel for
+			for (u32 m = 1; m < states_to_include; ++m) {
+				for (u32 p = 1; p < states_to_include; ++p) {
+					if (m == p)
+						continue;
+					//sbmf_log_info("(%u,%u),(%u,%u)", m,m,m,p);
+					f64 v_AA_m0p0 = V(L, &PHI(A,m), &PHI(A,0), &PHI(A,p), &PHI(A,0));
+					f64 v_AA_mmmp = V(L, &PHI(A,m), &PHI(A,m), &PHI(A,m), &PHI(A,p));
+					f64 v_AA_mm00 = V(L, &PHI(A,m), &PHI(A,m), &PHI(A,0), &PHI(A,0));
+					f64 v_AA_mp00 = V(L, &PHI(A,m), &PHI(A,p), &PHI(A,0), &PHI(A,0));
+
+					/* Two double substitutions */
+					f64 me0 = G0(A,A) * ((particle_count[A]-3)*v_AA_m0p0 + sqrt(2)*v_AA_mmmp);
+
+					/* One double substitution */
+					f64 me1;
+					{
+						f64 factor = (m == m) ? 1.0/sqrt(2.0) : 1.0;
+						me1 = factor * G0(A,A) * sqrt(particle_count[A] * (particle_count[A] - 1))
+							* v_AA_mm00;
+					}
+
+					f64 me2;
+					{
+						f64 factor = (m == p) ? 1.0/sqrt(2.0) : 1.0;
+						me2 = factor * G0(A,A) * sqrt(particle_count[A] * (particle_count[A] - 1))
+							* v_AA_mp00;
+					}
+
+					f64 Ediff0 = 2*ENERGY(A,0) - ENERGY(A,m) - ENERGY(A,m);
+					f64 Ediff1 = 2*ENERGY(A,0) - ENERGY(A,m) - ENERGY(A,p);
+					E3 += (me1*me0*me2)/(Ediff0*Ediff1);
+				}
+			}
+		}
+
+		/* mm,pq */
+		sbmf_log_info("mm,pq");
+		for (u32 A = 0; A < res.component_count; ++A) {
+#pragma omp parallel for
+			for (u32 m = 1; m < states_to_include; ++m) {
+				for (u32 p = 1; p < states_to_include; ++p) {
+					if (p == m)
+						continue;
+
+					for (u32 q = p+1; q < states_to_include; ++q) {
+						if (q == m)
+							continue;
+						//sbmf_log_info("(%u,%u),(%u,%u)", m,m,p,q);
+						f64 v_AA_mmpq = V(L, &PHI(A,m), &PHI(A,m), &PHI(A,p), &PHI(A,q));
+						f64 v_AA_mm00 = V(L, &PHI(A,m), &PHI(A,m), &PHI(A,0), &PHI(A,0));
+						f64 v_AA_pq00 = V(L, &PHI(A,p), &PHI(A,q), &PHI(A,0), &PHI(A,0));
+
+						/* Two double substitutions */
+						f64 me0 = (1.0/sqrt(2.0)) * G0(A,A) * v_AA_mmpq;
+
+						/* One double substitution */
+						f64 me1;
+						{
+							f64 factor = (m == m) ? 1.0/sqrt(2.0) : 1.0;
+							me1 = factor * G0(A,A) * sqrt(particle_count[A] * (particle_count[A] - 1))
+								* v_AA_mm00;
+						}
+
+						f64 me2;
+						{
+							f64 factor = (p == q) ? 1.0/sqrt(2.0) : 1.0;
+							me2 = factor * G0(A,A) * sqrt(particle_count[A] * (particle_count[A] - 1))
+								* v_AA_pq00;
+						}
+
+						f64 Ediff0 = 2*ENERGY(A,0) - ENERGY(A,m) - ENERGY(A,m);
+						f64 Ediff1 = 2*ENERGY(A,0) - ENERGY(A,p) - ENERGY(A,q);
+						E3 += (me1*me0*me2)/(Ediff0*Ediff1);
+					}
 				}
 			}
 		}
 
 		/* mp,mq */
 		sbmf_log_info("mp,mq");
-		for (u32 m = 1; m < states_to_include; ++m) {
-			for (u32 p = 1; p < states_to_include; ++p) {
-				if (p == m)
-					continue;
-				for (u32 q = p+1; q < states_to_include; ++q) {
-					if (q == m)
+		for (u32 A = 0; A < res.component_count; ++A) {
+#pragma omp parallel for
+			for (u32 m = 1; m < states_to_include; ++m) {
+				for (u32 p = 1; p < states_to_include; ++p) {
+					if (p == m)
 						continue;
-					//sbmf_log_info("(%u,%u),(%u,%u)", m,p,m,q);
-					f64 v_AA_p0q0 = V(L, &PHI(0,p), &PHI(0,0), &PHI(0,q), &PHI(0,0));
-					f64 v_AA_mpmq = V(L, &PHI(0,m), &PHI(0,p), &PHI(0,m), &PHI(0,q));
-					f64 v_AA_mp00 = V(L, &PHI(0,m), &PHI(0,p), &PHI(0,0), &PHI(0,0));
-					f64 v_AA_mq00 = V(L, &PHI(0,m), &PHI(0,q), &PHI(0,0), &PHI(0,0));
 
-					/* Two double substitutions */
-					f64 me0 = G0(0,0) * ((particle_count[0]-3)*v_AA_p0q0 + 2*v_AA_mpmq);
-					/* One double substitution */
-					f64 me1;
-					{
-						f64 factor = (m == p) ? 1.0/sqrt(2.0) : 1.0;
-						me1 = factor * G0(0,0) * sqrt(particle_count[0] * (particle_count[0] - 1))
-							* v_AA_mp00;
-					}
-					f64 me2;
-					{
-						f64 factor = (m == q) ? 1.0/sqrt(2.0) : 1.0;
-						me2 = factor * G0(0,0) * sqrt(particle_count[0] * (particle_count[0] - 1))
-							* v_AA_mq00;
-					}
+					for (u32 q = p+1; q < states_to_include; ++q) {
+						if (q == m)
+							continue;
+						//sbmf_log_info("(%u,%u),(%u,%u)", m,p,m,q);
+						f64 v_AA_p0q0 = V(L, &PHI(A,p), &PHI(A,0), &PHI(A,q), &PHI(A,0));
+						f64 v_AA_mpmq = V(L, &PHI(A,m), &PHI(A,p), &PHI(A,m), &PHI(A,q));
+						f64 v_AA_mp00 = V(L, &PHI(A,m), &PHI(A,p), &PHI(A,0), &PHI(A,0));
+						f64 v_AA_mq00 = V(L, &PHI(A,m), &PHI(A,q), &PHI(A,0), &PHI(A,0));
 
-					f64 Ediff0 = 2*ENERGY(0,0) - ENERGY(0,m) - ENERGY(0,p);
-					f64 Ediff1 = 2*ENERGY(0,0) - ENERGY(0,m) - ENERGY(0,q);
-					E3 += (me1*me0*me2)/(Ediff0*Ediff1);
+						/* Two double substitutions */
+						f64 me0 = G0(A,A) * ((particle_count[A]-3)*v_AA_p0q0 + 2*v_AA_mpmq);
+
+						/* One double substitution */
+						f64 me1;
+						{
+							f64 factor = (m == p) ? 1.0/sqrt(2.0) : 1.0;
+							me1 = factor * G0(A,A) * sqrt(particle_count[A] * (particle_count[A] - 1))
+								* v_AA_mp00;
+						}
+
+						f64 me2;
+						{
+							f64 factor = (m == q) ? 1.0/sqrt(2.0) : 1.0;
+							me2 = factor * G0(A,A) * sqrt(particle_count[A] * (particle_count[A] - 1))
+								* v_AA_mq00;
+						}
+
+						f64 Ediff0 = 2*ENERGY(A,0) - ENERGY(A,m) - ENERGY(A,p);
+						f64 Ediff1 = 2*ENERGY(A,0) - ENERGY(A,m) - ENERGY(A,q);
+						E3 += (me1*me0*me2)/(Ediff0*Ediff1);
+					}
 				}
 			}
 		}
 
 		/* mn,pq */
 		sbmf_log_info("mn,pq");
-		for (u32 m = 1; m < states_to_include; ++m) {
-			for (u32 n = m+1; n < states_to_include; ++n) {
-				for (u32 p = n+1; p < states_to_include; ++p) {
-					for (u32 q = p+1; q < states_to_include; ++q) {
-						//sbmf_log_info("(%u,%u),(%u,%u)", m,n,p,q);
-						f64 v_AA_mnpq = V(L, &PHI(0,m), &PHI(0,n), &PHI(0,p), &PHI(0,q));
-						f64 v_AA_mn00 = V(L, &PHI(0,m), &PHI(0,n), &PHI(0,0), &PHI(0,0));
-						f64 v_AA_pq00 = V(L, &PHI(0,p), &PHI(0,q), &PHI(0,0), &PHI(0,0));
+		for (u32 A = 0; A < res.component_count; ++A) {
+#pragma omp parallel for
+			for (u32 m = 1; m < states_to_include; ++m) {
+				for (u32 n = m+1; n < states_to_include; ++n) {
+					for (u32 p = n+1; p < states_to_include; ++p) {
+						for (u32 q = p+1; q < states_to_include; ++q) {
+							//sbmf_log_info("(%u,%u),(%u,%u)", m,n,p,q);
+							f64 v_AA_mnpq = V(L, &PHI(A,m), &PHI(A,n), &PHI(A,p), &PHI(A,q));
+							f64 v_AA_mn00 = V(L, &PHI(A,m), &PHI(A,n), &PHI(A,0), &PHI(A,0));
+							f64 v_AA_pq00 = V(L, &PHI(A,p), &PHI(A,q), &PHI(A,0), &PHI(A,0));
 
-						/* Two double substitutions */
-						f64 me0 = 2*G0(0,0)*v_AA_mnpq;
-						/* One double substitution */
-						f64 me1;
-						{
-							f64 factor = (m == n) ? 1.0/sqrt(2.0) : 1.0;
-							me1 = factor * G0(0,0) * sqrt(particle_count[0] * (particle_count[0] - 1))
-								* v_AA_mn00;
-						}
-						f64 me2;
-						{
-							f64 factor = (p == q) ? 1.0/sqrt(2.0) : 1.0;
-							me2 = factor * G0(0,0) * sqrt(particle_count[0] * (particle_count[0] - 1))
-								* v_AA_pq00;
-						}
+							/* Two double substitutions */
+							f64 me0 = 2*G0(A,A)*v_AA_mnpq;
 
-						f64 Ediff0 = 2*ENERGY(0,0) - ENERGY(0,m) - ENERGY(0,n);
-						f64 Ediff1 = 2*ENERGY(0,0) - ENERGY(0,p) - ENERGY(0,q);
-						E3 += (me1*me0*me2)/(Ediff0*Ediff1);
+							/* One double substitution */
+							f64 me1;
+							{
+								f64 factor = (m == n) ? 1.0/sqrt(2.0) : 1.0;
+								me1 = factor * G0(A,A) * sqrt(particle_count[A] * (particle_count[A] - 1))
+									* v_AA_mn00;
+							}
+							f64 me2;
+							{
+								f64 factor = (p == q) ? 1.0/sqrt(2.0) : 1.0;
+								me2 = factor * G0(A,A) * sqrt(particle_count[A] * (particle_count[A] - 1))
+									* v_AA_pq00;
+							}
+
+							f64 Ediff0 = 2*ENERGY(A,0) - ENERGY(A,m) - ENERGY(A,n);
+							f64 Ediff1 = 2*ENERGY(A,0) - ENERGY(A,p) - ENERGY(A,q);
+							E3 += (me1*me0*me2)/(Ediff0*Ediff1);
+						}
 					}
 				}
+			}
+		}
+
+		/* AmBn,AmBn */
+		for (u32 A = 0; A < res.component_count; ++A) {
+			for (u32 B = A+1; B < res.component_count; ++B) {
+#pragma omp parallel for
+				for (u32 m = 1; m < states_to_include; ++m) {
+					for (u32 n = 1; n < states_to_include; ++n) {
+						f64 v_AA_0000 = V(L, &PHI(A,0), &PHI(A,0), &PHI(A,0), &PHI(A,0));
+						f64 v_BB_0000 = V(L, &PHI(B,0), &PHI(B,0), &PHI(B,0), &PHI(B,0));
+						f64 v_AA_m0m0 = V(L, &PHI(A,m), &PHI(A,0), &PHI(A,m), &PHI(A,0));
+						f64 v_BB_n0n0 = V(L, &PHI(B,n), &PHI(B,0), &PHI(B,n), &PHI(B,0));
+
+						f64 v_AB_0000 = V(L, &PHI(A,0), &PHI(B,0), &PHI(A,0), &PHI(B,0));
+						f64 v_AB_mnmn = V(L, &PHI(A,m), &PHI(B,n), &PHI(A,m), &PHI(B,n));
+						f64 v_AB_m0m0 = V(L, &PHI(A,m), &PHI(B,0), &PHI(A,m), &PHI(B,0));
+						f64 v_AB_0n0n = V(L, &PHI(A,n), &PHI(B,0), &PHI(A,n), &PHI(B,0));
+
+						f64 me0 = 0;
+						me0 += 0.5*G0(A,A)*(-particle_count[A]*(particle_count[A]-1)*v_AA_0000
+								+ 2*(particle_count[A]-1)*v_AA_m0m0);
+						me0 += 0.5*G0(B,B)*(-particle_count[B]*(particle_count[B]-1)*v_BB_0000
+								+ 2*(particle_count[B]-1)*v_BB_n0n0);
+						me0 += G0(A,B)*(
+								(1-particle_count[A]*particle_count[B])*v_AB_0000
+								-v_AB_0n0n
+								-v_AB_m0m0
+								+v_AB_mnmn
+								);
+
+						f64 me1 = 0;
+						{
+							me1 = G0(A,B)*sqrt(particle_count[A]*particle_count[B])
+								* V(L, &PHI(A,m), &PHI(B,n), &PHI(A,0), &PHI(B,0));
+						}
+
+						f64 Ediff0 = ENERGY(A,0) + ENERGY(B,0) - ENERGY(A,m) - ENERGY(B,n);
+						E3 += (me1*me0*me1)/(Ediff0*Ediff0);
+					}
+				}
+
+			}
+		}
+
+		/* AmBn,AmBp */
+		for (u32 A = 0; A < res.component_count; ++A) {
+			for (u32 B = 0; B < res.component_count; ++B) {
+				if (B == A)
+					continue;
+
+#pragma omp parallel for
+				for (u32 m = 1; m < states_to_include; ++m) {
+					for (u32 n = 1; n < states_to_include; ++n) {
+						for (u32 p = n+1; p < states_to_include; ++p) {
+							f64 v_BB_0n0p = V(L, &PHI(B,0), &PHI(B,n), &PHI(B,0), &PHI(B,p));
+							f64 v_AB_mnmp = V(L, &PHI(A,m), &PHI(B,n), &PHI(A,m), &PHI(B,p));
+							f64 v_AB_0n0p = V(L, &PHI(A,0), &PHI(B,n), &PHI(A,0), &PHI(B,p));
+
+							f64 me0 = G0(B,B)*(particle_count[B]-1)*v_BB_0n0p
+								+ G(A,B)*(v_AB_mnmp - v_AB_0n0p);
+
+							/* mn,00 */
+							f64 me1 = 0;
+							{
+								me1 = G0(A,B)*sqrt(particle_count[A]*particle_count[B])
+									* V(L, &PHI(A,m), &PHI(B,n), &PHI(A,0), &PHI(B,0));
+							}
+							/* mp,00 */
+							f64 me2 = 0;
+							{
+								me2 = G0(A,B)*sqrt(particle_count[A]*particle_count[B])
+									* V(L, &PHI(A,m), &PHI(B,p), &PHI(A,0), &PHI(B,0));
+							}
+
+							f64 Ediff0 = ENERGY(A,0) + ENERGY(B,0) - ENERGY(A,m) - ENERGY(B,n);
+							f64 Ediff1 = ENERGY(A,0) + ENERGY(B,0) - ENERGY(A,m) - ENERGY(B,p);
+							E3 += (me1*me0*me2)/(Ediff0*Ediff1);
+						}
+					}
+				}
+			}
+		}
+
+
+		/* AmBn,ApBq */
+		for (u32 A = 0; A < res.component_count; ++A) {
+			for (u32 B = A+1; B < res.component_count; ++B) {
+
+#pragma omp parallel for
+				for (int m = 1; m < N; ++m) {
+					for (int n = 1; n < N; ++n){
+						if (n == m) continue;
+						for (int p = 1; p < N; ++p) {
+							if (p == n || p == m) continue;
+							for (int q = 1; q < N; ++q) {
+								if (q == p || q == m || q == n) continue;
+
+								/* Making sure we avoid mnpq <-> pqmn */
+								if (m*10+n > p*10+q) continue;
+
+
+								f64 v_AB_mnpq = V(L, &PHI(A,m), &PHI(B,n), &PHI(A,p), &PHI(B,q));
+
+								f64 me0 = G0(A,B) * v_AB_mnpq;
+
+								/* mn,00 */
+								f64 me1 = 0;
+								{
+									me1 = G0(A,B)*sqrt(particle_count[A]*particle_count[B])
+										* V(L, &PHI(A,m), &PHI(B,n), &PHI(A,0), &PHI(B,0));
+								}
+								/* pq,00 */
+								f64 me2 = 0;
+								{
+									me2 = G0(A,B)*sqrt(particle_count[A]*particle_count[B])
+										* V(L, &PHI(A,p), &PHI(B,q), &PHI(A,0), &PHI(B,0));
+								}
+
+								f64 Ediff0 = ENERGY(A,0) + ENERGY(B,0) - ENERGY(A,m) - ENERGY(B,n);
+								f64 Ediff1 = ENERGY(A,0) + ENERGY(B,0) - ENERGY(A,p) - ENERGY(B,q);
+								E3 += (me1*me0*me2)/(Ediff0*Ediff1);
+							}
+						}
+					}
+				}
+
 			}
 		}
 

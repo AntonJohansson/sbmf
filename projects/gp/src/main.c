@@ -4,8 +4,8 @@
 
 #include <stdio.h>
 
-#define NA 4
-#define NB 4
+#define NA 1000
+#define NB 1000
 
 //#define GAA (1.0/3.0)
 #define GAA (-2.0/((f64)NA-1))
@@ -13,7 +13,7 @@
 #define GBA (+1.0/((f64)NA))
 #define GBB (-2.0/((f64)NB-1))
 
-#define USE_GAUSSIAN_GUESS 1
+#define USE_GAUSSIAN_GUESS 0
 
 #define PERTURBATION(x) 2*gaussian(x, 0, 0.2)
 //#define PERTURBATION(x) 0.0
@@ -147,7 +147,7 @@ int main() {
         .num_basis_funcs = 16,
 		.basis = ho_basis,
 
-		.zero_threshold = 1e-13,
+		.zero_threshold = 0,
 		.debug_callback = debug_callback,
 		.measure_every = 0,
 		.gk=gk15
@@ -178,6 +178,7 @@ int main() {
 				.label = "potential",
 				});
 
+
 		f64 sample_in[N];
 		for (u32 i = 0; i < N; ++i) {
 			sample_in[i] = (f64) sp.points[i];
@@ -197,6 +198,26 @@ int main() {
 					.label = plot_snprintf("comp: %u", i),
 					.offset = res.energy[i],
 					});
+		}
+
+		{
+			FILE* fd = fopen("output/outplotdata", "w");
+			f64 sample[N*res.component_count];
+			for (u32 i = 0; i < res.component_count; ++i) {
+				f64 sample_out[N];
+				ho_sample(res.coeff_count, &res.coeff[i*res.coeff_count], N, &sample[i*N], sample_in);
+			}
+
+			for (u32 i = 0; i < N; ++i) {
+				fprintf(fd, "%lf\t", sample_in[i]);
+				for (u32 j = 0; j < res.component_count; ++j) {
+					f64 c = fabs(sample[j*N + i]);
+					fprintf(fd, "%lf\t", c*c);
+				}
+				fprintf(fd, "\n");
+			}
+
+			fclose(fd);
 		}
 
 		plot_update_until_closed();

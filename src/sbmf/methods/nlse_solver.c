@@ -165,7 +165,7 @@ struct nlse_result nlse_solver(struct nlse_settings settings, const u32 componen
 				break;
 			}
 			default:
-				sbmf_log_error("nlse_sovler: component %u has invalid guess!", i);
+				sbmf_log_error("nlse_solver: component %u has invalid guess!", i);
 				return res;
 		};
 	}
@@ -361,6 +361,24 @@ struct nlse_result nlse_solver(struct nlse_settings settings, const u32 componen
 		gsl_integration_workspace_free(ws[i]);
 	}
 #endif
+
+	/* Compute residuals */
+	for (u32 i = 0; i < component_count; ++i) {
+		f64 ans1[N], ans2[N];
+		symmetric_bandmat_mulv(ans1, res.hamiltonian[i], &res.coeff[i*N]);
+
+		for (u32 j = 0; j < N; ++j) {
+			ans2[j] = res.energy[i] * res.coeff[i*N + j];
+		}
+
+		f64 sum = 0.0;
+		for (u32 j = 0; j < N; ++j) {
+			sum += fabs(ans1[j] - ans2[j]);
+		}
+		sum = sqrt(sum);
+
+		sbmf_log_info("\t[%u] residual %e", i, sum);
+	}
 
 	return res;
 }

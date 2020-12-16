@@ -4,20 +4,17 @@
 
 #include <stdio.h>
 
-#define NA 4
-#define NB 4
+#define NA 1000
+#define NB 1000
 
-//#define GAA (1.0/3.0)
-#define GAA (-8.0/((f64)NA-1))
-#define GAB (+1.0/((f64)NB))
-#define GBA (+1.0/((f64)NA))
-#define GBB (-8.0/((f64)NB-1))
+#define GAA (+1.0/((f64)NA-1))
+#define GAB (+4.0/((f64)NB))
+#define GBA (+4.0/((f64)NA))
+#define GBB (+1.0/((f64)NB-1))
 
 #define USE_GAUSSIAN_GUESS 0
 
-#define PERTURBATION(x) (cos(5*x))
-//#define PERTURBATION(x) 0.0
-//#define PERTURBATION(x) (-1.5015*sqrt(x*x - 1.5*1.5 + 1.5015*1.5015));
+#define PERTURBATION(x) 2*gaussian(x, 0.0, 0.2)
 
 void perturbation(const u32 len, f64 out[static len],
                                 f64 in_x[static len], const u32 component_count,
@@ -61,7 +58,7 @@ void gaussian0(f64* out, f64* in, u32 len, void* data) {
 }
 void gaussian1(f64* out, f64* in, u32 len, void* data) {
 	for (u32 i = 0; i < len; ++i)
-		out[i] = gaussian(in[i] - 2.0, 0.0, 0.1);
+		out[i] = gaussian(in[i] + 1.0, 0.0, 0.1);
 }
 void gaussian2(f64* out, f64* in, u32 len, void* data) {
 	for (u32 i = 0; i < len; ++i)
@@ -69,7 +66,7 @@ void gaussian2(f64* out, f64* in, u32 len, void* data) {
 }
 void gaussian3(f64* out, f64* in, u32 len, void* data) {
 	for (u32 i = 0; i < len; ++i)
-		out[i] = gaussian(in[i] + 2.0, 0.0, 0.1);
+		out[i] = gaussian(in[i] - 1.0, 0.0, 0.1);
 }
 
 
@@ -123,7 +120,7 @@ int main() {
 
 	const u32 component_count = 2;
 
-	struct bestmf_2comp_result res = best_meanfield_2comp(settings, 4, g0, guesses);
+	struct bestmf_2comp_result res = best_meanfield_2comp(settings, NA, g0, guesses);
 	printf("energy: %lf\n", res.energy);
 	printf("n1: %lf\n", res.n1);
 	printf("n2: %lf\n", res.n2);

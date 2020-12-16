@@ -224,7 +224,7 @@ struct bestmf_2comp_result best_meanfield_2comp(struct nlse_settings settings,
 	u32 n3, n4;
 	compute_occupations(settings, particle_count, res.coeff_count, &res.coeff[2*res.coeff_count], &n3, &n4);
 
-	f64* p = (f64*)sbmf_stack_push(4*res.coeff_count*sizeof(f64));
+	f64* p = sbmf_stack_push(4*res.coeff_count*sizeof(f64));
 	memset(p, 0, 4*res.coeff_count*sizeof(f64));
 	compute_wavefunctions(settings, particle_count, res.coeff_count, res.coeff, n1, n2, p);
 	compute_wavefunctions(settings, particle_count, res.coeff_count, &res.coeff[2*res.coeff_count], n3, n4, &p[2*res.coeff_count]);

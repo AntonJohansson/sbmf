@@ -4,8 +4,8 @@
 
 #include <stdio.h>
 
-#define NA 1000
-#define NB 1000
+#define NA 4
+#define NB 4
 
 //#define GAA (1.0/3.0)
 #define GAA (-2.0/((f64)NA-1))
@@ -13,7 +13,7 @@
 #define GBA (+1.0/((f64)NA))
 #define GBB (-2.0/((f64)NB-1))
 
-#define USE_GAUSSIAN_GUESS 0
+#define USE_GAUSSIAN_GUESS 1
 
 #define PERTURBATION(x) 2*gaussian(x, 0, 0.2)
 //#define PERTURBATION(x) 0.0

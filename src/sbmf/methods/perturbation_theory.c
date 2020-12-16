@@ -493,7 +493,7 @@ struct pt_result rayleigh_schroedinger_pt(struct nlse_result res, f64* g0, u32* 
 							f64 v_AB_0n0p = V(L, &PHI(A,0), &PHI(B,n), &PHI(A,0), &PHI(B,p));
 
 							f64 me0 = G0(B,B)*(particle_count[B]-1)*v_BB_0n0p
-								+ G(A,B)*(v_AB_mnmp - v_AB_0n0p);
+								+ G0(A,B)*(v_AB_mnmp - v_AB_0n0p);
 
 							/* mn,00 */
 							f64 me1 = 0;
@@ -523,12 +523,12 @@ struct pt_result rayleigh_schroedinger_pt(struct nlse_result res, f64* g0, u32* 
 			for (u32 B = A+1; B < res.component_count; ++B) {
 
 #pragma omp parallel for
-				for (int m = 1; m < N; ++m) {
-					for (int n = 1; n < N; ++n){
+				for (u32 m = 1; m < states_to_include; ++m) {
+					for (u32 n = 1; n < states_to_include; ++n){
 						if (n == m) continue;
-						for (int p = 1; p < N; ++p) {
+						for (u32 p = 1; p < states_to_include; ++p) {
 							if (p == n || p == m) continue;
-							for (int q = 1; q < N; ++q) {
+							for (u32 q = 1; q < states_to_include; ++q) {
 								if (q == p || q == m || q == n) continue;
 
 								/* Making sure we avoid mnpq <-> pqmn */

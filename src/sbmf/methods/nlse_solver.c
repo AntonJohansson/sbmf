@@ -4,7 +4,10 @@
 	#include <gsl/gsl_integration.h>
 #endif
 
-struct integrand_params { u32 n[2]; u32 component_count; u32 coeff_count;
+struct integrand_params {
+	u32 n[2];
+	u32 component_count;
+	u32 coeff_count;
 	f64* coeff;
 
 	nlse_operator_func* op;
@@ -14,8 +17,8 @@ struct integrand_params { u32 n[2]; u32 component_count; u32 coeff_count;
 };
 
 static void sbmf_log_integration_result(integration_result res) {
-	sbmf_log_info("integral: %e", res.integral);
-	sbmf_log_info("error: %e", res.error);
+	sbmf_log_info("integral: %.10e", res.integral);
+	sbmf_log_info("error: %.10e", res.error);
 	sbmf_log_info("performed evals: %d", res.performed_evals);
 	sbmf_log_info("converged: %s", (res.converged) ? "yes" : "no");
 }
@@ -101,9 +104,6 @@ static f64 nonlinear_me_integrand_gsl(f64 in, void* data) {
 }
 #endif
 
-
-
-
 struct nlse_result nlse_solver(struct nlse_settings settings, const u32 component_count, struct nlse_component component[static component_count]) {
 	/* Lazy */
 	const u32 N = settings.num_basis_funcs;
@@ -132,6 +132,7 @@ struct nlse_result nlse_solver(struct nlse_settings settings, const u32 componen
 		.rel_error_tol = 1e-7,
 		.max_evals = settings.max_iterations,
 	};
+	sbmf_log_info("\tUsing gq quadrature of gauss size: %u", int_settings.gk.gauss_size);
 
 	/* Setup intial guess values for coeffs */
 	for (u32 i = 0; i < component_count; ++i) {
@@ -285,7 +286,14 @@ struct nlse_result nlse_solver(struct nlse_settings settings, const u32 componen
 				F.params = &params;
 				gsl_integration_qagi(&F, 1e-10, 1e-7, settings.max_iterations, ws[omp_get_thread_num()], &int_res.integral, &int_res.error);
 				int_res.converged = true;
+
+				if (r == 38 && c == 51)
+					sbmf_log_info("38,51: int: %.10e, error: %.10e", int_res.integral, int_res.error);
 #else
+				if (r == 38 && c == 51)
+					int_settings.print_error = true;
+				else
+					int_settings.print_error = false;
 				integration_result int_res = quadgk(nonlinear_me_integrand, -INFINITY, INFINITY, int_settings);
 #endif
 

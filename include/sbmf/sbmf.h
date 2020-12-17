@@ -145,6 +145,8 @@ typedef struct integration_settings {
 	// the supplied integrand.
 	i32 max_evals;
 
+	bool print_error;
+
 	void* userdata;
 } integration_settings;
 

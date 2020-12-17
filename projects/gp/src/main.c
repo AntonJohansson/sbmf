@@ -144,10 +144,10 @@ int main() {
 		.max_iterations = 1e5,
 		.error_tol = 1e-9,
 
-        .num_basis_funcs = 16,
+        .num_basis_funcs = 64,
 		.basis = ho_basis,
 
-		.zero_threshold = 0,
+		.zero_threshold = 1e-10,
 		.debug_callback = debug_callback,
 		.measure_every = 0,
 		.gk=gk15
@@ -161,7 +161,7 @@ int main() {
 
 	nlse_write_to_binary_file("outbin", res);
 
-#if 0
+#if 1
 	{
 		const u32 N = 256;
 		plot_init(800, 600, "gp2c");

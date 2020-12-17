@@ -458,6 +458,13 @@ static inline integration_result hadapt(integrand_vec* f, f64 start, f64 end,
 		result.integral = (result.integral - largest_error_seg.integral) + left_seg.integral + right_seg.integral;
 		result.error = (result.error - largest_error_seg.error) + left_seg.error + right_seg.error;
 
+		if (settings.print_error)
+			sbmf_log_info("\t%u -- %e\t%e -- %e -- %e\t%e", result.performed_evals, result.integral, result.error,
+					largest_error_seg.error,
+					left_seg.error,
+					right_seg.error
+					);
+
 		prioqueue_push(pq, &left_seg);
 		prioqueue_push(pq, &right_seg);
 	}
@@ -473,7 +480,8 @@ static inline integration_result hadapt(integrand_vec* f, f64 start, f64 end,
 integration_result quadgk(integrand_vec* f, f64 start, f64 end, integration_settings settings) {
 	/* If no gk rule is chosen, default to gk7 */
 	if (settings.gk.gauss_size == 0)
-		settings.gk = gk7;
+		settings.gk = gk15;
+
 	// Make sure the endpoints are ordered start < end
 	f64 output_factor = 1.0;
 	if (start > end) {

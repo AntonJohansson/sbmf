@@ -35,21 +35,22 @@ static inline void prioqueue_heapify(struct prioqueue* pq, u32 index) {
 	u32 R = PQ_RIGHT(index);
 	u32 tmp = index;
 
-	if (L >= pq->items || R >= pq->items)
-		return;
-
 	void* left     = barray_get(pq->mem, L);
 	void* right    = barray_get(pq->mem, R);
 	void* indexptr = barray_get(pq->mem, index);
 
-	if (!pq->cmp(indexptr, left)) {
-		indexptr = left;
-		index = L;
+	if (L < pq->items) {
+		if (!pq->cmp(indexptr, left)) {
+			indexptr = left;
+			index = L;
+		}
 	}
 
-	if (!pq->cmp(indexptr, right)) {
-		indexptr = right;
-		index = R;
+	if (R < pq->items) {
+		if (!pq->cmp(indexptr, right)) {
+			indexptr = right;
+			index = R;
+		}
 	}
 
 	if (index != tmp) {
@@ -81,6 +82,7 @@ static inline void prioqueue_push(struct prioqueue* pq, const void* data) {
 	void* child  = barray_get(pq->mem, i);
 	void* parent = barray_get(pq->mem, PQ_PARENT(i));
 	u8 tmpbuf[pq->item_size];
+	/* While the child comes before the parent */
 	while (i != 0 && pq->cmp(child, parent)) {
 		/* swap child and parent */
 		memcpy(tmpbuf, child, pq->item_size);

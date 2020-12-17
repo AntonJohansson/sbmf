@@ -286,14 +286,7 @@ struct nlse_result nlse_solver(struct nlse_settings settings, const u32 componen
 				F.params = &params;
 				gsl_integration_qagi(&F, 1e-10, 1e-7, settings.max_iterations, ws[omp_get_thread_num()], &int_res.integral, &int_res.error);
 				int_res.converged = true;
-
-				if (r == 38 && c == 51)
-					sbmf_log_info("38,51: int: %.10e, error: %.10e", int_res.integral, int_res.error);
 #else
-				if (r == 38 && c == 51)
-					int_settings.print_error = true;
-				else
-					int_settings.print_error = false;
 				integration_result int_res = quadgk(nonlinear_me_integrand, -INFINITY, INFINITY, int_settings);
 #endif
 

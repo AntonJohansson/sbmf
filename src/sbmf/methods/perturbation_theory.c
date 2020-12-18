@@ -208,7 +208,7 @@ struct pt_result rayleigh_schroedinger_pt(struct nlse_result res, f64* g0, i32* 
 		/* mm,mm */
 		sbmf_log_info("mm,mm");
 		for (u32 A = 0; A < res.component_count; ++A) {
-#pragma omp parallel for
+#pragma omp parallel for reduction(+: E3)
 			for (u32 m = 1; m < states_to_include; ++m) {
 				//sbmf_log_info("(%u,%u),(%u,%u)", m,m,m,m);
 				f64 v_AA_mmmm = V(&pt, A,A, m,m,m,m);
@@ -242,7 +242,7 @@ struct pt_result rayleigh_schroedinger_pt(struct nlse_result res, f64* g0, i32* 
 		/* mn,mn */
 		sbmf_log_info("mn,mn");
 		for (u32 A = 0; A < res.component_count; ++A) {
-#pragma omp parallel for
+#pragma omp parallel for reduction(+: E3)
 			for (u32 m = 1; m < states_to_include; ++m) {
 				for (u32 n = m+1; n < states_to_include; ++n) {
 					//sbmf_log_info("(%u,%u),(%u,%u)", m,n,m,n);
@@ -279,7 +279,7 @@ struct pt_result rayleigh_schroedinger_pt(struct nlse_result res, f64* g0, i32* 
 		/* mm,nn */
 		sbmf_log_info("mm,nn");
 		for (u32 A = 0; A < res.component_count; ++A) {
-#pragma omp parallel for
+#pragma omp parallel for reduction(+: E3)
 			for (u32 m = 1; m < states_to_include; ++m) {
 				for (u32 n = m+1; n < states_to_include; ++n) {
 					//sbmf_log_info("(%u,%u),(%u,%u)", m,m,n,n);
@@ -302,7 +302,7 @@ struct pt_result rayleigh_schroedinger_pt(struct nlse_result res, f64* g0, i32* 
 		/* mm,mp */
 		sbmf_log_info("mm,mp");
 		for (u32 A = 0; A < res.component_count; ++A) {
-#pragma omp parallel for
+#pragma omp parallel for reduction(+: E3)
 			for (u32 m = 1; m < states_to_include; ++m) {
 				for (u32 p = 1; p < states_to_include; ++p) {
 					if (m == p)
@@ -329,7 +329,7 @@ struct pt_result rayleigh_schroedinger_pt(struct nlse_result res, f64* g0, i32* 
 		/* mm,pq */
 		sbmf_log_info("mm,pq");
 		for (u32 A = 0; A < res.component_count; ++A) {
-#pragma omp parallel for
+#pragma omp parallel for reduction(+: E3)
 			for (u32 m = 1; m < states_to_include; ++m) {
 				for (u32 p = 1; p < states_to_include; ++p) {
 					if (p == m)
@@ -360,7 +360,7 @@ struct pt_result rayleigh_schroedinger_pt(struct nlse_result res, f64* g0, i32* 
 		/* mp,mq */
 		sbmf_log_info("mp,mq");
 		for (u32 A = 0; A < res.component_count; ++A) {
-#pragma omp parallel for
+#pragma omp parallel for reduction(+: E3)
 			for (u32 m = 1; m < states_to_include; ++m) {
 				for (u32 p = 1; p < states_to_include; ++p) {
 					if (p == m)
@@ -390,7 +390,7 @@ struct pt_result rayleigh_schroedinger_pt(struct nlse_result res, f64* g0, i32* 
 		/* mn,pq */
 		sbmf_log_info("mn,pq");
 		for (u32 A = 0; A < res.component_count; ++A) {
-#pragma omp parallel for
+#pragma omp parallel for reduction(+: E3)
 			for (u32 m = 1; m < states_to_include; ++m) {
 				for (u32 n = m+1; n < states_to_include; ++n) {
 					for (u32 p = n+1; p < states_to_include; ++p) {
@@ -419,7 +419,7 @@ struct pt_result rayleigh_schroedinger_pt(struct nlse_result res, f64* g0, i32* 
 		sbmf_log_info("E3 before: %e", E3);
 		for (u32 A = 0; A < res.component_count; ++A) {
 			for (u32 B = A+1; B < res.component_count; ++B) {
-#pragma omp parallel for
+#pragma omp parallel for reduction(+: E3)
 				for (u32 m = 1; m < states_to_include; ++m) {
 					for (u32 n = 1; n < states_to_include; ++n) {
 						f64 v_AA_0000 = V(&pt, A,A, 0,0,0,0);
@@ -464,7 +464,7 @@ struct pt_result rayleigh_schroedinger_pt(struct nlse_result res, f64* g0, i32* 
 				if (B == A)
 					continue;
 
-#pragma omp parallel for
+#pragma omp parallel for reduction(+: E3)
 				for (u32 m = 1; m < states_to_include; ++m) {
 					for (u32 n = 1; n < states_to_include; ++n) {
 						if (n == m) continue;
@@ -497,7 +497,7 @@ struct pt_result rayleigh_schroedinger_pt(struct nlse_result res, f64* g0, i32* 
 		for (u32 A = 0; A < res.component_count; ++A) {
 			for (u32 B = A+1; B < res.component_count; ++B) {
 
-#pragma omp parallel for
+#pragma omp parallel for reduction(+: E3)
 				for (u32 m = 1; m < states_to_include; ++m) {
 					for (u32 n = 1; n < states_to_include; ++n){
 						if (n == m) continue;

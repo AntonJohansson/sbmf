@@ -97,7 +97,7 @@ static f64 rs_2nd_order_ediff(struct pt_settings* pt, u32 A, u32 B, u32 i, u32 j
 
 struct pt_result rayleigh_schroedinger_pt(struct nlse_result res, f64* g0, i32* particle_count) {
 	/* order of hamiltonians, that is include all states */
-	const u32 states_to_include = res.coeff_count;
+	const u32 states_to_include = 5; //res.coeff_count;
 	sbmf_log_info("running rayleigh schödinger PT:\n    components: %u\n    states: %u\n", res.component_count, states_to_include);
 
 	struct eigen_result_real states[res.component_count];
@@ -210,7 +210,7 @@ struct pt_result rayleigh_schroedinger_pt(struct nlse_result res, f64* g0, i32* 
 		for (u32 A = 0; A < res.component_count; ++A) {
 #pragma omp parallel for reduction(+: E3)
 			for (u32 m = 1; m < states_to_include; ++m) {
-				//sbmf_log_info("(%u,%u),(%u,%u)", m,m,m,m);
+				//sbmf_log_info("\t(%u,%u),(%u,%u)", m,m,m,m);
 				f64 v_AA_mmmm = V(&pt, A,A, m,m,m,m);
 				f64 v_AA_m0m0 = V(&pt, A,A, m,0,m,0);
 				f64 v_AA_0000 = V(&pt, A,A, 0,0,0,0);
@@ -245,7 +245,7 @@ struct pt_result rayleigh_schroedinger_pt(struct nlse_result res, f64* g0, i32* 
 #pragma omp parallel for reduction(+: E3)
 			for (u32 m = 1; m < states_to_include; ++m) {
 				for (u32 n = m+1; n < states_to_include; ++n) {
-					//sbmf_log_info("(%u,%u),(%u,%u)", m,n,m,n);
+					//sbmf_log_info("\t(%u,%u),(%u,%u)", m,n,m,n);
 					f64 v_AA_mnmn = V(&pt, A,A, m,n,m,n);
 					f64 v_AA_m0m0 = V(&pt, A,A, m,0,m,0);
 					f64 v_AA_n0n0 = V(&pt, A,A, n,0,n,0);
@@ -282,7 +282,7 @@ struct pt_result rayleigh_schroedinger_pt(struct nlse_result res, f64* g0, i32* 
 #pragma omp parallel for reduction(+: E3)
 			for (u32 m = 1; m < states_to_include; ++m) {
 				for (u32 n = m+1; n < states_to_include; ++n) {
-					//sbmf_log_info("(%u,%u),(%u,%u)", m,m,n,n);
+					//sbmf_log_info("\t(%u,%u),(%u,%u)", m,m,n,n);
 					f64 v_AA_mmnn = V(&pt, A,A, m,m,n,n);
 
 					/* Two double substitutions */
@@ -307,7 +307,7 @@ struct pt_result rayleigh_schroedinger_pt(struct nlse_result res, f64* g0, i32* 
 				for (u32 p = 1; p < states_to_include; ++p) {
 					if (m == p)
 						continue;
-					//sbmf_log_info("(%u,%u),(%u,%u)", m,m,m,p);
+					//sbmf_log_info("\t(%u,%u),(%u,%u)", m,m,m,p);
 					f64 v_AA_m0p0 = V(&pt, A,A, m,0,p,0);
 					f64 v_AA_mmmp = V(&pt, A,A, m,m,m,p);
 
@@ -338,11 +338,12 @@ struct pt_result rayleigh_schroedinger_pt(struct nlse_result res, f64* g0, i32* 
 					for (u32 q = p+1; q < states_to_include; ++q) {
 						if (q == m)
 							continue;
-						//sbmf_log_info("(%u,%u),(%u,%u)", m,m,p,q);
+						//sbmf_log_info("\t(%u,%u),(%u,%u)", m,m,p,q);
 						f64 v_AA_mmpq = V(&pt, A,A, m,m,p,q);
 
 						/* Two double substitutions */
-						f64 me0 = (1.0/sqrt(2.0)) * G0(&pt,A,A) * v_AA_mmpq;
+						//f64 me0 = (1.0/sqrt(2.0)) * G0(&pt,A,A) * v_AA_mmpq;
+						f64 me0 = sqrt(2.0) * G0(&pt,A,A) * v_AA_mmpq;
 
 						/* One double substitution */
 						f64 me1 	= rs_2nd_order_me(&pt, A,A, m,m);
@@ -369,7 +370,7 @@ struct pt_result rayleigh_schroedinger_pt(struct nlse_result res, f64* g0, i32* 
 					for (u32 q = p+1; q < states_to_include; ++q) {
 						if (q == m)
 							continue;
-						//sbmf_log_info("(%u,%u),(%u,%u)", m,p,m,q);
+						//sbmf_log_info("\t(%u,%u),(%u,%u)", m,p,m,q);
 						f64 v_AA_p0q0 = V(&pt, A,A, p,0,q,0);
 						f64 v_AA_mpmq = V(&pt, A,A, m,p,m,q);
 
@@ -395,7 +396,7 @@ struct pt_result rayleigh_schroedinger_pt(struct nlse_result res, f64* g0, i32* 
 				for (u32 n = m+1; n < states_to_include; ++n) {
 					for (u32 p = n+1; p < states_to_include; ++p) {
 						for (u32 q = p+1; q < states_to_include; ++q) {
-							//sbmf_log_info("(%u,%u),(%u,%u)", m,n,p,q);
+							//sbmf_log_info("\t(%u,%u),(%u,%u)", m,n,p,q);
 							f64 v_AA_mnpq = V(&pt, A,A, m,n,p,q);
 
 							/* Two double substitutions */

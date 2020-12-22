@@ -162,7 +162,7 @@ int main() {
 
 	nlse_write_to_binary_file("outbin", res);
 
-#if 1
+#if 0
 	{
 		const u32 N = 256;
 		plot_init(800, 600, "gp2c");

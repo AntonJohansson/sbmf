@@ -97,7 +97,7 @@ static f64 rs_2nd_order_ediff(struct pt_settings* pt, u32 A, u32 B, u32 i, u32 j
 
 struct pt_result rayleigh_schroedinger_pt(struct nlse_result res, f64* g0, i32* particle_count) {
 	/* order of hamiltonians, that is include all states */
-	const u32 states_to_include = 5; //res.coeff_count;
+	const u32 states_to_include = res.coeff_count;
 	sbmf_log_info("running rayleigh schödinger PT:\n    components: %u\n    states: %u\n", res.component_count, states_to_include);
 
 	struct eigen_result_real states[res.component_count];
@@ -223,13 +223,13 @@ struct pt_result rayleigh_schroedinger_pt(struct nlse_result res, f64* g0, i32* 
 						- G0(&pt,A,A)*(particle_count[A]-1)*(2*v_AA_m0m0 + (particle_count[A]-2)*v_AA_0000);
 
 				/* Handle intracomponent terms */
-				for (u32 B = 0; B < res.component_count; ++B) {
-					if (B == A)
-						continue;
+				//for (u32 B = 0; B < res.component_count; ++B) {
+				//	if (B == A)
+				//		continue;
 
-					f64 v_BA_0000 = V(&pt, B,A, 0,0,0,0);
-					me0 -= G0(&pt,A,B)*particle_count[A]*particle_count[B]*v_BA_0000;
-				}
+				//	f64 v_BA_0000 = V(&pt, B,A, 0,0,0,0);
+				//	me0 -= G0(&pt,A,B)*particle_count[A]*particle_count[B]*v_BA_0000;
+				//}
 
 				/* One double substitution */
 				f64 me1 = rs_2nd_order_me(&pt, A,A, m,m);
@@ -260,13 +260,13 @@ struct pt_result rayleigh_schroedinger_pt(struct nlse_result res, f64* g0, i32* 
 						- G0(&pt,A,A)*(particle_count[A]-1)*(v_AA_m0m0 + v_AA_n0n0 + (particle_count[A]-2)*v_AA_0000);
 
 					/* Handle intercomponent term */
-					for (u32 B = 0; B < res.component_count; ++B) {
-						if (B == A)
-							continue;
+					//for (u32 B = 0; B < res.component_count; ++B) {
+					//	if (B == A)
+					//		continue;
 
-						f64 v_BA_0000 = V(&pt, B,A, 0,0,0,0);
-						me0 -= G0(&pt,A,B)*particle_count[A]*particle_count[B]*v_BA_0000;
-					}
+					//	f64 v_BA_0000 = V(&pt, B,A, 0,0,0,0);
+					//	me0 -= G0(&pt,A,B)*particle_count[A]*particle_count[B]*v_BA_0000;
+					//}
 
 					/* One double substitution */
 					f64 me1 = rs_2nd_order_me(&pt, A,A, m,n);
@@ -415,6 +415,7 @@ struct pt_result rayleigh_schroedinger_pt(struct nlse_result res, f64* g0, i32* 
 			}
 		}
 
+#if 0
 		/* AmBn,AmBn */
 		sbmf_log_info("AmBn,AmBn; AmBm,AmBm");
 		sbmf_log_info("E3 before: %e", E3);
@@ -528,6 +529,7 @@ struct pt_result rayleigh_schroedinger_pt(struct nlse_result res, f64* g0, i32* 
 
 			}
 		}
+#endif
 
 		E3 -= E1 * E3_last_term;
 	}

@@ -145,7 +145,7 @@ int main() {
 		.max_iterations = 1e5,
 		.error_tol = 1e-9,
 
-        .num_basis_funcs = 50,
+        .num_basis_funcs = 16,
 		.basis = ho_basis,
 
 		.zero_threshold = 1e-10,

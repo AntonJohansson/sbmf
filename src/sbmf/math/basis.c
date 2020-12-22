@@ -1,13 +1,3 @@
-static inline f128 factorial_128(const u32 n) {
-	f128 prod = 1.0;
-	f128 current_value = (f128) n;
-	while (current_value > 0.0) {
-		prod *= current_value;
-		current_value -= 1.0;
-	}
-	return prod;
-}
-
 /* Currently doesnt handle 2d/3d/... case */
 void ho_eigenfunc(const u32 n, const u32 len, f64 out[static len], f64 in[static len]) {
 	/*

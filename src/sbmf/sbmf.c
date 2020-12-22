@@ -33,6 +33,7 @@ void sbmf_log_panic(const char* fmt, ...);
 #include "global_state.c"
 #include "memory/bucketarray.c"
 #include "memory/prioqueue.c"
+#include "memory/linprob_hashmap.c"
 #include "math/functions.c"
 #include "math/matrix.c"
 #include "math/find_eigenpairs.c"

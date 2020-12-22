@@ -17,3 +17,21 @@ void f64_normalize(f64* out, f64* data, u32 size) {
 		out[i] = data[i] * scaling;
 	}
 }
+
+static inline f128 factorial_128(const u32 n) {
+	f128 prod = 1.0;
+	f128 current_value = (f128) n;
+	while (current_value > 0.0) {
+		prod *= current_value;
+		current_value -= 1.0;
+	}
+	return prod;
+}
+
+static inline u64 n_choose_k(const u32 n, const u32 k) {
+	f128 n_fact = factorial_128(n);
+	f128 k_fact = factorial_128(k);
+	f128 n_minus_k_fact = factorial_128(n-k);
+	f128 ans = (n_fact/n_minus_k_fact) * 1.0/k_fact;
+	return lroundl(ans);
+}

@@ -20,6 +20,7 @@ static void interrupt_handler(int dummy) {
 	exit(1);
 }
 
+
 void sbmf_init() {
 	if (_state.initialized) {
 		sbmf_log_error("sbmf_init(): Already intialized!");
@@ -43,6 +44,7 @@ void sbmf_init() {
 	}
 
 	_state.initialized = true;
+
 }
 
 void sbmf_shutdown() {

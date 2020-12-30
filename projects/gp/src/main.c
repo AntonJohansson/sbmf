@@ -4,14 +4,15 @@
 
 #include <stdio.h>
 
-#define NA 4
+#define NA 100
 #define NB 0
 
-#define GAA (1.0/3.0)
-//#define GAA (-4.0/((f64)NA-1))
+//#define GAA (-4.0)
+#define GAA (1e-5)
+//#define GAA (1/((f64)NA-1))
 #define GAB (+1.0/((f64)NB))
 #define GBA (+1.0/((f64)NA))
-#define GBB (-4.0/((f64)NB-1))
+#define GBB (+4.0/((f64)NB-1))
 
 #define USE_GAUSSIAN_GUESS 0
 #define COMPONENT_COUNT 1
@@ -34,49 +35,50 @@ void perturbation(const u32 len, f64 out[static len],
 
 
 
-void debug_callback(struct nlse_settings settings, struct nlse_result res) {
+	void debug_callback(struct nlse_settings settings, struct nlse_result res) {
 #if 1
-	const u32 N = 256;
-	plot_init(800, 600, "gp2c");
+		const u32 N = 256;
+		plot_init(800, 600, "gp2c");
 
-	f32 potdata[N], adata[N], bdata[N];
-	sample_space sp = make_linspace(1, -5, 5, N);
+		f32 potdata[N], adata[N], bdata[N];
+		sample_space sp = make_linspace(1, -5, 5, N);
 
-	for (u32 i = 0; i < N; ++i) {
-		f64 x = sp.points[i];
-		potdata[i] = (f32) ho_potential(&x,1,0) + PERTURBATION(x);
-	}
-	push_line_plot(&(plot_push_desc){
-			.space = &sp,
-			.data = potdata,
-			.label = "potential",
-			});
-
-	f64 sample_in[N];
-	for (u32 i = 0; i < N; ++i) {
-		sample_in[i] = (f64) sp.points[i];
-	}
-
-	for (u32 i = 0; i < res.component_count; ++i) {
-		f64 sample_out[N];
-		ho_sample(res.coeff_count, &res.coeff[i*res.coeff_count], N, sample_out, sample_in);
-
-		f32 data[N];
-		for (u32 k = 0; k < N; ++k) {
-			data[k] = fabs(sample_out[k])*fabs(sample_out[k]);
+		for (u32 i = 0; i < N; ++i) {
+			f64 x = sp.points[i];
+			potdata[i] = (f32) ho_potential(&x,1,0) + PERTURBATION(x);
 		}
 		push_line_plot(&(plot_push_desc){
 				.space = &sp,
-				.data = data,
-				.label = plot_snprintf("comp: %u", i),
-				.offset = res.energy[i],
+				.data = potdata,
+				.label = "potential",
 				});
+
+		f64 sample_in[N];
+		for (u32 i = 0; i < N; ++i) {
+			sample_in[i] = (f64) sp.points[i];
+		}
+
+		for (u32 i = 0; i < res.component_count; ++i) {
+			f64 sample_out[N];
+			ho_sample(res.coeff_count, &res.coeff[i*res.coeff_count], N, sample_out, sample_in);
+
+			f32 data[N];
+			for (u32 k = 0; k < N; ++k) {
+				data[k] = fabs(sample_out[k])*fabs(sample_out[k]);
+			}
+			push_line_plot(&(plot_push_desc){
+					.space = &sp,
+					.data = data,
+					.label = plot_snprintf("comp: %u", i),
+					.offset = res.energy[i],
+					});
+		}
+
+		plot_update_until_closed();
+		plot_shutdown();
+#endif
 	}
 
-	plot_update_until_closed();
-	plot_shutdown();
-#endif
-}
 
 
 
@@ -93,28 +95,27 @@ void debug_callback(struct nlse_settings settings, struct nlse_result res) {
 
 
 
-
-void log_callback(enum sbmf_log_level log_level, const char* msg) {
-	printf("%s\n", msg);
-}
-
+	void log_callback(enum sbmf_log_level log_level, const char* msg) {
+		printf("%s\n", msg);
+	}
 
 
 
 
-void gaussian0(f64* out, f64* in, u32 len, void* data) {
-	for (u32 i = 0; i < len; ++i)
-		out[i] = gaussian(in[i] + 1.0, 0.0, 0.1);
-}
-void gaussian1(f64* out, f64* in, u32 len, void* data) {
-	for (u32 i = 0; i < len; ++i)
-		out[i] = gaussian(in[i] - 1.0, 0.0, 0.1);
-}
+
+	void gaussian0(f64* out, f64* in, u32 len, void* data) {
+		for (u32 i = 0; i < len; ++i)
+			out[i] = gaussian(in[i] + 1.0, 0.0, 0.1);
+	}
+	void gaussian1(f64* out, f64* in, u32 len, void* data) {
+		for (u32 i = 0; i < len; ++i)
+			out[i] = gaussian(in[i] - 1.0, 0.0, 0.1);
+	}
 
 
 
 
-int main() {
+	int main() {
 	sbmf_set_log_callback(log_callback);
 	sbmf_init();
 
@@ -157,12 +158,14 @@ int main() {
 	const u32 component_count = COMPONENT_COUNT;
 
 	struct nlse_result res = grosspitaevskii(settings, component_count, occupations, guesses, g0);
-	printf("\nfull energy: %lf\n",
-			full_energy(settings, res.coeff_count, component_count, res.coeff, occupations, g0));
+	f64 Efull = full_energy(settings, res.coeff_count, component_count, res.coeff, occupations, g0);
+	printf("\nfull energy: %lf\n", Efull);
+	printf("\nfull energy per particle: %lf\n", Efull/(f64)NA);
+
 
 	nlse_write_to_binary_file("outbin", res);
 
-#if 0
+#if 1
 	{
 		const u32 N = 256;
 		plot_init(800, 600, "gp2c");
@@ -235,6 +238,8 @@ int main() {
 		printf("E0+E1:       %.15lf\n", ptres.E0+ptres.E1);
 		printf("E0+E1+E2:    %.15lf\n", ptres.E0+ptres.E1+ptres.E2);
 		printf("E0+E1+E2+E3: %.15lf\n", ptres.E0+ptres.E1+ptres.E2+ptres.E3);
+
+		printf("E0+E1+E2+E3: %.15lf\n", (ptres.E0+ptres.E1+ptres.E2+ptres.E3)/(f64)NA);
 	}
 
 	sbmf_shutdown();

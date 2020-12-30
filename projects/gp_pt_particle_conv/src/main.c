@@ -7,7 +7,7 @@
 #define NA 4
 #define NB 0
 
-#define GAA (1.0/3.0)
+#define GAA (1.0/1000.0)
 //#define GAA (-2.0/((f64)NA-1))
 #define GAB (+1.0/((f64)NB))
 #define GBA (+1.0/((f64)NA))
@@ -93,10 +93,11 @@ int main() {
 
 	u32 occupations[] = {NA,NB};
 
-	u32 bs[] = {4,8,12,16,24,32,48,64};
+	//u32 bs[] = {4,8,12,16,24,32,48,64};
+	u32 os[] = {5,10,50,100,200,300,400,500,600,700,800,900,1000};
 	struct nlse_settings settings = {
         .spatial_pot_perturbation = perturbation,
-		.max_iterations = 1e5,
+		.max_iterations = 1000,
 		.max_integration_evals = 1e5,
 		.error_tol = 1e-9,
 
@@ -109,29 +110,33 @@ int main() {
 
 	const u32 component_count = 1;
 
-	for (u32 i = 0; i < sizeof(bs)/sizeof(bs[0]); ++i) {
-		u32 b = bs[i];
-		settings.num_basis_funcs = b;
+	for (u32 i = 0; i < sizeof(os)/sizeof(os[0]); ++i) {
+		u32 o = os[i];
+		occupations[0] = o;
+		occupations[1] = o;
 
 		sbmf_init();
 		struct nlse_result res = grosspitaevskii(settings, component_count, occupations, guesses, g0);
 		f64 Egp = full_energy(settings, res.coeff_count, component_count, res.coeff, occupations, g0);
 
 		struct pt_result ptres = rayleigh_schroedinger_pt(res, g0, occupations);
-		printf("E0:          %.15lf\n", ptres.E0);
-		printf("E1:          %.15lf\n", ptres.E1);
-		printf("E2:          %.15lf\n", ptres.E2);
-		printf("E3:          %.15lf\n", ptres.E3);
-		printf("E0+E1:       %.15lf\n", ptres.E0+ptres.E1);
-		printf("E0+E1+E2:    %.15lf\n", ptres.E0+ptres.E1+ptres.E2);
-		printf("E0+E1+E2+E3: %.15lf\n", ptres.E0+ptres.E1+ptres.E2+ptres.E3);
+		//printf("E0:          %.15lf\n", ptres.E0);
+		//printf("E1:          %.15lf\n", ptres.E1);
+		//printf("E2:          %.15lf\n", ptres.E2);
+		//printf("E3:          %.15lf\n", ptres.E3);
+		//printf("E0+E1:       %.15lf\n", ptres.E0+ptres.E1);
+		//printf("E0+E1+E2:    %.15lf\n", ptres.E0+ptres.E1+ptres.E2);
+		//printf("E0+E1+E2+E3: %.15lf\n", ptres.E0+ptres.E1+ptres.E2+ptres.E3);
 
 		{
 			FILE* fd = fopen("out", "a");
-			fprintf(fd, "%u\t%lf\t%lf\t%lf\t%lf\t%lf\t%lf\n",
-					b,
-					Egp, ptres.E0, ptres.E1, ptres.E2, ptres.E3,
-					ptres.E0+ptres.E1+ptres.E2+ptres.E3);
+			f64 Ept = ptres.E0+ptres.E1+ptres.E2+ptres.E3;
+			fprintf(fd, "%u\t%lf\t%lf\t%lf\n",
+					o,
+					Egp/(f64)o,
+					Ept/(f64)o,
+					(Egp - Ept)/(f64)o
+					);
 			fclose(fd);
 		}
 

@@ -242,6 +242,7 @@ typedef void nlse_debug_callback(struct nlse_settings, struct nlse_result);
 
 struct nlse_settings {
 	u32 max_iterations;
+	u32 max_integration_evals;
 	f64 error_tol;
 
 	/* Separating out the spatial potentiential

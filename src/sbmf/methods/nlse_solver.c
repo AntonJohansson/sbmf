@@ -130,7 +130,7 @@ struct nlse_result nlse_solver(struct nlse_settings settings, const u32 componen
 		.gk = (settings.gk.gauss_size > 0) ? settings.gk : gk15,
 		.abs_error_tol = 1e-10,
 		.rel_error_tol = 1e-7,
-		.max_evals = settings.max_iterations,
+		.max_evals = settings.max_integration_evals,
 	};
 	sbmf_log_info("\tUsing gq quadrature of gauss size: %u", int_settings.gk.gauss_size);
 
@@ -310,6 +310,24 @@ struct nlse_result nlse_solver(struct nlse_settings settings, const u32 componen
 			assert(symmetric_bandmat_is_valid(res.hamiltonian[i]));
 		}
 
+		/* Check for smallest/largest value */
+		//for (u32 i = 0; i < component_count; ++i) {
+		//	f64 smallest = INFINITY;
+		//	f64 largest = -INFINITY;
+		//	for (u32 j = 0; j < matrix_element_count; ++j) {
+		//		u32 r = matrix_element_rows[j];
+		//		u32 c = matrix_element_cols[j];
+		//		u32 me_index = symmetric_bandmat_index(res.hamiltonian[i], r,c);
+
+		//		f64 val = res.hamiltonian[i].data[me_index];
+		//		if (val < smallest)
+		//			smallest = val;
+		//		if (val > largest)
+		//			largest = val;
+		//	}
+		//	sbmf_log_info("\t[%u]: smallest: %.2e -- largest: %.2e", i, smallest, largest);
+		//}
+
 		/*
 		 * Solve and normalize all the Hamiltonian
 		 * eigenvalue problems
@@ -347,7 +365,7 @@ struct nlse_result nlse_solver(struct nlse_settings settings, const u32 componen
 		for (u32 i = 0; i < component_count; ++i) {
 			if (res.error[i] > settings.error_tol)
 				should_exit = false;
-			sbmf_log_info("\t[%u] -- error: %.2e, energy: %.2e", i, res.error[i], res.energy[i]);
+			sbmf_log_info("\t[%u] -- error: %.10e, energy: %.10e", i, res.error[i], res.energy[i]);
 		}
 
 		if (should_exit) {

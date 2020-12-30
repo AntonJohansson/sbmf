@@ -4,17 +4,17 @@
 
 #include <stdio.h>
 
-#define NA 100
+#define NA 2
 #define NB 0
 
 //#define GAA (-4.0)
-#define GAA (1e-5)
+#define GAA (4)
 //#define GAA (1/((f64)NA-1))
 #define GAB (+1.0/((f64)NB))
 #define GBA (+1.0/((f64)NA))
 #define GBB (+4.0/((f64)NB-1))
 
-#define USE_GAUSSIAN_GUESS 0
+#define USE_GAUSSIAN_GUESS 1
 #define COMPONENT_COUNT 1
 
 //#define PERTURBATION(x) 2*gaussian(x, 0, 0.2)
@@ -77,6 +77,19 @@ void perturbation(const u32 len, f64 out[static len],
 		plot_update_until_closed();
 		plot_shutdown();
 #endif
+
+#if 1
+		{
+			FILE* fd = fopen("debug_out", "w");
+			for (f64 x = -5; x < 5; x += 0.1) {
+				f64 out;
+				ho_sample(res.coeff_count, &res.coeff[0], 1, &out, &x);
+				f64 pot = ho_potential(&x,1,0) + PERTURBATION(x);
+				fprintf(fd, "%lf\t%lf\t%lf\n", x, pot, out*out);
+			}
+			fclose(fd);
+		}
+#endif
 	}
 
 
@@ -105,7 +118,7 @@ void perturbation(const u32 len, f64 out[static len],
 
 	void gaussian0(f64* out, f64* in, u32 len, void* data) {
 		for (u32 i = 0; i < len; ++i)
-			out[i] = gaussian(in[i] + 1.0, 0.0, 0.1);
+			out[i] = gaussian(in[i] + 0.0, 0.0, 10);// + gaussian(in[i] - 1.0, 0.0, 0.2);
 	}
 	void gaussian1(f64* out, f64* in, u32 len, void* data) {
 		for (u32 i = 0; i < len; ++i)
@@ -144,6 +157,7 @@ void perturbation(const u32 len, f64 out[static len],
 	struct nlse_settings settings = {
         .spatial_pot_perturbation = perturbation,
 		.max_iterations = 1e5,
+		.max_integration_evals = 1e5,
 		.error_tol = 1e-9,
 
         .num_basis_funcs = 16,

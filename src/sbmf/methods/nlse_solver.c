@@ -105,6 +105,45 @@ static f64 nonlinear_me_integrand_gsl(f64 in, void* data) {
 #endif
 
 struct nlse_result nlse_solver(struct nlse_settings settings, const u32 component_count, struct nlse_component component[static component_count]) {
+	//{
+	//	struct symmetric_bandmat bm = symmetric_bandmat_new_zero(2,2);
+	//	bm.data[symmetric_bandmat_index(bm, 0,0)] = 1;
+	//	bm.data[symmetric_bandmat_index(bm, 0,1)] = 2;
+	//	bm.data[symmetric_bandmat_index(bm, 1,1)] = 1;
+	//	SYMMETRIC_BANDMAT_FOREACH(bm, r,c) {
+	//		sbmf_log_info("%u,%u -- %lf", r,c, bm.data[symmetric_bandmat_index(bm,r,c)]);
+	//	}
+	//	f64 y[2] = {1,1};
+	//	f64 x[2];
+
+	//	symmetric_bandmat_equation(x, bm ,y);
+	//	for (u32 i = 0; i < 2; ++i) {
+	//		sbmf_log_info("%lf",x[i]);
+	//	}
+	//}
+
+	{
+		struct diis_data* d = diis_data_new(2, 2);
+
+		diis_push(d, (f64[2]){1, 10}, 0);
+		diis_push(d, (f64[2]){2, 5}, 0);
+		for (u32 i = 0; i < d->log_items; ++i) {
+			printf("%u: ", i);
+			for (u32 j = 0; j < d->size; ++j) {
+				printf("%lf ", *(d->data_log + i*d->size + j));
+			}
+			printf("\n");
+		}
+
+		f64 x[2], E;
+		diis_compute(d, x, &E);
+
+		printf("\n");
+		for (u32 i = 0; i < d->size; ++i) {
+			printf("%lf ", x[i]);
+		}
+		printf("\n");
+	}
 	/* Lazy */
 	const u32 N = settings.num_basis_funcs;
 
@@ -125,6 +164,7 @@ struct nlse_result nlse_solver(struct nlse_settings settings, const u32 componen
 
 	/* Place to store coeffs from previous iterations */
 	f64* old_coeff = sbmf_stack_push(component_count*(N*sizeof(f64)));
+	f64* old_energy = sbmf_stack_push(component_count * sizeof(f64));
 
 	integration_settings int_settings = {
 		.gk = (settings.gk.gauss_size > 0) ? settings.gk : gk15,
@@ -252,9 +292,17 @@ struct nlse_result nlse_solver(struct nlse_settings settings, const u32 componen
 	}
 #endif
 
+	struct diis_data* ds[res.component_count];
+	if (settings.diis_log_length > 0) {
+		for (u32 i = 0; i < res.component_count; ++i) {
+			ds[i] = diis_data_new(N, settings.diis_log_length);
+		}
+	}
+
 	/* Do the actual iterations */
 	for (; res.iterations < settings.max_iterations; ++res.iterations) {
 		memcpy(old_coeff, res.coeff, res.component_count * N * sizeof(f64));
+		memcpy(old_energy, res.energy, res.component_count * sizeof(f64));
 
 		/* Call debug callback if requested by user */
 		if (settings.measure_every > 0 &&
@@ -337,16 +385,24 @@ struct nlse_result nlse_solver(struct nlse_settings settings, const u32 componen
 			struct eigen_result_real eigres = find_eigenpairs_sparse_real(res.hamiltonian[i], 1, EV_SMALLEST);
 
 			/* Copy energies */
-			res.energy[i] = eigres.eigenvalues[0];
+			res.energy[i] = settings.mixing * eigres.eigenvalues[0]
+				+ (1.0 - settings.mixing)*old_energy[i];
 
 			for (u32 j = 0; j < res.coeff_count; ++j) {
-				res.coeff[i*res.coeff_count + j] = eigres.eigenvectors[j];
+				res.coeff[i*res.coeff_count + j] =
+					settings.mixing * eigres.eigenvectors[j]
+					+ (1.0 - settings.mixing) * old_coeff[i*res.coeff_count + j];
 			}
 			f64_normalize(&res.coeff[i*res.coeff_count], &res.coeff[i*res.coeff_count], res.coeff_count);
-		}
 
-		if (settings.post_normalize_callback) {
-			settings.post_normalize_callback(settings, res);
+			if (settings.diis_log_length > 0) {
+				diis_push(ds[i], &res.coeff[i*res.coeff_count], res.energy[i]);
+				if (ds[i]->log_items == ds[i]->log_length) {
+					sbmf_log_info("\t[%u]: running diis compute", i);
+					diis_compute(ds[i], &res.coeff[i*res.coeff_count], &res.energy[i]);
+					f64_normalize(&res.coeff[i*res.coeff_count], &res.coeff[i*res.coeff_count], res.coeff_count);
+				}
+			}
 		}
 
 		/* Calculate error */

@@ -277,6 +277,15 @@ struct nlse_settings {
 	/* Everything below the zero_threshold is considered
 	 * 0 in the Hamiltonian. */
 	f64 zero_threshold;
+
+	/* Mixing determines how the estimated solution is updated
+	 * each iteration. Setting mixing = 0.75 results in
+	 * new_solution = 75% this iteration + 25% old solution
+	 */
+	f64 mixing;
+
+	/* ... */
+	u32 diis_log_length;
 };
 
 /* Initial Guess */

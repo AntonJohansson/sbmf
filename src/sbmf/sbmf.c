@@ -39,6 +39,7 @@ void sbmf_log_panic(const char* fmt, ...);
 #include "math/find_eigenpairs.c"
 #include "math/basis.c"
 #include "methods/quadgk.c"
+#include "methods/diis.c"
 #include "methods/nlse_solver.c"
 #include "methods/grosspitaevskii.c"
 #include "methods/best_meanfield.c"

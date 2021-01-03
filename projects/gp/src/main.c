@@ -8,13 +8,13 @@
 #define NB 0
 
 //#define GAA (-4.0)
-#define GAA (4)
+#define GAA (3)
 //#define GAA (1/((f64)NA-1))
 #define GAB (+1.0/((f64)NB))
 #define GBA (+1.0/((f64)NA))
 #define GBB (+4.0/((f64)NB-1))
 
-#define USE_GAUSSIAN_GUESS 1
+#define USE_GAUSSIAN_GUESS 0
 #define COMPONENT_COUNT 1
 
 //#define PERTURBATION(x) 2*gaussian(x, 0, 0.2)
@@ -118,7 +118,8 @@ void perturbation(const u32 len, f64 out[static len],
 
 	void gaussian0(f64* out, f64* in, u32 len, void* data) {
 		for (u32 i = 0; i < len; ++i)
-			out[i] = gaussian(in[i] + 0.0, 0.0, 10);// + gaussian(in[i] - 1.0, 0.0, 0.2);
+			out[i] = (1 - 0.5 * in[i]*in[i]);
+			//out[i] = gaussian(in[i], 0.0, 1);// + gaussian(in[i] - 1.0, 0.0, 0.2);
 	}
 	void gaussian1(f64* out, f64* in, u32 len, void* data) {
 		for (u32 i = 0; i < len; ++i)
@@ -128,7 +129,7 @@ void perturbation(const u32 len, f64 out[static len],
 
 
 
-	int main() {
+int main() {
 	sbmf_set_log_callback(log_callback);
 	sbmf_init();
 
@@ -160,12 +161,15 @@ void perturbation(const u32 len, f64 out[static len],
 		.max_integration_evals = 1e5,
 		.error_tol = 1e-9,
 
-        .num_basis_funcs = 16,
+        .num_basis_funcs = 32,
 		.basis = ho_basis,
 
 		.zero_threshold = 1e-10,
+		//.zero_threshold = 0,
+		.mixing = 1.0,
+		.diis_log_length = 5,
 		.debug_callback = debug_callback,
-		.measure_every = 0,
+		.measure_every = 111,
 		.gk=gk15
     };
 
@@ -243,6 +247,7 @@ void perturbation(const u32 len, f64 out[static len],
 	}
 #endif
 
+#if 0
 	{
 		struct pt_result ptres = rayleigh_schroedinger_pt(res, g0, occupations);
 		printf("E0:          %.15lf\n", ptres.E0);
@@ -255,6 +260,7 @@ void perturbation(const u32 len, f64 out[static len],
 
 		printf("E0+E1+E2+E3: %.15lf\n", (ptres.E0+ptres.E1+ptres.E2+ptres.E3)/(f64)NA);
 	}
+#endif
 
 	sbmf_shutdown();
 }

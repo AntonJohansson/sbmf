@@ -7,7 +7,9 @@
 #define NA 4
 #define NB 0
 
-#define GAA (1.0/1000.0)
+#define ORDER (1000)
+
+#define GAA (1.0/ORDER)
 //#define GAA (-2.0/((f64)NA-1))
 #define GAB (+1.0/((f64)NB))
 #define GBA (+1.0/((f64)NA))
@@ -94,7 +96,8 @@ int main() {
 	u32 occupations[] = {NA,NB};
 
 	//u32 bs[] = {4,8,12,16,24,32,48,64};
-	u32 os[] = {5,10,50,100,200,300,400,500,600,700,800,900,1000};
+	//u32 os[] = {5,10,50,100,200,300,400,500,600,700,800,900,1000};
+	u32 os[] = {ORDER, 2*ORDER, 3*ORDER, 3.5*ORDER};
 	struct nlse_settings settings = {
         .spatial_pot_perturbation = perturbation,
 		.max_iterations = 1000,

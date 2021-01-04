@@ -8,7 +8,7 @@
 #define NB 0
 
 //#define GAA (-4.0)
-#define GAA (3)
+#define GAA (4)
 //#define GAA (1/((f64)NA-1))
 #define GAB (+1.0/((f64)NB))
 #define GBA (+1.0/((f64)NA))
@@ -161,15 +161,19 @@ int main() {
 		.max_integration_evals = 1e5,
 		.error_tol = 1e-9,
 
-        .num_basis_funcs = 32,
+        .num_basis_funcs = 16,
 		.basis = ho_basis,
 
 		.zero_threshold = 1e-10,
 		//.zero_threshold = 0,
-		.mixing = 1.0,
-		.diis_log_length = 5,
+		.mixing = 0.0,
+		.diis_log_length = 8,
+
+		.orbital_choice = NLSE_ORBITAL_MAXIMUM_OVERLAP,
+		.mom_orbitals_to_consider = 8,
+
 		.debug_callback = debug_callback,
-		.measure_every = 111,
+		.measure_every = 0,
 		.gk=gk15
     };
 
@@ -183,7 +187,7 @@ int main() {
 
 	nlse_write_to_binary_file("outbin", res);
 
-#if 1
+#if 0
 	{
 		const u32 N = 256;
 		plot_init(800, 600, "gp2c");

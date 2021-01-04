@@ -240,6 +240,11 @@ struct nlse_settings;
 struct nlse_result;
 typedef void nlse_debug_callback(struct nlse_settings, struct nlse_result);
 
+enum nlse_orbital_choice {
+	NLSE_ORBITAL_LOWEST_ENERGY 	 = 0,
+	NLSE_ORBITAL_MAXIMUM_OVERLAP = 1,
+};
+
 struct nlse_settings {
 	u32 max_iterations;
 	u32 max_integration_evals;
@@ -277,6 +282,9 @@ struct nlse_settings {
 	/* Everything below the zero_threshold is considered
 	 * 0 in the Hamiltonian. */
 	f64 zero_threshold;
+
+	enum nlse_orbital_choice orbital_choice;
+	u32 mom_orbitals_to_consider;
 
 	/* Mixing determines how the estimated solution is updated
 	 * each iteration. Setting mixing = 0.75 results in

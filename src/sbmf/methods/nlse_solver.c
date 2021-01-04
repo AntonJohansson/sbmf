@@ -122,28 +122,32 @@ struct nlse_result nlse_solver(struct nlse_settings settings, const u32 componen
 	//	}
 	//}
 
-	{
-		struct diis_data* d = diis_data_new(2, 2);
+	//{
+	//	struct diis_data* d = diis_data_new(2, 5);
 
-		diis_push(d, (f64[2]){1, 10}, 0);
-		diis_push(d, (f64[2]){2, 5}, 0);
-		for (u32 i = 0; i < d->log_items; ++i) {
-			printf("%u: ", i);
-			for (u32 j = 0; j < d->size; ++j) {
-				printf("%lf ", *(d->data_log + i*d->size + j));
-			}
-			printf("\n");
-		}
+	//	diis_push(d, (f64[2]){1.0, 0.9}, 0);
+	//	diis_push(d, (f64[2]){0.9, 0.7}, 0);
+	//	diis_push(d, (f64[2]){0.8, 0.4}, 0);
+	//	diis_push(d, (f64[2]){0.7, 0.2}, 0);
+	//	diis_push(d, (f64[2]){0.6, 0.1}, 0);
+	//	//for (u32 i = 0; i < d->log_items; ++i) {
+	//	//	printf("%u: ", i);
+	//	//	for (u32 j = 0; j < d->size; ++j) {
+	//	//		printf("%lf ", *(d->data_log + i*d->size + j));
+	//	//	}
+	//	//	printf("\n");
+	//	//}
 
-		f64 x[2], E;
-		diis_compute(d, x, &E);
+	//	f64 x[2], E;
+	//	diis_compute(d, x, &E);
 
-		printf("\n");
-		for (u32 i = 0; i < d->size; ++i) {
-			printf("%lf ", x[i]);
-		}
-		printf("\n");
-	}
+	//	//printf("\n");
+	//	//for (u32 i = 0; i < d->size; ++i) {
+	//	//	printf("%lf ", x[i]);
+	//	//}
+	//	//printf("\n");
+	//	return (struct nlse_result){};
+	//}
 	/* Lazy */
 	const u32 N = settings.num_basis_funcs;
 
@@ -301,6 +305,7 @@ struct nlse_result nlse_solver(struct nlse_settings settings, const u32 componen
 
 	/* Do the actual iterations */
 	for (; res.iterations < settings.max_iterations; ++res.iterations) {
+		sbmf_log_info("nlse starting iteration %u", res.iterations);
 		memcpy(old_coeff, res.coeff, res.component_count * N * sizeof(f64));
 		memcpy(old_energy, res.energy, res.component_count * sizeof(f64));
 
@@ -381,27 +386,63 @@ struct nlse_result nlse_solver(struct nlse_settings settings, const u32 componen
 		 * eigenvalue problems
 		 */
 		for (u32 i = 0; i < component_count; ++i) {
-			/* Solve for first eigenvector (ground state) */
-			struct eigen_result_real eigres = find_eigenpairs_sparse_real(res.hamiltonian[i], 1, EV_SMALLEST);
+			struct eigen_result_real eigres;
+			u32 new_orbital_index = 0;
+			switch (settings.orbital_choice) {
+				case NLSE_ORBITAL_LOWEST_ENERGY: {
+					eigres = find_eigenpairs_sparse_real(res.hamiltonian[i], 1, EV_SMALLEST);
+					break;
+				}
+				case NLSE_ORBITAL_MAXIMUM_OVERLAP: {
+					eigres = find_eigenpairs_sparse_real(res.hamiltonian[i],
+							settings.mom_orbitals_to_consider, EV_SMALLEST);
+					f64 maximum_overlap = -INFINITY;
+					for (u32 j = 0; j < settings.mom_orbitals_to_consider; ++j) {
+						f64 overlap = 0.0;
+						for (u32 k = 0; k < res.coeff_count; ++k) {
+							f64 a = eigres.eigenvectors[j*res.coeff_count + k];
+							f64 b = old_coeff[i*res.coeff_count + k];
+							overlap += a*b;
+						}
+						if (overlap > maximum_overlap) {
+							new_orbital_index = i;
+							maximum_overlap = overlap;
+						}
+					}
+					break;
+				}
+			};
 
-			/* Copy energies */
-			res.energy[i] = settings.mixing * eigres.eigenvalues[0]
-				+ (1.0 - settings.mixing)*old_energy[i];
-
+			/* Copy energies and coeffs */
+			res.energy[i] = eigres.eigenvalues[new_orbital_index];
 			for (u32 j = 0; j < res.coeff_count; ++j) {
-				res.coeff[i*res.coeff_count + j] =
-					settings.mixing * eigres.eigenvectors[j]
-					+ (1.0 - settings.mixing) * old_coeff[i*res.coeff_count + j];
+				res.coeff[i*res.coeff_count + j] = eigres.eigenvectors[res.coeff_count*new_orbital_index + j];
 			}
 			f64_normalize(&res.coeff[i*res.coeff_count], &res.coeff[i*res.coeff_count], res.coeff_count);
 
+			/* DIIS */
 			if (settings.diis_log_length > 0) {
 				diis_push(ds[i], &res.coeff[i*res.coeff_count], res.energy[i]);
-				if (ds[i]->log_items == ds[i]->log_length) {
-					sbmf_log_info("\t[%u]: running diis compute", i);
-					diis_compute(ds[i], &res.coeff[i*res.coeff_count], &res.energy[i]);
+
+				sbmf_log_info("\t[%u]: running diis compute", i);
+				if (diis_compute(ds[i], &res.coeff[i*res.coeff_count], &res.energy[i])) {
 					f64_normalize(&res.coeff[i*res.coeff_count], &res.coeff[i*res.coeff_count], res.coeff_count);
+				} else if (ds[i]->log_items >= 3) {
+					settings.diis_log_length = 0;
 				}
+			}
+
+			/* Apply mixing */
+			if (settings.mixing > 0.0) {
+				res.energy[i] = (1.0 - settings.mixing) * res.energy[i]
+					+ settings.mixing*old_energy[i];
+
+				for (u32 j = 0; j < res.coeff_count; ++j) {
+					res.coeff[i*res.coeff_count + j] =
+						(1.0 - settings.mixing) * settings.mixing * res.coeff[j]
+						+ settings.mixing * old_coeff[i*res.coeff_count + j];
+				}
+				f64_normalize(&res.coeff[i*res.coeff_count], &res.coeff[i*res.coeff_count], res.coeff_count);
 			}
 		}
 
@@ -416,7 +457,6 @@ struct nlse_result nlse_solver(struct nlse_settings settings, const u32 componen
 		}
 
 		/* Break condition */
-		sbmf_log_info("nlse finished iterations %u", res.iterations);
 		bool should_exit = true;
 		for (u32 i = 0; i < component_count; ++i) {
 			if (res.error[i] > settings.error_tol)

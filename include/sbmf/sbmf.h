@@ -294,6 +294,7 @@ struct nlse_settings {
 
 	/* ... */
 	u32 diis_log_length;
+	bool diis_enabled;
 };
 
 /* Initial Guess */

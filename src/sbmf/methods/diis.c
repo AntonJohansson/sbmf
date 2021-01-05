@@ -1,10 +1,16 @@
+enum diis_status {
+	DIIS_SUBSPACE_TOO_SMALL,
+	DIIS_LINEARLY_DEP_SUBSPACE,
+	DIIS_SUCCESS,
+};
+
 struct diis_data {
 	f64* data_log;
 	f64* delta_log;
 	f64* energy;
+
 	u32 log_length;
 	u32 size;
-
 	u32 log_index;
 	u32 log_items;
 };
@@ -44,9 +50,9 @@ void diis_push(struct diis_data* d, f64* v, f64 E) {
 		d->log_items++;
 }
 
-bool diis_compute(struct diis_data* d, f64* new_x, f64* new_E) {
+enum diis_status diis_compute(struct diis_data* d, f64* new_x, f64* new_E, f64* err, f64 zero_threshold) {
 	if (d->log_items < 3)
-		return false;
+		return DIIS_SUBSPACE_TOO_SMALL;
 
 	/* Compute deltas */
 	for (u32 i = 0; i < d->log_items-1; ++i) {
@@ -69,7 +75,11 @@ bool diis_compute(struct diis_data* d, f64* new_x, f64* new_E) {
 				for (u32 i = 0; i < d->size; ++i) {
 					f64 a = *(d->delta_log + diis_get(d, r,i));
 					f64 b = *(d->delta_log + diis_get(d, c,i));
-					overlap += a*b;
+					f64 val = a*b;
+					if (fabs(val) < zero_threshold)
+						val = 0;
+
+					overlap += val;
 				}
 
 				mat[r*d->log_items + c] = overlap;
@@ -90,13 +100,6 @@ bool diis_compute(struct diis_data* d, f64* new_x, f64* new_E) {
 		mat[(d->log_items-1)*d->log_items + (d->log_items-1)] = 0;
 	}
 
-	//for (u32 r = 0; r < d->log_items; ++r) {
-	//	for (u32 c = 0; c < d->log_items; ++c) {
-	//		printf("%lf ", mat[r*d->log_items + c]);
-	//	}
-	//	printf("\n");
-	//}
-
 	/* Solve mat*x = y problem */
 	f64 y[d->log_items];
 	memset(y, 0, d->log_items*sizeof(f64));
@@ -106,35 +109,32 @@ bool diis_compute(struct diis_data* d, f64* new_x, f64* new_E) {
 
 	/* LU factorize mat */
 	{
-		LAPACKE_dgetrf(LAPACK_COL_MAJOR, d->log_items, d->log_items,
+		i32 err = LAPACKE_dgetrf(LAPACK_COL_MAJOR, d->log_items, d->log_items,
 				mat, d->log_items, pivot);
+		assert(err >= 0);
+
+		if (err > 0) {
+			/* some equations are linearly dependant */
+			d->log_items = 0;
+			d->log_index = 0;
+			return DIIS_LINEARLY_DEP_SUBSPACE;
+		}
 	}
 
 	/* Solve problem with LU factorized mat */
 	{
-		LAPACKE_dgetrs(LAPACK_COL_MAJOR, 'N', d->log_items,
+		i32 err = LAPACKE_dgetrs(LAPACK_COL_MAJOR, 'N', d->log_items,
 				1, mat, d->log_items,
 				pivot,
 				y, d->log_items);
-	}
-
-	f64 delta[d->size];
-	memset(delta, 0, d->size*sizeof(f64));
-	for (u32 i = 0; i < d->log_items-1; ++i) {
-		u32 l = (d->log_index + i) % d->log_items;
-		for (u32 j = 0; j < d->size; ++j) {
-			delta[j] += y[i] * (*(d->delta_log + diis_get(d, l,j)));
-		}
+		assert(err == 0);
 	}
 
 	/*
 	 * The goal of this whole things is to minimize the following
 	 * in a least squared sense to approximate the null vector
 	 */
-	f64 sum = 0;
-	//for (u32 j = 0; j < d->size; ++j) {
-	//	sum += delta[j]*delta[j];
-	//}
+	*err = 0;
 	for (u32 r = 0; r < d->log_items-1; ++r) {
 		for (u32 c = 0; c < d->log_items-1; ++c) {
 			/* Compute overlap */
@@ -145,38 +145,28 @@ bool diis_compute(struct diis_data* d, f64* new_x, f64* new_E) {
 				overlap += a*b;
 			}
 
-			sum += y[r]*y[c]*overlap;
+			*err += y[r]*y[c]*overlap;
 		}
 	}
-	sum = sqrt(sum);
-	printf("\t\tsum: %e\n", sum);
+	*err = sqrt(*err);
+	printf("\terr: %e\n", *err);
 
 	/*
 	 * When close to convergence, some equation in mat
 	 * may be linearly dependant, thus some y[i] may be
 	 * inf or nan. When this happens, empty the subspace.
 	 */
-	if (isnan(sum) || isinf(sum)) {
+	if (isnan(*err) || isinf(*err)) {
 		d->log_items = 0;
-		return false;
+		d->log_index = 0;
+		return DIIS_LINEARLY_DEP_SUBSPACE;
 	}
-
-	//for (u32 j = 0; j < d->size; ++j) {
-	//	printf("%lf ", delta[j]);
-	//}
-	//printf("\n");
-
-	//for (u32 i = 0; i < d->log_items; ++i) {
-	//	printf("[%u]: %lf\n", i, d->energy[i]);
-	//}
 
 	memset(new_x, 0, d->size*sizeof(f64));
 	*new_E = 0;
 	/* optimal coeffs. are now stored in y */
 	for (u32 i = 0; i < d->log_items-1; ++i) {
 		u32 l = (d->log_index + i) % d->log_items;
-		if (isnan(y[i]) || isinf(y[i]))
-			return false;
 
 		*new_E += y[i]*d->energy[i];
 
@@ -185,5 +175,5 @@ bool diis_compute(struct diis_data* d, f64* new_x, f64* new_E) {
 		}
 	}
 
-	return true;
+	return DIIS_SUCCESS;
 }

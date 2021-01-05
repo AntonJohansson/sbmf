@@ -106,23 +106,6 @@ static f64 nonlinear_me_integrand_gsl(f64 in, void* data) {
 
 struct nlse_result nlse_solver(struct nlse_settings settings, const u32 component_count, struct nlse_component component[static component_count]) {
 	//{
-	//	struct symmetric_bandmat bm = symmetric_bandmat_new_zero(2,2);
-	//	bm.data[symmetric_bandmat_index(bm, 0,0)] = 1;
-	//	bm.data[symmetric_bandmat_index(bm, 0,1)] = 2;
-	//	bm.data[symmetric_bandmat_index(bm, 1,1)] = 1;
-	//	SYMMETRIC_BANDMAT_FOREACH(bm, r,c) {
-	//		sbmf_log_info("%u,%u -- %lf", r,c, bm.data[symmetric_bandmat_index(bm,r,c)]);
-	//	}
-	//	f64 y[2] = {1,1};
-	//	f64 x[2];
-
-	//	symmetric_bandmat_equation(x, bm ,y);
-	//	for (u32 i = 0; i < 2; ++i) {
-	//		sbmf_log_info("%lf",x[i]);
-	//	}
-	//}
-
-	//{
 	//	struct diis_data* d = diis_data_new(2, 5);
 
 	//	diis_push(d, (f64[2]){1.0, 0.9}, 0);
@@ -176,7 +159,6 @@ struct nlse_result nlse_solver(struct nlse_settings settings, const u32 componen
 		.rel_error_tol = 1e-7,
 		.max_evals = settings.max_integration_evals,
 	};
-	sbmf_log_info("\tUsing gq quadrature of gauss size: %u", int_settings.gk.gauss_size);
 
 	/* Setup intial guess values for coeffs */
 	for (u32 i = 0; i < component_count; ++i) {
@@ -363,24 +345,6 @@ struct nlse_result nlse_solver(struct nlse_settings settings, const u32 componen
 			assert(symmetric_bandmat_is_valid(res.hamiltonian[i]));
 		}
 
-		/* Check for smallest/largest value */
-		//for (u32 i = 0; i < component_count; ++i) {
-		//	f64 smallest = INFINITY;
-		//	f64 largest = -INFINITY;
-		//	for (u32 j = 0; j < matrix_element_count; ++j) {
-		//		u32 r = matrix_element_rows[j];
-		//		u32 c = matrix_element_cols[j];
-		//		u32 me_index = symmetric_bandmat_index(res.hamiltonian[i], r,c);
-
-		//		f64 val = res.hamiltonian[i].data[me_index];
-		//		if (val < smallest)
-		//			smallest = val;
-		//		if (val > largest)
-		//			largest = val;
-		//	}
-		//	sbmf_log_info("\t[%u]: smallest: %.2e -- largest: %.2e", i, smallest, largest);
-		//}
-
 		/*
 		 * Solve and normalize all the Hamiltonian
 		 * eigenvalue problems
@@ -391,6 +355,8 @@ struct nlse_result nlse_solver(struct nlse_settings settings, const u32 componen
 			switch (settings.orbital_choice) {
 				case NLSE_ORBITAL_LOWEST_ENERGY: {
 					eigres = find_eigenpairs_sparse_real(res.hamiltonian[i], 1, EV_SMALLEST);
+					f64_normalize(&eigres.eigenvectors[0],
+							&eigres.eigenvectors[0], res.coeff_count);
 					break;
 				}
 				case NLSE_ORBITAL_MAXIMUM_OVERLAP: {
@@ -398,14 +364,18 @@ struct nlse_result nlse_solver(struct nlse_settings settings, const u32 componen
 							settings.mom_orbitals_to_consider, EV_SMALLEST);
 					f64 maximum_overlap = -INFINITY;
 					for (u32 j = 0; j < settings.mom_orbitals_to_consider; ++j) {
+						f64_normalize(&eigres.eigenvectors[j*res.coeff_count],
+								&eigres.eigenvectors[j*res.coeff_count], res.coeff_count);
 						f64 overlap = 0.0;
 						for (u32 k = 0; k < res.coeff_count; ++k) {
 							f64 a = eigres.eigenvectors[j*res.coeff_count + k];
 							f64 b = old_coeff[i*res.coeff_count + k];
 							overlap += a*b;
 						}
+						overlap = fabs(overlap);
+
 						if (overlap > maximum_overlap) {
-							new_orbital_index = i;
+							new_orbital_index = j;
 							maximum_overlap = overlap;
 						}
 					}
@@ -415,21 +385,31 @@ struct nlse_result nlse_solver(struct nlse_settings settings, const u32 componen
 
 			/* Copy energies and coeffs */
 			res.energy[i] = eigres.eigenvalues[new_orbital_index];
+			sbmf_log_info("\t[%u]: energy before diis %lf", i, res.energy[i]);
 			for (u32 j = 0; j < res.coeff_count; ++j) {
 				res.coeff[i*res.coeff_count + j] = eigres.eigenvectors[res.coeff_count*new_orbital_index + j];
 			}
-			f64_normalize(&res.coeff[i*res.coeff_count], &res.coeff[i*res.coeff_count], res.coeff_count);
 
 			/* DIIS */
-			if (settings.diis_log_length > 0) {
+			if (settings.diis_enabled && settings.diis_log_length > 0) {
 				diis_push(ds[i], &res.coeff[i*res.coeff_count], res.energy[i]);
 
-				sbmf_log_info("\t[%u]: running diis compute", i);
-				if (diis_compute(ds[i], &res.coeff[i*res.coeff_count], &res.energy[i])) {
+				f64 err = 0;
+				f64 E = 0;
+				f64 coeff[res.coeff_count];
+				memset(coeff, 0, res.coeff_count*sizeof(f64));
+				//if (diis_compute(ds[i], &res.coeff[i*res.coeff_count], &E, &err)) {
+				enum diis_status status = diis_compute(ds[i], coeff, &E, &err, settings.zero_threshold);
+				if (status == DIIS_SUCCESS) {
+					sbmf_log_info("\t[%u]: ran diis compute", i);
+					memcpy(&res.coeff[i*res.coeff_count], coeff, res.coeff_count*sizeof(f64));
+					res.energy[i] = E;
 					f64_normalize(&res.coeff[i*res.coeff_count], &res.coeff[i*res.coeff_count], res.coeff_count);
-				} else if (ds[i]->log_items >= 3) {
-					settings.diis_log_length = 0;
+				} else if (status == DIIS_LINEARLY_DEP_SUBSPACE) {
+					//settings.mixing = 0.9;
+					//settings.diis_enabled = false;
 				}
+
 			}
 
 			/* Apply mixing */
@@ -444,6 +424,8 @@ struct nlse_result nlse_solver(struct nlse_settings settings, const u32 componen
 				}
 				f64_normalize(&res.coeff[i*res.coeff_count], &res.coeff[i*res.coeff_count], res.coeff_count);
 			}
+
+
 		}
 
 		/* Calculate error */

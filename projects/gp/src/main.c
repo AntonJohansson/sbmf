@@ -8,13 +8,13 @@
 #define NB 0
 
 //#define GAA (-4.0)
-#define GAA (4)
+#define GAA (4.0)
 //#define GAA (1/((f64)NA-1))
 #define GAB (+1.0/((f64)NB))
 #define GBA (+1.0/((f64)NA))
 #define GBB (+4.0/((f64)NB-1))
 
-#define USE_GAUSSIAN_GUESS 0
+#define USE_GAUSSIAN_GUESS 1
 #define COMPONENT_COUNT 1
 
 //#define PERTURBATION(x) 2*gaussian(x, 0, 0.2)
@@ -35,8 +35,8 @@ void perturbation(const u32 len, f64 out[static len],
 
 
 
-	void debug_callback(struct nlse_settings settings, struct nlse_result res) {
-#if 1
+void debug_callback(struct nlse_settings settings, struct nlse_result res) {
+#if 0
 		const u32 N = 256;
 		plot_init(800, 600, "gp2c");
 
@@ -80,13 +80,13 @@ void perturbation(const u32 len, f64 out[static len],
 
 #if 1
 		{
-			FILE* fd = fopen("debug_out", "w");
-			for (f64 x = -5; x < 5; x += 0.1) {
-				f64 out;
-				ho_sample(res.coeff_count, &res.coeff[0], 1, &out, &x);
-				f64 pot = ho_potential(&x,1,0) + PERTURBATION(x);
-				fprintf(fd, "%lf\t%lf\t%lf\n", x, pot, out*out);
-			}
+			FILE* fd = fopen("debug_out", "a");
+			fprintf(fd, "%u\t%lf\n", res.iterations, res.energy[0]);
+			//for (f64 x = -5; x < 5; x += 0.1) {
+			//	f64 out;
+			//	ho_sample(res.coeff_count, &res.coeff[0], 1, &out, &x);
+			//	fprintf(fd, "%lf\t%lf\n", x, out*out);
+			//}
 			fclose(fd);
 		}
 #endif
@@ -117,9 +117,10 @@ void perturbation(const u32 len, f64 out[static len],
 
 
 	void gaussian0(f64* out, f64* in, u32 len, void* data) {
-		for (u32 i = 0; i < len; ++i)
-			out[i] = (1 - 0.5 * in[i]*in[i]);
-			//out[i] = gaussian(in[i], 0.0, 1);// + gaussian(in[i] - 1.0, 0.0, 0.2);
+		for (u32 i = 0; i < len; ++i) {
+			//out[i] = (1 - 0.5 * in[i]*in[i]);
+			out[i] = gaussian(in[i], 0.0, 5);// + gaussian(in[i] - 1.0, 0.0, 0.2);
+		}
 	}
 	void gaussian1(f64* out, f64* in, u32 len, void* data) {
 		for (u32 i = 0; i < len; ++i)
@@ -161,19 +162,20 @@ int main() {
 		.max_integration_evals = 1e5,
 		.error_tol = 1e-9,
 
-        .num_basis_funcs = 16,
+        .num_basis_funcs = 32,
 		.basis = ho_basis,
 
 		.zero_threshold = 1e-10,
-		//.zero_threshold = 0,
-		.mixing = 0.0,
-		.diis_log_length = 8,
+		.mixing = 0.9,
+		.diis_log_length = 16,
+		.diis_enabled = true,
 
-		.orbital_choice = NLSE_ORBITAL_MAXIMUM_OVERLAP,
+		.orbital_choice = NLSE_ORBITAL_LOWEST_ENERGY,
+		//.orbital_choice = NLSE_ORBITAL_MAXIMUM_OVERLAP,
 		.mom_orbitals_to_consider = 8,
 
 		.debug_callback = debug_callback,
-		.measure_every = 0,
+		.measure_every = 1,
 		.gk=gk15
     };
 
@@ -187,7 +189,7 @@ int main() {
 
 	nlse_write_to_binary_file("outbin", res);
 
-#if 0
+#if 1
 	{
 		const u32 N = 256;
 		plot_init(800, 600, "gp2c");

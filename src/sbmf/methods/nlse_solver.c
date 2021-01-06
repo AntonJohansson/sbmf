@@ -155,8 +155,8 @@ struct nlse_result nlse_solver(struct nlse_settings settings, const u32 componen
 
 	integration_settings int_settings = {
 		.gk = (settings.gk.gauss_size > 0) ? settings.gk : gk15,
-		.abs_error_tol = 1e-10,
-		.rel_error_tol = 1e-7,
+		.abs_error_tol = 1e-15,
+		.rel_error_tol = 1e-8,
 		.max_evals = settings.max_integration_evals,
 	};
 
@@ -298,6 +298,15 @@ struct nlse_result nlse_solver(struct nlse_settings settings, const u32 componen
 			settings.debug_callback(settings, res);
 		}
 
+		/* Should we still apply mixing? */
+		if (settings.mixing > 0 && settings.mix_until_iteration > 0 && res.iterations == settings.mix_until_iteration) {
+			settings.mixing = 0;
+		}
+
+		if (settings.orbital_choice != NLSE_ORBITAL_MAXIMUM_OVERLAP && settings.mom_enable_at_iteration > 0 && res.iterations == settings.mom_enable_at_iteration) {
+			settings.orbital_choice = NLSE_ORBITAL_MAXIMUM_OVERLAP;
+		}
+
 		/*
 		 * Construct all the Hamiltonians
 		 */
@@ -390,6 +399,19 @@ struct nlse_result nlse_solver(struct nlse_settings settings, const u32 componen
 				res.coeff[i*res.coeff_count + j] = eigres.eigenvectors[res.coeff_count*new_orbital_index + j];
 			}
 
+			/* Apply mixing */
+			if (settings.mixing > 0.0) {
+				res.energy[i] = (1.0 - settings.mixing) * res.energy[i]
+					+ settings.mixing*old_energy[i];
+
+				for (u32 j = 0; j < res.coeff_count; ++j) {
+					res.coeff[i*res.coeff_count + j] =
+						(1.0 - settings.mixing) * settings.mixing * res.coeff[j]
+						+ settings.mixing * old_coeff[i*res.coeff_count + j];
+				}
+				f64_normalize(&res.coeff[i*res.coeff_count], &res.coeff[i*res.coeff_count], res.coeff_count);
+			}
+
 			/* DIIS */
 			if (settings.diis_enabled && settings.diis_log_length > 0) {
 				diis_push(ds[i], &res.coeff[i*res.coeff_count], res.energy[i]);
@@ -412,18 +434,6 @@ struct nlse_result nlse_solver(struct nlse_settings settings, const u32 componen
 
 			}
 
-			/* Apply mixing */
-			if (settings.mixing > 0.0) {
-				res.energy[i] = (1.0 - settings.mixing) * res.energy[i]
-					+ settings.mixing*old_energy[i];
-
-				for (u32 j = 0; j < res.coeff_count; ++j) {
-					res.coeff[i*res.coeff_count + j] =
-						(1.0 - settings.mixing) * settings.mixing * res.coeff[j]
-						+ settings.mixing * old_coeff[i*res.coeff_count + j];
-				}
-				f64_normalize(&res.coeff[i*res.coeff_count], &res.coeff[i*res.coeff_count], res.coeff_count);
-			}
 
 
 		}

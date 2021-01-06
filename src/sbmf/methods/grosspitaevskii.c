@@ -15,7 +15,7 @@ static void gp_operator(const u32 len, f64 out[static len],
 
 struct nlse_result grosspitaevskii(struct nlse_settings settings,
 		const u32 comp_count,
-		u32 occupations[static comp_count],
+		i64 occupations[static comp_count],
 		struct nlse_guess guesses[static comp_count],
 		f64 g0[static comp_count*comp_count]) {
 
@@ -105,7 +105,7 @@ void full_energy_integrand(f64* out, f64* in, u32 len, void* data) {
 f64 full_energy(struct nlse_settings settings,
 		const u32 coeff_count, const u32 comp_count,
 		f64 coeff[static coeff_count*comp_count],
-		u32 occupations[static comp_count],
+		i64 occupations[static comp_count],
 		f64 g0[static comp_count*comp_count]
 		) {
 	f64 E = 0.0;

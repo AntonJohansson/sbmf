@@ -7,7 +7,7 @@
 #define NA 4
 #define NB 0
 
-#define ORDER (1000)
+#define ORDER (100000)
 
 #define GAA (1.0/ORDER)
 //#define GAA (-2.0/((f64)NA-1))
@@ -93,7 +93,7 @@ int main() {
 		GBA, GBB
 	};
 
-	u32 occupations[] = {NA,NB};
+	i64 occupations[] = {NA,NB};
 
 	//u32 bs[] = {4,8,12,16,24,32,48,64};
 	//u32 os[] = {5,10,50,100,200,300,400,500,600,700,800,900,1000};
@@ -134,7 +134,7 @@ int main() {
 		{
 			FILE* fd = fopen("out", "a");
 			f64 Ept = ptres.E0+ptres.E1+ptres.E2+ptres.E3;
-			fprintf(fd, "%u\t%lf\t%lf\t%lf\n",
+			fprintf(fd, "%u\t%.10e\t%.10e\t%.10e\n",
 					o,
 					Egp/(f64)o,
 					Ept/(f64)o,

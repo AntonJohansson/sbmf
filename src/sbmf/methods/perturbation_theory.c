@@ -6,7 +6,7 @@
 struct pt_settings {
 	struct nlse_result* res;
 	f64* g0;
-	i32* particle_count;
+	i64* particle_count;
 
 	struct eigen_result_real* states;
 	const u32 N; /* states to include */
@@ -95,7 +95,7 @@ static f64 rs_2nd_order_ediff(struct pt_settings* pt, u32 A, u32 B, u32 i, u32 j
  * Main function for Rayleigh-Schrodinger perturbation theory
  */
 
-struct pt_result rayleigh_schroedinger_pt(struct nlse_result res, f64* g0, i32* particle_count) {
+struct pt_result rayleigh_schroedinger_pt(struct nlse_result res, f64* g0, i64* particle_count) {
 	/* order of hamiltonians, that is include all states */
 	const u32 states_to_include = res.coeff_count;
 	sbmf_log_info("running rayleigh schödinger PT:\n    components: %u\n    states: %u\n", res.component_count, states_to_include);

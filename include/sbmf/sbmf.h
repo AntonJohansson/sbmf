@@ -285,12 +285,14 @@ struct nlse_settings {
 
 	enum nlse_orbital_choice orbital_choice;
 	u32 mom_orbitals_to_consider;
+	u32 mom_enable_at_iteration;
 
 	/* Mixing determines how the estimated solution is updated
 	 * each iteration. Setting mixing = 0.75 results in
 	 * new_solution = 75% this iteration + 25% old solution
 	 */
 	f64 mixing;
+	u32 mix_until_iteration;
 
 	/* ... */
 	u32 diis_log_length;
@@ -343,14 +345,14 @@ struct nlse_result nlse_read_from_binary_file(const char* file);
 
 struct nlse_result grosspitaevskii(struct nlse_settings settings,
 		const u32 comp_count,
-		u32 occupations[static comp_count],
+		i64 occupations[static comp_count],
 		struct nlse_guess guesses[static comp_count],
 		f64 g0[static comp_count*comp_count]);
 
 f64 full_energy(struct nlse_settings settings,
 		const u32 coeff_count, const u32 comp_count,
 		f64 coeff[static coeff_count*comp_count],
-		u32 occupations[static comp_count],
+		i64 occupations[static comp_count],
 		f64 g0[static comp_count*comp_count]
 		);
 
@@ -358,32 +360,17 @@ f64 full_energy(struct nlse_settings settings,
  * Best mean-field
  */
 
-struct bestmf_result {
-	f64 energy;
-	u32 coeff_count;
-	u32 comp_count;
-	f64* coeff;
-	f64 n1;
-	f64 n2;
-};
-
-struct bestmf_result best_meanfield(struct nlse_settings settings,
-		const u32 particle_count, f64 g0, struct nlse_guess* guesses);
-
-struct bestmf_2comp_result {
-	f64 energy;
-	u32 coeff_count;
-	u32 comp_count;
-	f64* coeff;
-	f64 n1;
-	f64 n2;
-	f64 n3;
-	f64 n4;
-};
-struct bestmf_2comp_result best_meanfield_2comp(struct nlse_settings settings,
-		const u32 particle_count,
-		f64 g0[static 2*2],
-		struct nlse_guess* guesses);
+//struct bestmf_result {
+//	f64 energy;
+//	u32 coeff_count;
+//	u32 comp_count;
+//	f64* coeff;
+//	f64 n1;
+//	f64 n2;
+//};
+//
+//struct bestmf_result best_meanfield(struct nlse_settings settings,
+//		const i64 particle_count, f64 g0, struct nlse_guess* guesses);
 
 /*
  * Perturbation theory
@@ -393,4 +380,4 @@ struct pt_result {
 	f64 E0, E1, E2, E3;
 };
 
-struct pt_result rayleigh_schroedinger_pt(struct nlse_result res, f64* g0, i32* particle_count);
+struct pt_result rayleigh_schroedinger_pt(struct nlse_result res, f64* g0, i64* particle_count);

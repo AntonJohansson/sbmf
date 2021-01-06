@@ -14,7 +14,7 @@
 #define GBA (+1.0/((f64)NA))
 #define GBB (+4.0/((f64)NB-1))
 
-#define USE_GAUSSIAN_GUESS 1
+#define USE_GAUSSIAN_GUESS 0
 #define COMPONENT_COUNT 1
 
 //#define PERTURBATION(x) 2*gaussian(x, 0, 0.2)
@@ -154,28 +154,30 @@ int main() {
 		GBA, GBB
 	};
 
-	u32 occupations[] = {NA,NB};
+	i64 occupations[] = {NA,NB};
 
 	struct nlse_settings settings = {
         .spatial_pot_perturbation = perturbation,
 		.max_iterations = 1e5,
 		.max_integration_evals = 1e5,
-		.error_tol = 1e-9,
+		.error_tol = 1e-7,
 
-        .num_basis_funcs = 32,
+        .num_basis_funcs = 24,
 		.basis = ho_basis,
 
 		.zero_threshold = 1e-10,
 		.mixing = 0.9,
-		.diis_log_length = 16,
+		.mix_until_iteration = 0,
+		.diis_log_length = 4,
 		.diis_enabled = true,
 
 		.orbital_choice = NLSE_ORBITAL_LOWEST_ENERGY,
 		//.orbital_choice = NLSE_ORBITAL_MAXIMUM_OVERLAP,
 		.mom_orbitals_to_consider = 8,
+		.mom_enable_at_iteration = 0,
 
 		.debug_callback = debug_callback,
-		.measure_every = 1,
+		.measure_every = 0,
 		.gk=gk15
     };
 

@@ -142,6 +142,7 @@ struct nlse_result nlse_solver(struct nlse_settings settings, const u32 componen
 		.coeff 		 = sbmf_stack_push(component_count*(N*sizeof(f64))),
 		.error 		 = sbmf_stack_push(component_count*sizeof(f64)),
 		.energy 	 = sbmf_stack_push(component_count*sizeof(f64)),
+		.residual 	 = sbmf_stack_push(component_count*sizeof(f64)),
 		.hamiltonian = sbmf_stack_push(component_count * sizeof(struct symmetric_bandmat)),
 		.converged = false,
 	};
@@ -314,6 +315,9 @@ struct nlse_result nlse_solver(struct nlse_settings settings, const u32 componen
 			params.op = component[i].op;
 			params.op_userdata = component[i].userdata;
 
+			struct symmetric_bandmat old_H = symmetric_bandmat_new(N,N);
+			memcpy(old_H.data, res.hamiltonian[i].data, N*N*sizeof(f64));
+
 			/* Construct the i:th component's hamiltonian */
 #pragma omp parallel for firstprivate(params, int_settings) shared(res, linear_hamiltonian)
 			for (u32 j = 0; j < matrix_element_count; ++j) {
@@ -349,6 +353,10 @@ struct nlse_result nlse_solver(struct nlse_settings settings, const u32 componen
 
 				u32 me_index = symmetric_bandmat_index(res.hamiltonian[i], r,c);
 				res.hamiltonian[i].data[me_index] = linear_hamiltonian.data[me_index] + int_res.integral;
+
+#if 1
+				res.hamiltonian[i].data[me_index] = (1.0 - 0.6)*res.hamiltonian[i].data[me_index] + 0.6*old_H.data[me_index];
+#endif
 			}
 
 			assert(symmetric_bandmat_is_valid(res.hamiltonian[i]));
@@ -366,6 +374,20 @@ struct nlse_result nlse_solver(struct nlse_settings settings, const u32 componen
 					eigres = find_eigenpairs_sparse_real(res.hamiltonian[i], 1, EV_SMALLEST);
 					f64_normalize(&eigres.eigenvectors[0],
 							&eigres.eigenvectors[0], res.coeff_count);
+					//{
+					//	eigres = find_eigenpairs_sparse_real(res.hamiltonian[i], 5, EV_SMALLEST);
+					//	f64 lowest_energy = INFINITY;
+					//	i64 occupations = 2;
+					//	f64 g0 = 4;
+					//	for (u32 k = 0; k < 5; ++k) {
+					//		f64 Efull = full_energy(settings, res.coeff_count, res.component_count, &eigres.eigenvectors[k*res.coeff_count], &occupations, &g0);
+					//		sbmf_log_info("\t efull[%u] = %e", k, Efull);
+					//		if (Efull < lowest_energy) {
+					//			lowest_energy = Efull;
+					//			new_orbital_index = k;
+					//		}
+					//	}
+					//}
 					break;
 				}
 				case NLSE_ORBITAL_MAXIMUM_OVERLAP: {
@@ -392,25 +414,14 @@ struct nlse_result nlse_solver(struct nlse_settings settings, const u32 componen
 				}
 			};
 
+
 			/* Copy energies and coeffs */
 			res.energy[i] = eigres.eigenvalues[new_orbital_index];
 			sbmf_log_info("\t[%u]: energy before diis %lf", i, res.energy[i]);
 			for (u32 j = 0; j < res.coeff_count; ++j) {
 				res.coeff[i*res.coeff_count + j] = eigres.eigenvectors[res.coeff_count*new_orbital_index + j];
 			}
-
-			/* Apply mixing */
-			if (settings.mixing > 0.0) {
-				res.energy[i] = (1.0 - settings.mixing) * res.energy[i]
-					+ settings.mixing*old_energy[i];
-
-				for (u32 j = 0; j < res.coeff_count; ++j) {
-					res.coeff[i*res.coeff_count + j] =
-						(1.0 - settings.mixing) * settings.mixing * res.coeff[j]
-						+ settings.mixing * old_coeff[i*res.coeff_count + j];
-				}
-				f64_normalize(&res.coeff[i*res.coeff_count], &res.coeff[i*res.coeff_count], res.coeff_count);
-			}
+			f64_normalize(&res.coeff[i*res.coeff_count], &res.coeff[i*res.coeff_count], res.coeff_count);
 
 			/* DIIS */
 			if (settings.diis_enabled && settings.diis_log_length > 0) {
@@ -435,6 +446,18 @@ struct nlse_result nlse_solver(struct nlse_settings settings, const u32 componen
 			}
 
 
+			/* Apply mixing */
+			if (settings.mixing > 0.0) {
+				res.energy[i] = (1.0 - settings.mixing) * res.energy[i]
+					+ settings.mixing*old_energy[i];
+
+				for (u32 j = 0; j < res.coeff_count; ++j) {
+					res.coeff[i*res.coeff_count + j] =
+						(1.0 - settings.mixing) * settings.mixing * res.coeff[i*res.coeff_count + j]
+						+ settings.mixing * old_coeff[i*res.coeff_count + j];
+				}
+				f64_normalize(&res.coeff[i*res.coeff_count], &res.coeff[i*res.coeff_count], res.coeff_count);
+			}
 
 		}
 
@@ -484,6 +507,7 @@ struct nlse_result nlse_solver(struct nlse_settings settings, const u32 componen
 		}
 		sum = sqrt(sum);
 
+		res.residual[i] = sum;
 		sbmf_log_info("\t[%u] residual %e", i, sum);
 	}
 

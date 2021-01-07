@@ -6,18 +6,23 @@
 #include <string.h>
 #include <time.h>
 
-#define NA 4
-#define NB 4
+#define NA 2
+#define NB 2
 
-#define GAA (-4.00/((f64)NA-1))
-#define GAB (+1.00/((f64)NB))
-#define GBA (+1.00/((f64)NA))
-#define GBB (-4.00/((f64)NB-1))
+#define GAA (+0.5)
+#define GAB (1.0/NA)
+#define GBA (1.0/NB)
+#define GBB (+0.5)
 
-#define USE_GAUSSIAN_GUESS 1
+//#define GAA (-4.00/((f64)NA-1))
+//#define GAB (+1.00/((f64)NB))
+//#define GBA (+1.00/((f64)NA))
+//#define GBB (-4.00/((f64)NB-1))
 
-#define PERTURBATION(x) 2*gaussian(x, 0, 0.2)
-//#define PERTURBATION(x) 0.0
+#define USE_GAUSSIAN_GUESS 0
+
+//#define PERTURBATION(x) 2*gaussian(x, 0, 0.2)
+#define PERTURBATION(x) 0.0
 //#define PERTURBATION(x) (-1.5015*sqrt(x*x - 1.5*1.5 + 1.5015*1.5015));
 
 static f64 elapsed_time(struct timespec t0, struct timespec t1) {
@@ -86,6 +91,7 @@ int main() {
 
 	struct nlse_settings settings = {
 		.max_iterations = 1e5,
+		.max_integration_evals = 1e5,
 		.error_tol = 1e-10,
         .spatial_pot_perturbation = perturbation,
 
@@ -118,11 +124,11 @@ int main() {
 		GAA, GAB,
 		GBA, GBB
 	};
-	u32 occupations[] = {NA,NB};
+	i64 occupations[] = {NA,NB};
 
 	u32 comp_count = 2;
 
-	u32 bs[] = {/*4, 8, 12, 16, 24, 32, 48, 64,*/ 96, 128};
+	u32 bs[] = {/*4, 8, 12, 16, 24, 32, 48, */64};
 
 	for (u32 i = 0; i < sizeof(bs)/sizeof(bs[0]); ++i) {
 		FILE* fd = fopen("out", "a");
@@ -141,13 +147,15 @@ int main() {
 
 			struct timespec t1 = current_time();
 
-			f64 E = full_energy_naked(settings,
+			f64 E = full_energy(settings,
 					res.coeff_count, comp_count,
 					res.coeff,
 					occupations,
 					g0);
 
-			fprintf(fd, "%u\t%lf\t%lf\n",
+			printf("full energy: %.10lf\n", E/(occupations[0] + occupations[1]));
+
+			fprintf(fd, "%u\t%lf\t%.10lf\n",
 					b,
 					E/(occupations[0] + occupations[1]),
 					elapsed_time(t0,t1)/res.iterations

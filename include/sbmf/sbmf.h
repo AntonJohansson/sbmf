@@ -328,6 +328,7 @@ struct nlse_result {
 	f64* coeff;
 	f64* error;
 	f64* energy;
+	f64* residual;
 	struct symmetric_bandmat* hamiltonian;
 	bool converged;
 };

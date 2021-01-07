@@ -4,16 +4,17 @@
 
 #include <stdio.h>
 
-#define NA 2
+#define NA 1000
 #define NB 0
 
 //#define GAA (-4.0)
-#define GAA (4.0)
-//#define GAA (1/((f64)NA-1))
-#define GAB (+1.0/((f64)NB))
-#define GBA (+1.0/((f64)NA))
-#define GBB (+4.0/((f64)NB-1))
+#define GAA (6.0/(NA-1))
+//#define GAA (+0.5/1000)
+#define GAB (+1.0/1000)
+#define GBA (+1.0/1000)
+#define GBB (+0.5/1000)
 
+#define USE_TF_GUESS 1
 #define USE_GAUSSIAN_GUESS 0
 #define COMPONENT_COUNT 1
 
@@ -36,7 +37,7 @@ void perturbation(const u32 len, f64 out[static len],
 
 
 void debug_callback(struct nlse_settings settings, struct nlse_result res) {
-#if 0
+#if 1
 		const u32 N = 256;
 		plot_init(800, 600, "gp2c");
 
@@ -78,7 +79,7 @@ void debug_callback(struct nlse_settings settings, struct nlse_result res) {
 		plot_shutdown();
 #endif
 
-#if 1
+#if 0
 		{
 			FILE* fd = fopen("debug_out", "a");
 			fprintf(fd, "%u\t%lf\n", res.iterations, res.energy[0]);
@@ -114,18 +115,26 @@ void debug_callback(struct nlse_settings settings, struct nlse_result res) {
 
 
 
-
-
-	void gaussian0(f64* out, f64* in, u32 len, void* data) {
-		for (u32 i = 0; i < len; ++i) {
-			//out[i] = (1 - 0.5 * in[i]*in[i]);
-			out[i] = gaussian(in[i], 0.0, 5);// + gaussian(in[i] - 1.0, 0.0, 0.2);
-		}
+void tf(f64* out, f64* in, u32 len, void* data) {
+	f64 mu = 0.5 * sqrt(3*GAA*(NA-1)/2);
+	for (u32 i = 0; i < len; ++i) {
+		out[i] = (mu - 0.5*in[i]*in[i])/4.0;
+		if (out[i] < 0)
+			out[i] = 0;
+		out[i] = sqrt(out[i]);
 	}
-	void gaussian1(f64* out, f64* in, u32 len, void* data) {
-		for (u32 i = 0; i < len; ++i)
-			out[i] = gaussian(in[i] - 1.0, 0.0, 0.1);
+}
+
+void gaussian0(f64* out, f64* in, u32 len, void* data) {
+	for (u32 i = 0; i < len; ++i) {
+		//out[i] = (1 - 0.5 * in[i]*in[i]);
+		out[i] = gaussian(in[i] + 1.0, 0.0, 0.1);// + gaussian(in[i] - 1.0, 0.0, 0.2);
 	}
+}
+void gaussian1(f64* out, f64* in, u32 len, void* data) {
+	for (u32 i = 0; i < len; ++i)
+		out[i] = gaussian(in[i] - 1.0, 0.0, 0.1);
+}
 
 
 
@@ -145,6 +154,17 @@ int main() {
 			.data.spatial_guess = gaussian1,
 		},
 	};
+#elif USE_TF_GUESS
+	struct nlse_guess guesses[] = {
+		[0] = {
+			.type = SPATIAL_GUESS,
+			.data.spatial_guess = tf,
+		},
+		[1] = {
+			.type = SPATIAL_GUESS,
+			.data.spatial_guess = tf,
+		},
+	};
 #else
 	struct nlse_guess* guesses = NULL;
 #endif
@@ -160,16 +180,16 @@ int main() {
         .spatial_pot_perturbation = perturbation,
 		.max_iterations = 1e5,
 		.max_integration_evals = 1e5,
-		.error_tol = 1e-7,
+		.error_tol = 1e-8,
 
-        .num_basis_funcs = 24,
+        .num_basis_funcs = 32,
 		.basis = ho_basis,
 
 		.zero_threshold = 1e-10,
-		.mixing = 0.9,
+		.mixing = 0.0,
 		.mix_until_iteration = 0,
 		.diis_log_length = 4,
-		.diis_enabled = true,
+		.diis_enabled = false,
 
 		.orbital_choice = NLSE_ORBITAL_LOWEST_ENERGY,
 		//.orbital_choice = NLSE_ORBITAL_MAXIMUM_OVERLAP,
@@ -186,12 +206,12 @@ int main() {
 	struct nlse_result res = grosspitaevskii(settings, component_count, occupations, guesses, g0);
 	f64 Efull = full_energy(settings, res.coeff_count, component_count, res.coeff, occupations, g0);
 	printf("\nfull energy: %lf\n", Efull);
-	printf("\nfull energy per particle: %lf\n", Efull/(f64)NA);
+	printf("\nfull energy per particle: %lf\n", Efull/((f64)NA+(f64)NB));
 
 
 	nlse_write_to_binary_file("outbin", res);
 
-#if 1
+#if 0
 	{
 		const u32 N = 256;
 		plot_init(800, 600, "gp2c");
@@ -255,7 +275,7 @@ int main() {
 	}
 #endif
 
-#if 0
+#if 1
 	{
 		struct pt_result ptres = rayleigh_schroedinger_pt(res, g0, occupations);
 		printf("E0:          %.15lf\n", ptres.E0);
@@ -267,6 +287,7 @@ int main() {
 		printf("E0+E1+E2+E3: %.15lf\n", ptres.E0+ptres.E1+ptres.E2+ptres.E3);
 
 		printf("E0+E1+E2+E3: %.15lf\n", (ptres.E0+ptres.E1+ptres.E2+ptres.E3)/(f64)NA);
+		printf("diff: %.15lf\n", Efull/NA - (ptres.E0+ptres.E1+ptres.E2+ptres.E3)/(f64)NA
 	}
 #endif
 

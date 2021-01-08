@@ -5,12 +5,21 @@
 #include <stdio.h>
 
 #define NA 4
+#define NB 4
 
-#define ORDER (1e5)
+#define ORDER (1000)
 
-#define GAA (1.0/ORDER)
+#define GAA (0.5/ORDER)
+#define GAB (1.0/ORDER)
+#define GBA (1.0/ORDER)
+#define GBB (0.5/ORDER)
 
-#define USE_GAUSSIAN_GUESS 0
+//#define GAA (-2.0/((f64)NA-1))
+//#define GAB (+1.0/((f64)NB))
+//#define GBA (+1.0/((f64)NA))
+//#define GBB (-2.0/((f64)NB-1))
+
+#define USE_GAUSSIAN_GUESS 1
 
 //#define PERTURBATION(x) 2*gaussian(x, 0, 0.2)
 #define PERTURBATION(x) 0.0
@@ -25,9 +34,45 @@ void perturbation(const u32 len, f64 out[static len],
     }
 }
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 void log_callback(enum sbmf_log_level log_level, const char* msg) {
 	printf("%s\n", msg);
 }
+
+
+
+
+
+void gaussian0(f64* out, f64* in, u32 len, void* data) {
+	for (u32 i = 0; i < len; ++i)
+		out[i] = gaussian(in[i] + 1.0, 0.0, 0.1);
+}
+void gaussian1(f64* out, f64* in, u32 len, void* data) {
+	for (u32 i = 0; i < len; ++i)
+		out[i] = gaussian(in[i] - 1.0, 0.0, 0.1);
+}
+
+
+
 
 int main() {
 	sbmf_set_log_callback(log_callback);
@@ -38,38 +83,44 @@ int main() {
 			.type = SPATIAL_GUESS,
 			.data.spatial_guess = gaussian0,
 		},
+		[1] = {
+			.type = SPATIAL_GUESS,
+			.data.spatial_guess = gaussian1,
+		},
 	};
 #else
 	struct nlse_guess* guesses = NULL;
 #endif
 
-	f64 g0[] = { GAA };
+	f64 g0[] = {
+		GAA, GAB,
+		GBA, GBB
+	};
 
-	i64 occupations[] = {NA};
+	i64 occupations[] = {NA,NB};
 
 	//u32 bs[] = {4,8,12,16,24,32,48,64};
 	//u32 os[] = {5,10,50,100,200,300,400,500,600,700,800,900,1000};
-	i64 os[] = {ORDER, 2*ORDER, 3*ORDER, 4*ORDER, 5*ORDER, 6*ORDER, 7*ORDER, 8*ORDER, 9*ORDER};
+	u32 os[] = {ORDER, 2*ORDER/*, 3*ORDER, 3.5*ORDER*/};
 	struct nlse_settings settings = {
         .spatial_pot_perturbation = perturbation,
 		.max_iterations = 1000,
 		.max_integration_evals = 1e5,
 		.error_tol = 1e-9,
 
-        .num_basis_funcs = 48,
+        .num_basis_funcs = 32,
 		.basis = ho_basis,
-
-		.hamiltonian_mixing = 0.6,
 
 		.zero_threshold = 1e-10,
 		.gk=gk15
     };
 
-	const u32 component_count = 1;
+	const u32 component_count = 2;
 
 	for (u32 i = 0; i < sizeof(os)/sizeof(os[0]); ++i) {
 		u32 o = os[i];
 		occupations[0] = o;
+		occupations[1] = o;
 
 		sbmf_init();
 		struct nlse_result res = grosspitaevskii(settings, component_count, occupations, guesses, g0);

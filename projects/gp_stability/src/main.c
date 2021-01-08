@@ -1,7 +1,8 @@
 #include <sbmf/sbmf.h>
 #include <stdio.h>
 
-#define PERTURBATION(x) 2*gaussian(x, 0, 0.2)
+//#define PERTURBATION(x) 2*gaussian(x, 0, 0.2)
+#define PERTURBATION(x) 0.0
 
 void perturbation(const u32 len, f64 out[static len],
                                 f64 in_x[static len], const u32 component_count,
@@ -26,7 +27,7 @@ int main() {
 
 	struct nlse_guess* guesses = NULL;
 
-	u32 occupations[] = {2};
+	i64 occupations[] = {2};
 
 	struct nlse_settings settings = {
 		.spatial_pot_perturbation = perturbation,
@@ -34,8 +35,10 @@ int main() {
 		.max_integration_evals = 1e5,
 		.error_tol = 1e-9,
 
-        .num_basis_funcs = 16,
+        .num_basis_funcs = 32,
 		.basis = ho_basis,
+
+		.hamiltonian_mixing = 0.6,
 
 		.zero_threshold = 1e-10,
 		.gk=gk15
@@ -43,8 +46,11 @@ int main() {
 
 	const u32 component_count = 1;
 
-	for (f64 f = -10; f < 5; f += 0.25) {
-		f64 g0[] = {f};
+	f64 g0s[] = {3.6, 4.0, 4.5, 5.0, 5.5, 6.0, 6.5, 7.0, 7.5, 8.0, 8.5, 9.0, 9.5, 10.0};
+	//f64 g0s[] = {/*-10.0, -9.5, -9.0, -8.5, -8.0, -7.5, -7.0, -6.5, -6.0, -5.5, -5.0, -4.5, -4.0, -3.5, -3.0, -2.5, -2.0, -1.5, -1.0, -0.5, 0.0, 0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5,*/ 4.0, 4.1};
+	//f64 g0s[] = {-10.0, -9.5, -9.0, -8.5, -8.0, -7.5, -7.0, -6.5, -6.0, -5.5, -5.0, -4.5, -4.0, -3.5, -3.0, -2.5, -2.0, -1.5, -1.0, -0.5, 0.0, 0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5};
+	for (u32 i = 0; i < sizeof(g0s)/sizeof(f64); ++i) {
+		f64* g0 = &g0s[i];
 		sbmf_init();
 		struct nlse_result res = grosspitaevskii(settings, component_count, occupations, guesses, g0);
 
@@ -55,7 +61,7 @@ int main() {
 		{
 			FILE* fd = fopen("out", "a");
 			fprintf(fd, "%lf\t%lf\n",
-					f,
+					g0s[i],
 					Egp
 					);
 			fclose(fd);

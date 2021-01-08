@@ -4,22 +4,22 @@
 
 #include <stdio.h>
 
-#define NA 1000
+#define NA 2
 #define NB 0
 
 //#define GAA (-4.0)
-#define GAA (6.0/(NA-1))
+#define GAA (-10.0/(NA-1))
 //#define GAA (+0.5/1000)
 #define GAB (+1.0/1000)
 #define GBA (+1.0/1000)
 #define GBB (+0.5/1000)
 
-#define USE_TF_GUESS 1
+#define USE_TF_GUESS 0
 #define USE_GAUSSIAN_GUESS 0
 #define COMPONENT_COUNT 1
 
-//#define PERTURBATION(x) 2*gaussian(x, 0, 0.2)
-#define PERTURBATION(x) 0.0
+#define PERTURBATION(x) 2*gaussian(x, 0, 0.2)
+//#define PERTURBATION(x) 0.0
 //#define PERTURBATION(x) (-1.5015*sqrt(x*x - 1.5*1.5 + 1.5015*1.5015));
 
 void perturbation(const u32 len, f64 out[static len],
@@ -182,11 +182,11 @@ int main() {
 		.max_integration_evals = 1e5,
 		.error_tol = 1e-8,
 
-        .num_basis_funcs = 32,
+        .num_basis_funcs = 16,
 		.basis = ho_basis,
 
 		.zero_threshold = 1e-10,
-		.mixing = 0.0,
+		.orbital_mixing = 0.0,
 		.mix_until_iteration = 0,
 		.diis_log_length = 4,
 		.diis_enabled = false,
@@ -211,7 +211,7 @@ int main() {
 
 	nlse_write_to_binary_file("outbin", res);
 
-#if 0
+#if 1
 	{
 		const u32 N = 256;
 		plot_init(800, 600, "gp2c");
@@ -275,7 +275,7 @@ int main() {
 	}
 #endif
 
-#if 1
+#if 0
 	{
 		struct pt_result ptres = rayleigh_schroedinger_pt(res, g0, occupations);
 		printf("E0:          %.15lf\n", ptres.E0);
@@ -287,7 +287,7 @@ int main() {
 		printf("E0+E1+E2+E3: %.15lf\n", ptres.E0+ptres.E1+ptres.E2+ptres.E3);
 
 		printf("E0+E1+E2+E3: %.15lf\n", (ptres.E0+ptres.E1+ptres.E2+ptres.E3)/(f64)NA);
-		printf("diff: %.15lf\n", Efull/NA - (ptres.E0+ptres.E1+ptres.E2+ptres.E3)/(f64)NA
+		printf("diff: %.15lf\n", Efull/NA - (ptres.E0+ptres.E1+ptres.E2+ptres.E3)/(f64)NA);
 	}
 #endif
 

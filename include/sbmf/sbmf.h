@@ -291,7 +291,8 @@ struct nlse_settings {
 	 * each iteration. Setting mixing = 0.75 results in
 	 * new_solution = 75% this iteration + 25% old solution
 	 */
-	f64 mixing;
+	f64 orbital_mixing;
+	f64 hamiltonian_mixing;
 	u32 mix_until_iteration;
 
 	/* ... */

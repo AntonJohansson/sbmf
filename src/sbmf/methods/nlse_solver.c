@@ -300,8 +300,11 @@ struct nlse_result nlse_solver(struct nlse_settings settings, const u32 componen
 		}
 
 		/* Should we still apply mixing? */
-		if (settings.mixing > 0 && settings.mix_until_iteration > 0 && res.iterations == settings.mix_until_iteration) {
-			settings.mixing = 0;
+		if (settings.orbital_mixing > 0 && settings.mix_until_iteration > 0 && res.iterations == settings.mix_until_iteration) {
+			settings.orbital_mixing = 0;
+		}
+		if (settings.hamiltonian_mixing > 0 && settings.mix_until_iteration > 0 && res.iterations == settings.mix_until_iteration) {
+			settings.hamiltonian_mixing = 0;
 		}
 
 		if (settings.orbital_choice != NLSE_ORBITAL_MAXIMUM_OVERLAP && settings.mom_enable_at_iteration > 0 && res.iterations == settings.mom_enable_at_iteration) {
@@ -354,9 +357,9 @@ struct nlse_result nlse_solver(struct nlse_settings settings, const u32 componen
 				u32 me_index = symmetric_bandmat_index(res.hamiltonian[i], r,c);
 				res.hamiltonian[i].data[me_index] = linear_hamiltonian.data[me_index] + int_res.integral;
 
-#if 1
-				res.hamiltonian[i].data[me_index] = (1.0 - 0.6)*res.hamiltonian[i].data[me_index] + 0.6*old_H.data[me_index];
-#endif
+				if (settings.hamiltonian_mixing > 0) {
+					res.hamiltonian[i].data[me_index] = (1.0 - settings.hamiltonian_mixing)*res.hamiltonian[i].data[me_index] + settings.hamiltonian_mixing*old_H.data[me_index];
+				}
 			}
 
 			assert(symmetric_bandmat_is_valid(res.hamiltonian[i]));
@@ -446,15 +449,13 @@ struct nlse_result nlse_solver(struct nlse_settings settings, const u32 componen
 			}
 
 
-			/* Apply mixing */
-			if (settings.mixing > 0.0) {
-				res.energy[i] = (1.0 - settings.mixing) * res.energy[i]
-					+ settings.mixing*old_energy[i];
+			/* Apply orbital mixing */
+			if (settings.orbital_mixing > 0.0) {
+				res.energy[i] = (1.0 - settings.orbital_mixing) * res.energy[i] + settings.orbital_mixing*old_energy[i];
 
 				for (u32 j = 0; j < res.coeff_count; ++j) {
 					res.coeff[i*res.coeff_count + j] =
-						(1.0 - settings.mixing) * settings.mixing * res.coeff[i*res.coeff_count + j]
-						+ settings.mixing * old_coeff[i*res.coeff_count + j];
+						(1.0 - settings.orbital_mixing) * settings.orbital_mixing * res.coeff[i*res.coeff_count + j] + settings.orbital_mixing * old_coeff[i*res.coeff_count + j];
 				}
 				f64_normalize(&res.coeff[i*res.coeff_count], &res.coeff[i*res.coeff_count], res.coeff_count);
 			}

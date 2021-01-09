@@ -136,6 +136,11 @@ void gaussian1(f64* out, f64* in, u32 len, void* data) {
 }
 
 
+void expnx(f64* out, f64* in, u32 len, void* p) {
+	for (u32 i = 0; i < len; ++i) {
+		out[i] = exp(-fabs(in[i]));
+	}
+}
 
 
 int main() {
@@ -179,14 +184,14 @@ int main() {
         .spatial_pot_perturbation = perturbation,
 		.max_iterations = 1e5,
 		.max_integration_evals = 1e5,
-		.error_tol = 1e-8,
+		.error_tol = 1e-10,
 
-        .num_basis_funcs = 16,
+        .num_basis_funcs = 50,
 		.basis = ho_basis,
 
 		.zero_threshold = 1e-10,
 		.orbital_mixing = 0.0,
-		.hamiltonian_mixing = 0.6,
+		.hamiltonian_mixing = 0.0,
 		.mix_until_iteration = 0,
 		.diis_log_length = 4,
 		.diis_enabled = false,

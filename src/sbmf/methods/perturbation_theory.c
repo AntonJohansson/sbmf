@@ -46,7 +46,7 @@ void V_integrand(f64* out, f64* in, u32 len, void* data) {
 	}
 }
 
-static f64 V(struct pt_settings* pt, u32 A, u32 B, u32 i, u32 j, u32 k, u32 l) {
+static inline f64 V(struct pt_settings* pt, u32 A, u32 B, u32 i, u32 j, u32 k, u32 l) {
 	/* Check if we have computed this integral already */
 	struct V_params p = {
 		.coeff_count = pt->L,
@@ -75,7 +75,7 @@ static f64 V(struct pt_settings* pt, u32 A, u32 B, u32 i, u32 j, u32 k, u32 l) {
  * Helper functions since these will be calculated a lot
  */
 
-static f64 rs_2nd_order_me(struct pt_settings* pt, u32 A, u32 B, u32 i, u32 j) {
+static inline f64 rs_2nd_order_me(struct pt_settings* pt, u32 A, u32 B, u32 i, u32 j) {
 	f64 me = 0.0;
 	if (A == B) {
 		f64 factor = (i == j) ? 1.0/sqrt(2.0) : 1.0;
@@ -88,7 +88,7 @@ static f64 rs_2nd_order_me(struct pt_settings* pt, u32 A, u32 B, u32 i, u32 j) {
 	return me;
 }
 
-static f64 rs_2nd_order_ediff(struct pt_settings* pt, u32 A, u32 B, u32 i, u32 j) {
+static inline f64 rs_2nd_order_ediff(struct pt_settings* pt, u32 A, u32 B, u32 i, u32 j) {
 	return E(pt,A,0) + E(pt,B,0) - E(pt,A,i) - E(pt,B,j);
 }
 
@@ -125,6 +125,7 @@ struct pt_result rayleigh_schroedinger_pt(struct nlse_result res, f64* g0, i64* 
 			E0 += particle_count[A] * E(&pt, A, 0);
 		}
 	}
+	sbmf_log_info("E0: %.10lf", E0);
 
 	/* first ordet PT, computes <0|V|0> */
 	f64 E1 = 0.0;
@@ -144,7 +145,8 @@ struct pt_result rayleigh_schroedinger_pt(struct nlse_result res, f64* g0, i64* 
 		}
 	}
 
-	/* second order pt, computes
+	/*
+	 * second order pt, computes
 	 *     sum |<k|V|0>|^2/(E0-Ek)
 	 * where |k> are double substitions.
 	 */
@@ -152,7 +154,8 @@ struct pt_result rayleigh_schroedinger_pt(struct nlse_result res, f64* g0, i64* 
 	f64 E3_last_term = 0.0;
 	{
 		for (u32 A = 0; A < res.component_count; ++A) {
-			/* Double substitutions (both excitations within same component),
+			/*
+			 * Double substitutions (both excitations within same component),
 			 * loop over unique pairs (j,k).
 			 */
 			for (u32 i = 1; i < states_to_include; ++i) {
@@ -187,9 +190,12 @@ struct pt_result rayleigh_schroedinger_pt(struct nlse_result res, f64* g0, i64* 
 		}
 	}
 
+	sbmf_log_info("\tE0+E1+E2: %.10lf", E0+E1+E2);
+
 	f64 E3 = 0.0;
 #if 1
 	{
+		struct index {u32 m, n, p, q;};
 		/*
 		 * Loop over all <AmAn|V|ApAq>,
 		 * requires all unique combinations (m,n,p,q)
@@ -229,6 +235,7 @@ struct pt_result rayleigh_schroedinger_pt(struct nlse_result res, f64* g0, i64* 
 				E3 += (me1*me0*me1)/(Ediff*Ediff);
 			}
 		}
+		sbmf_log_info("\tE3: %lf", E3);
 
 		/* mn,mn */
 		/* states_to_include * (states_to_include - 1)/2 */
@@ -267,6 +274,7 @@ struct pt_result rayleigh_schroedinger_pt(struct nlse_result res, f64* g0, i64* 
 				}
 			}
 		}
+		sbmf_log_info("\tE3: %lf", E3);
 
 		/* mm,nn */
 		/* states_to_include * (states_to_include - 1)/2 */
@@ -291,12 +299,13 @@ struct pt_result rayleigh_schroedinger_pt(struct nlse_result res, f64* g0, i64* 
 				}
 			}
 		}
+		sbmf_log_info("\tE3: %lf", E3);
 
 		/* mm,mp */
 		/* states_to_include * (states_to_include - 1) */
 		sbmf_log_info("mm,mp");
 		for (u32 A = 0; A < res.component_count; ++A) {
-#pragma omp parallel for reduction(+: E3)
+#pragma omp parallel for reduction(+: E3) collapse(2)
 			for (u32 m = 1; m < states_to_include; ++m) {
 				for (u32 p = 1; p < states_to_include; ++p) {
 					if (m == p)
@@ -319,98 +328,135 @@ struct pt_result rayleigh_schroedinger_pt(struct nlse_result res, f64* g0, i64* 
 				}
 			}
 		}
+		sbmf_log_info("\tE3: %lf", E3);
 
 		/* mm,pq */
-		/* states_to_include*(states_to_include - 1)*(states_to_include-2)/2 */
+		/* (states_to_include-1)*(states_to_include - 2)*(states_to_include-3) */
 		sbmf_log_info("mm,pq");
-		for (u32 A = 0; A < res.component_count; ++A) {
-#pragma omp parallel for reduction(+: E3)
+		{
+			const u32 len = (states_to_include-1)*(states_to_include - 2)*(states_to_include-3)/2;
+			struct index inds[len];
+			u32 iter = 0;
 			for (u32 m = 1; m < states_to_include; ++m) {
 				for (u32 p = 1; p < states_to_include; ++p) {
 					if (p == m)
 						continue;
-
 					for (u32 q = p+1; q < states_to_include; ++q) {
 						if (q == m)
 							continue;
-						//sbmf_log_info("\t(%u,%u),(%u,%u)", m,m,p,q);
-						f64 v_AA_mmpq = V(&pt, A,A, m,m,p,q);
-
-						/* Two double substitutions */
-						//f64 me0 = (1.0/sqrt(2.0)) * G0(&pt,A,A) * v_AA_mmpq;
-						f64 me0 = sqrt(2.0) * G0(&pt,A,A) * v_AA_mmpq;
-
-						/* One double substitution */
-						f64 me1 	= rs_2nd_order_me(&pt, A,A, m,m);
-						f64 Ediff0  = rs_2nd_order_ediff(&pt, A,A, m,m);
-
-						f64 me2 	= rs_2nd_order_me(&pt, A,A, p,q);
-						f64 Ediff1  = rs_2nd_order_ediff(&pt, A,A, p,q);
-
-						E3 += (me1*me0*me2)/(Ediff0*Ediff1);
+						inds[iter++] = (struct index){m,m,p,q};
 					}
 				}
 			}
+
+			for (u32 A = 0; A < res.component_count; ++A) {
+#pragma omp parallel for reduction(+: E3)
+				for (u32 i = 0; i < len; ++i) {
+					f64 v_AA_mmpq = V(&pt, A,A, inds[i].m, inds[i].n, inds[i].p, inds[i].q);
+
+					/* Two double substitutions */
+					// f64 me0 = (1.0/sqrt(2.0)) * G0(&pt,A,A) * v_AA_mmpq;
+					f64 me0 = sqrt(2.0) * G0(&pt,A,A) * v_AA_mmpq;
+
+					/* One double substitution */
+					f64 me1 	= rs_2nd_order_me(&pt, A,A, inds[i].m, inds[i].n);
+					f64 Ediff0  = rs_2nd_order_ediff(&pt, A,A, inds[i].m, inds[i].n);
+
+					f64 me2 	= rs_2nd_order_me(&pt, A,A, inds[i].p, inds[i].q);
+					f64 Ediff1  = rs_2nd_order_ediff(&pt, A,A, inds[i].p, inds[i].q);
+
+					E3 += (me1*me0*me2)/(Ediff0*Ediff1);
+				}
+			}
 		}
+		sbmf_log_info("\tE3: %lf", E3);
 
 		/* mp,mq */
 		/* states_to_include*(states_to_include - 1)*(states_to_include-2)/2 */
 		sbmf_log_info("mp,mq");
-		for (u32 A = 0; A < res.component_count; ++A) {
-#pragma omp parallel for reduction(+: E3)
+		{
+			const u32 len = (states_to_include-1)*(states_to_include-2)*(states_to_include-3)/2;
+			u32 inds[len][4];
+			u32 iter = 0;
 			for (u32 m = 1; m < states_to_include; ++m) {
 				for (u32 p = 1; p < states_to_include; ++p) {
 					if (p == m)
 						continue;
-
 					for (u32 q = p+1; q < states_to_include; ++q) {
 						if (q == m)
 							continue;
-						//sbmf_log_info("\t(%u,%u),(%u,%u)", m,p,m,q);
-						f64 v_AA_p0q0 = V(&pt, A,A, p,0,q,0);
-						f64 v_AA_mpmq = V(&pt, A,A, m,p,m,q);
-
-						/* Two double substitutions */
-						f64 me0 = G0(&pt,A,A) * ((particle_count[A]-3)*v_AA_p0q0 + 2*v_AA_mpmq);
-
-						/* One double substitution */
-						f64 me1 	= rs_2nd_order_me(&pt,    A,A, m,p);
-						f64 Ediff0  = rs_2nd_order_ediff(&pt, A,A, m,p);
-						f64 me2 	= rs_2nd_order_me(&pt,    A,A, m,q);
-						f64 Ediff1  = rs_2nd_order_ediff(&pt, A,A, m,q);
-						E3 += (me1*me0*me2)/(Ediff0*Ediff1);
+						inds[iter][0] = m;
+						inds[iter][1] = p;
+						inds[iter][2] = m;
+						inds[iter][3] = q;
+						iter++;
 					}
 				}
 			}
+
+			for (u32 A = 0; A < res.component_count; ++A) {
+#pragma omp parallel for reduction(+: E3)
+				for (u32 i = 0; i < len; ++i) {
+					/* p0q0 */
+					f64 v_AA_p0q0 = V(&pt, A,A, inds[i][1],0,inds[i][3],0);
+					/* mpmq */
+					f64 v_AA_mpmq = V(&pt, A,A, inds[i][0], inds[i][1], inds[i][2], inds[i][3]);
+
+					/* Two double substitutions */
+					f64 me0 = G0(&pt,A,A) * ((particle_count[A]-3)*v_AA_p0q0 + 2*v_AA_mpmq);
+
+					/* One double substitution */
+					f64 me1 	= rs_2nd_order_me(&pt,    A,A, inds[i][0], inds[i][1]);
+					f64 Ediff0  = rs_2nd_order_ediff(&pt, A,A, inds[i][0], inds[i][1]);
+					f64 me2 	= rs_2nd_order_me(&pt,    A,A, inds[i][2], inds[i][3]);
+					f64 Ediff1  = rs_2nd_order_ediff(&pt, A,A, inds[i][2], inds[i][3]);
+					E3 += (me1*me0*me2)/(Ediff0*Ediff1);
+				}
+			}
 		}
+		sbmf_log_info("\tE3: %lf", E3);
 
 		/* mn,pq */
 		/* states_to_include choose 4 */
 		sbmf_log_info("mn,pq");
-		for (u32 A = 0; A < res.component_count; ++A) {
-#pragma omp parallel for reduction(+: E3)
+		{
+			const u32 len = n_choose_k(states_to_include-1, 4);
+			u32 inds[len][4];
+			u32 iter = 0;
 			for (u32 m = 1; m < states_to_include; ++m) {
 				for (u32 n = m+1; n < states_to_include; ++n) {
 					for (u32 p = n+1; p < states_to_include; ++p) {
 						for (u32 q = p+1; q < states_to_include; ++q) {
-							//sbmf_log_info("\t(%u,%u),(%u,%u)", m,n,p,q);
-							f64 v_AA_mnpq = V(&pt, A,A, m,n,p,q);
-
-							/* Two double substitutions */
-							f64 me0 = 2*G0(&pt,A,A)*v_AA_mnpq;
-
-							/* One double substitution */
-							f64 me1 	= rs_2nd_order_me(&pt,    A,A, m,n);
-							f64 Ediff0  = rs_2nd_order_ediff(&pt, A,A, m,n);
-							f64 me2 	= rs_2nd_order_me(&pt,    A,A, p,q);
-							f64 Ediff1  = rs_2nd_order_ediff(&pt, A,A, p,q);
-
-							E3 += (me1*me0*me2)/(Ediff0*Ediff1);
+							inds[iter][0] = m;
+							inds[iter][1] = n;
+							inds[iter][2] = p;
+							inds[iter][3] = q;
+							iter++;
 						}
 					}
 				}
 			}
+
+			for (u32 A = 0; A < res.component_count; ++A) {
+#pragma omp parallel for reduction(+: E3)
+				for (u32 i = 0; i < len; ++i) {
+					//sbmf_log_info("\t(%u,%u),(%u,%u)", m,n,p,q);
+					f64 v_AA_mnpq = V(&pt, A,A, inds[i][0], inds[i][1], inds[i][2], inds[i][3]);
+
+					/* Two double substitutions */
+					f64 me0 = 2*G0(&pt,A,A)*v_AA_mnpq;
+
+					/* One double substitution */
+					f64 me1 	= rs_2nd_order_me(&pt,    A,A, inds[i][0], inds[i][1]);
+					f64 Ediff0  = rs_2nd_order_ediff(&pt, A,A, inds[i][0], inds[i][1]);
+					f64 me2 	= rs_2nd_order_me(&pt,    A,A, inds[i][2], inds[i][3]);
+					f64 Ediff1  = rs_2nd_order_ediff(&pt, A,A, inds[i][2], inds[i][3]);
+
+					E3 += (me1*me0*me2)/(Ediff0*Ediff1);
+				}
+			}
 		}
+		sbmf_log_info("\tE3: %lf", E3);
 
 #if 1
 		/* AmBn,AmBn */

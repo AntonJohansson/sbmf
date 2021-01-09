@@ -359,7 +359,7 @@ void quadgk_infinite_interval(integrand_func* f, const struct quadgk_settings* s
 	 * exit early without having to initalize extra memory and
 	 * so on.
 	 */
-	struct eval_result eval_res;
+	struct eval_result eval_res = {0};
 	evaluate_rule(f, start, end, settings, &eval_res);
 	res->performed_evals += eval_res.func_evals;
 
@@ -383,8 +383,8 @@ void quadgk_infinite_interval(integrand_func* f, const struct quadgk_settings* s
 	struct prioqueue* pq = prioqueue_new(64, sizeof(struct segment), compare_segments);
 	prioqueue_push(pq, &s);
 
-	struct segment largest_error_seg;
-	struct eval_result left_eval_res, right_eval_res;
+	struct segment largest_error_seg = {0};
+	struct eval_result left_eval_res = {0}, right_eval_res = {0};
 
 	while (!should_exit(settings, res)) {
 		prioqueue_pop(pq, &largest_error_seg);

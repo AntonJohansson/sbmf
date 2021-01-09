@@ -2,10 +2,10 @@
 #include <stdio.h>
 
 #define NA 4
-#define NB 4
+#define NB 0
 
-//#define GAA (1.0/3.0)
-#define GAA (-2.0/((f64)NA-1))
+#define GAA (1.0/3.0)
+//#define GAA (-2.0/((f64)NA-1))
 #define GAB (+1.0/((f64)NB))
 #define GBA (+1.0/((f64)NA))
 #define GBB (-2.0/((f64)NB-1))
@@ -23,9 +23,9 @@ int main() {
 		GBA, GBB
 	};
 
-	u32 occupations[] = {NA,NB};
+	i64 occupations[] = {NA,NB};
 
-	struct nlse_result res = nlse_read_from_binary_file("outbin");
+	struct nlse_result res = nlse_read_from_binary_file("outbin_1comp");
 
 	{
 		struct pt_result ptres = rayleigh_schroedinger_pt(res, g0, occupations);

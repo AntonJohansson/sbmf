@@ -4,11 +4,12 @@
 
 #include <stdio.h>
 
-#define NA 2
+#define NA (4)
 #define NB 0
 
+#define GAA (1.0/3.0)
 //#define GAA (-4.0)
-#define GAA (-10.0/(NA-1))
+//#define GAA (-10.0/(NA-1))
 //#define GAA (+0.5/1000)
 #define GAB (+1.0/1000)
 #define GBA (+1.0/1000)
@@ -18,8 +19,8 @@
 #define USE_GAUSSIAN_GUESS 0
 #define COMPONENT_COUNT 1
 
-#define PERTURBATION(x) 2*gaussian(x, 0, 0.2)
-//#define PERTURBATION(x) 0.0
+//#define PERTURBATION(x) 2*gaussian(x, 0, 0.2)
+#define PERTURBATION(x) 0.0
 //#define PERTURBATION(x) (-1.5015*sqrt(x*x - 1.5*1.5 + 1.5015*1.5015));
 
 void perturbation(const u32 len, f64 out[static len],
@@ -109,11 +110,9 @@ void debug_callback(struct nlse_settings settings, struct nlse_result res) {
 
 
 
-	void log_callback(enum sbmf_log_level log_level, const char* msg) {
-		printf("%s\n", msg);
-	}
-
-
+void log_callback(enum sbmf_log_level log_level, const char* msg) {
+	printf("%s\n", msg);
+}
 
 void tf(f64* out, f64* in, u32 len, void* data) {
 	f64 mu = 0.5 * sqrt(3*GAA*(NA-1)/2);
@@ -187,6 +186,7 @@ int main() {
 
 		.zero_threshold = 1e-10,
 		.orbital_mixing = 0.0,
+		.hamiltonian_mixing = 0.6,
 		.mix_until_iteration = 0,
 		.diis_log_length = 4,
 		.diis_enabled = false,
@@ -275,7 +275,7 @@ int main() {
 	}
 #endif
 
-#if 0
+#if 1
 	{
 		struct pt_result ptres = rayleigh_schroedinger_pt(res, g0, occupations);
 		printf("E0:          %.15lf\n", ptres.E0);

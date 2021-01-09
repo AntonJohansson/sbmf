@@ -213,46 +213,39 @@ struct gk_data gk20 = {
 
 
 
-
-
-struct coordinate_transform {
-	coord_transform_input_func* input;
-	coord_transform_output_func* output;
-	f64 original_start;
-	f64 original_end;
-};
-
-typedef struct {
+struct segment {
 	f64 integral;
 	f64 error;
 
 	f64 start;
 	f64 end;
-} segment;
+};
 
 static inline f64 norm(f64 r) {
-	return fabs(r);
+	return r*r; //fabs(r);
 }
 
-typedef struct {
-	segment seg;
+struct eval_result {
+	struct segment seg;
 	u32 func_evals;
 	bool valid;
-} eval_result;
+};
 
-static eval_result evaluate_rule(integrand_vec* f, f64 start, f64 end,
-		struct coordinate_transform transform,
-		integration_settings settings) {
-	struct gk_data* gk = &settings.gk;
+static void evaluate_rule(integrand_func* f, f64 start, f64 end, const struct quadgk_settings* settings, struct eval_result* res) {
+	const struct gk_data* gk = &settings->gk;
 	f64 mid = 0.5 * (end - start);
 
-	// 	0 -- if even size
-	// 	1 -- if odd size
+	/*
+	 *  	0 -- if even size
+	 * 	1 -- if odd size
+	 */
 	u32 is_order_odd = 1 - (gk->kronod_size & 1);
 
-	// fg/k - gauss/kronod function eval
-	// Ig/k - gauss/kronod integral estimate
-	// xg/k - gauss/kronod sample nodes
+	/*
+	 * fg/k - gauss/kronod function eval
+	 * Ig/k - gauss/kronod integral estimate
+	 * xg/k - gauss/kronod sample nodes
+	 */
 
 	/* Size of the gauss weights array (other than the last element if odd order) */
 	u32 size = gk->gauss_size - is_order_odd;
@@ -276,16 +269,19 @@ static eval_result evaluate_rule(integrand_vec* f, f64 start, f64 end,
 
 	/* Apply transform scaling to input */
 	for (u32 i = 0; i < sample_size; ++i) {
-		transformed_sample_points[i] = transform.input(sample_points[i], transform.original_start, transform.original_end);
+		transformed_sample_points[i] = sample_points[i]/(1.0 - sample_points[i]*sample_points[i]);
 	}
 
 	/* Sample the function */
 	f64 output[sample_size];
-	f(output, transformed_sample_points, sample_size, settings.userdata);
+	f(output, transformed_sample_points, sample_size, settings->userdata);
 
 	/* Apply transform output scaling */
+	f64 one_minus_t2, scale;
 	for (u32 i = 0; i < sample_size; ++i) {
-		output[i] *= transform.output(sample_points[i]);
+		one_minus_t2 = (1.0 - sample_points[i]*sample_points[i]);
+		scale = (1.0 + sample_points[i]*sample_points[i]) / (one_minus_t2*one_minus_t2);
+		output[i] *= scale;
 	}
 
 	/* Compute the integral estimate */
@@ -317,210 +313,98 @@ static eval_result evaluate_rule(integrand_vec* f, f64 start, f64 end,
 		sbmf_log_error("evaluation of gk rule resulted in [%s]", (isinf(error) == 1) ? "inf" : "nan");
 	}
 
-	return (eval_result){
-		.seg = {Ik_s, error, start, end},
-		.func_evals = 4*gk->gauss_size + 1,
-		.valid = valid
-	};
+	/* Setup return values */
+	res->seg = (struct segment){Ik_s, error, start, end};
+	res->func_evals = 4*gk->gauss_size + 1;
+	res->valid = valid;
 }
 
-// Sort segments by error in descending order.
+/* Compare function for priority queue, sort segments by error in descending order. */
 static bool compare_segments(void* a, void* b) {
-	return (((segment*)a)->error > ((segment*)b)->error);
+	return (((struct segment*)a)->error > ((struct segment*)b)->error);
 }
 
-static inline bool should_exit(integration_result result, integration_settings settings) {
-	return (result.error <= settings.abs_error_tol ||
-			result.error <= settings.rel_error_tol*norm(result.integral) ||
-			result.performed_evals >= settings.max_evals);
+static inline bool should_exit(const struct quadgk_settings* settings, struct quadgk_result* res) {
+	return (res->error <= settings->abs_error_tol ||
+			res->error <= settings->rel_error_tol*norm(res->integral) ||
+			res->performed_evals >= settings->max_evals);
 }
 
-
-/*
- * f(x)
- * x = g(t)
- * dx/dt = g'(t)
- * => f(x)*dx = f(g(t))*g'(t)*dt
- */
-
-
-static f64 coord_transform_input_identity(f64 t, f64 a, f64 b) {
-	SBMF_UNUSED(a);
-	SBMF_UNUSED(b);
-	return t;
-}
-static f64 coord_transform_output_identity(f64 t) {
-	SBMF_UNUSED(t);
-	return 1.0;
-}
-
-static f64 coord_transform_input_both_inf(f64 t, f64 a, f64 b) {
-	SBMF_UNUSED(a);
-	SBMF_UNUSED(b);
-	return t/(1.0 - t*t);
-}
-static f64 coord_transform_output_both_inf(f64 t) {
-	f64 one_minus_t2 = 1.0 - t*t;
-	return (1.0 + t*t)/(one_minus_t2*one_minus_t2);
-}
-
-static f64 coord_transform_input_start_inf(f64 t, f64 a, f64 b) {
-	SBMF_UNUSED(a);
-	return b - t/(1.0 - t);
-}
-static f64 coord_transform_output_start_inf(f64 t) {
-	f64 one_minus_t = 1.0 - t;
-	return -1.0/(one_minus_t*one_minus_t);
-}
-
-static f64 coord_transform_input_end_inf(f64 t, f64 a, f64 b) {
-	SBMF_UNUSED(b);
-	return a + t/(1.0 - t);
-}
-static f64 coord_transform_output_end_inf(f64 t) {
-	f64 one_minus_t = 1.0 - t;
-	return 1.0/(one_minus_t*one_minus_t);
-}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-static inline integration_result hadapt(integrand_vec* f, f64 start, f64 end,
-		struct coordinate_transform transform,
-		integration_settings settings) {
-	integration_result result = {
-		.integral = 0,
-		.error = 0,
-		.performed_evals = 0,
-		.converged = false,
-	};
-
-	// Perform one evaluation of the rule and see if we can
-	// exit early without having to initalize extra memory and
-	// so on.
-	eval_result eval_res = evaluate_rule(f, start, end, transform, settings);
-	result.performed_evals += eval_res.func_evals;
-
-	segment s = eval_res.seg;
-	result.integral = s.integral;
-	result.error = s.error;
-
-	if (!eval_res.valid || should_exit(result, settings)) {
-		if (eval_res.valid && result.performed_evals <= settings.max_evals)
-			result.converged = true;
-		return result;
+void quadgk_infinite_interval(integrand_func* f, const struct quadgk_settings* settings, struct quadgk_result* res) {
+	if (!settings) {
+		sbmf_log_error("You need to provide a quadgk_settings struct!");
+		return;
 	}
 
-	/* If we get to this point we were not able to exit early and have do to more subdivisions
+	if (!res) {
+		sbmf_log_error("You need to provide a quadgk_result struct!");
+		return;
+	}
+
+	if (settings->gk.gauss_size == 0) {
+		sbmf_log_error("You need to specify a gk rule!");
+		return;
+	}
+
+	/* Interval for for transformed integrand */
+	f64 start = -1.0, end = 1.0;
+
+	res->integral = 0;
+	res->error = 0;
+	res->performed_evals = 0;
+	res->converged = false;
+
+	/*
+	 * Perform one evaluation of the rule and see if we can
+	 * exit early without having to initalize extra memory and
+	 * so on.
+	 */
+	struct eval_result eval_res;
+	evaluate_rule(f, start, end, settings, &eval_res);
+	res->performed_evals += eval_res.func_evals;
+
+	struct segment s = eval_res.seg;
+	res->integral = s.integral;
+	res->error = s.error;
+
+	if (!eval_res.valid || should_exit(settings, res)) {
+		if (eval_res.valid && res->performed_evals <= settings->max_evals)
+			res->converged = true;
+		return;
+	}
+
+	/*
+	 * If we get to this point we were not able to exit early and have do to more subdivisions
 	 * to get desired error tolerance.
 	 */
 
 	u32 memory_marker = sbmf_stack_marker();
 
-	/*
-	 * struct prioqueue* pq = prioqueue_new(2*settings.max_evals, sizeof(segment), compare_segments);
-	 */
-	struct prioqueue* pq = prioqueue_new(64, sizeof(segment), compare_segments);
+	struct prioqueue* pq = prioqueue_new(64, sizeof(struct segment), compare_segments);
 	prioqueue_push(pq, &s);
 
-	segment largest_error_seg;
+	struct segment largest_error_seg;
+	struct eval_result left_eval_res, right_eval_res;
 
-	while (!should_exit(result, settings)) {
+	while (!should_exit(settings, res)) {
 		prioqueue_pop(pq, &largest_error_seg);
 
 		f64 midpoint = 0.5 * (largest_error_seg.start + largest_error_seg.end);
-		eval_result left_eval_res = evaluate_rule(f, largest_error_seg.start, midpoint, transform, settings);
-		eval_result right_eval_res = evaluate_rule(f, midpoint, largest_error_seg.end, transform, settings);
+		evaluate_rule(f, largest_error_seg.start, midpoint, settings, &left_eval_res);
+		evaluate_rule(f, midpoint, largest_error_seg.end, settings, &right_eval_res);
 		if (!left_eval_res.valid || !right_eval_res.valid)
-			return result;
+			return;
 
-		segment left_seg = left_eval_res.seg;
-		segment right_seg = right_eval_res.seg;
+		res->performed_evals += left_eval_res.func_evals + right_eval_res.func_evals;
+		res->integral = (res->integral - largest_error_seg.integral) + left_eval_res.seg.integral + right_eval_res.seg.integral;
+		res->error = (res->error - largest_error_seg.error) + left_eval_res.seg.error + right_eval_res.seg.error;
 
-		result.performed_evals += left_eval_res.func_evals + right_eval_res.func_evals;
-		result.integral = (result.integral - largest_error_seg.integral) + left_seg.integral + right_seg.integral;
-		result.error = (result.error - largest_error_seg.error) + left_seg.error + right_seg.error;
-
-		if (settings.print_error)
-			sbmf_log_info("\t%u -- %e\t%e -- %e -- %e\t%e", result.performed_evals, result.integral, result.error,
-					largest_error_seg.error,
-					left_seg.error,
-					right_seg.error
-					);
-
-		prioqueue_push(pq, &left_seg);
-		prioqueue_push(pq, &right_seg);
+		prioqueue_push(pq, &left_eval_res.seg);
+		prioqueue_push(pq, &right_eval_res.seg);
 	}
 
 	sbmf_stack_free_to_marker(memory_marker);
 
-	if (result.performed_evals <= settings.max_evals)
-		result.converged = true;
-
-	return result;
-}
-
-integration_result quadgk(integrand_vec* f, f64 start, f64 end, integration_settings settings) {
-	/* If no gk rule is chosen, default to gk7 */
-	if (settings.gk.gauss_size == 0)
-		settings.gk = gk15;
-
-	// Make sure the endpoints are ordered start < end
-	f64 output_factor = 1.0;
-	if (start > end) {
-		f64 temp = start;
-		start = end;
-		end = temp;
-		output_factor = -1.0;
-	}
-
-	// Check for infinities in integration interval
-	i32 start_isinf = isinf(start);
-	i32 end_isinf = isinf(end);
-
-	integration_result res = {0};
-	struct coordinate_transform transform = {
-		.input = coord_transform_input_identity,
-		.output = coord_transform_output_identity,
-		.original_start = start,
-		.original_end = end,
-	};
-
-	if (start_isinf || end_isinf) {
-		if (start_isinf && end_isinf) {
-			transform.input  = coord_transform_input_both_inf;
-			transform.output = coord_transform_output_both_inf;
-			res = hadapt(f, -1, 1, transform, settings);
-		} else if (end_isinf) {
-			transform.input  = coord_transform_input_end_inf;
-			transform.output = coord_transform_output_end_inf;
-			res = hadapt(f, 0, 1, transform, settings);
-		} else if (start_isinf) {
-			transform.input  = coord_transform_input_start_inf;
-			transform.output = coord_transform_output_start_inf;
-			res = hadapt(f, 1, 0, transform, settings);
-		}
-	} else {
-		res = hadapt(f, start, end, transform, settings);
-	}
-
-	res.integral = output_factor*res.integral;
-	return res;
+	if (res->performed_evals <= settings->max_evals)
+		res->converged = true;
 }

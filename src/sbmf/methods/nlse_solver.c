@@ -16,11 +16,11 @@ struct integrand_params {
 	struct basis basis;
 };
 
-static void sbmf_log_integration_result(integration_result res) {
-	sbmf_log_info("integral: %.10e", res.integral);
-	sbmf_log_info("error: %.10e", res.error);
-	sbmf_log_info("performed evals: %d", res.performed_evals);
-	sbmf_log_info("converged: %s", (res.converged) ? "yes" : "no");
+static void sbmf_log_integration_result(struct quadgk_result* res) {
+	sbmf_log_info("integral: %.10e", res->integral);
+	sbmf_log_info("error: %.10e", res->error);
+	sbmf_log_info("performed evals: %d", res->performed_evals);
+	sbmf_log_info("converged: %s", (res->converged) ? "yes" : "no");
 }
 
 /* functions to handle spatial guesses */
@@ -154,7 +154,7 @@ struct nlse_result nlse_solver(struct nlse_settings settings, const u32 componen
 	f64* old_coeff = sbmf_stack_push(component_count*(N*sizeof(f64)));
 	f64* old_energy = sbmf_stack_push(component_count * sizeof(f64));
 
-	integration_settings int_settings = {
+	struct quadgk_settings int_settings = {
 		.gk = (settings.gk.gauss_size > 0) ? settings.gk : gk15,
 		.abs_error_tol = 1e-15,
 		.rel_error_tol = 1e-8,
@@ -181,7 +181,8 @@ struct nlse_result nlse_solver(struct nlse_settings settings, const u32 componen
 				f64* out = &res.coeff[i*res.coeff_count];
 				for (u32 j = 0; j < res.coeff_count; ++j) {
 					p.n = j;
-					integration_result r = quadgk(guess_integrand, -INFINITY, INFINITY, int_settings);
+					struct quadgk_result r;
+					quadgk_infinite_interval(guess_integrand, &int_settings, &r);
 					out[j] = r.integral;
 				}
 				f64_normalize(out, out, res.coeff_count);
@@ -245,7 +246,8 @@ struct nlse_result nlse_solver(struct nlse_settings settings, const u32 componen
 				params.n[0] = r;
 				params.n[1] = c;
 
-				integration_result int_res = quadgk(linear_me_integrand, -INFINITY, INFINITY, int_settings);
+				struct quadgk_result int_res;
+				quadgk_infinite_interval(linear_me_integrand, &int_settings, &int_res);
 
 				if (fabs(int_res.integral) <= settings.zero_threshold)
 					int_res.integral = 0.0;
@@ -253,7 +255,7 @@ struct nlse_result nlse_solver(struct nlse_settings settings, const u32 componen
 				if (!int_res.converged) {
 					sbmf_log_error("In construction of linear hamiltonian:");
 					sbmf_log_error("\tIntegration failed for %d,%d", r,c);
-					sbmf_log_integration_result(int_res);
+					sbmf_log_integration_result(&int_res);
 				}
 				assert(int_res.converged);
 
@@ -338,7 +340,8 @@ struct nlse_result nlse_solver(struct nlse_settings settings, const u32 componen
 				gsl_integration_qagi(&F, 1e-10, 1e-7, settings.max_iterations, ws[omp_get_thread_num()], &int_res.integral, &int_res.error);
 				int_res.converged = true;
 #else
-				integration_result int_res = quadgk(nonlinear_me_integrand, -INFINITY, INFINITY, int_settings);
+				struct quadgk_result int_res;
+				quadgk_infinite_interval(nonlinear_me_integrand, &int_settings, &int_res);
 #endif
 
 				/* Check if the resultant integral is less than what we can resolve,
@@ -350,7 +353,7 @@ struct nlse_result nlse_solver(struct nlse_settings settings, const u32 componen
 				if (!int_res.converged) {
 					sbmf_log_error("In construction of component %u's hamiltonian:", i);
 					sbmf_log_error("\tIntegration failed for %d,%d", r,c);
-					sbmf_log_integration_result(int_res);
+					sbmf_log_integration_result(&int_res);
 				}
 				assert(int_res.converged);
 

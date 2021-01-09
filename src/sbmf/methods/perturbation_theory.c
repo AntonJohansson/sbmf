@@ -56,7 +56,7 @@ static f64 V(struct pt_settings* pt, u32 A, u32 B, u32 i, u32 j, u32 k, u32 l) {
 		.l = PHI(pt, B, l)
 	};
 
-    struct integration_settings settings = {
+    struct quadgk_settings settings = {
         .abs_error_tol = 1e-10,
         .rel_error_tol = 1e-7,
 		.gk = gk15,
@@ -64,7 +64,8 @@ static f64 V(struct pt_settings* pt, u32 A, u32 B, u32 i, u32 j, u32 k, u32 l) {
 		.userdata = &p,
     };
 
-	struct integration_result res = quadgk(V_integrand, -INFINITY, INFINITY, settings);
+	struct quadgk_result res;
+	quadgk_infinite_interval(V_integrand, &settings, &res);
 	assert(res.converged);
 
 	return res.integral;

@@ -11,6 +11,10 @@
 #define GAA (1.0/ORDER)
 
 #define USE_GAUSSIAN_GUESS 0
+#define USE_TF_GUESS 1
+
+static f64 g0[] = { GAA };
+static i64 occupations[] = {NA};
 
 //#define PERTURBATION(x) 2*gaussian(x, 0, 0.2)
 #define PERTURBATION(x) 0.0
@@ -23,6 +27,16 @@ void perturbation(const u32 len, f64 out[static len],
     for (u32 i = 0; i < len; ++i) {
         out[i] = PERTURBATION(in_x[i]);
     }
+}
+
+void tf(f64* out, f64* in, u32 len, void* data) {
+	f64 mu = 0.5 * sqrt(3*g0[0]*(occupations[0]-1)/2);
+	for (u32 i = 0; i < len; ++i) {
+		out[i] = (mu - 0.5*in[i]*in[i])/4.0;
+		if (out[i] < 0)
+			out[i] = 0;
+		out[i] = sqrt(out[i]);
+	}
 }
 
 void log_callback(enum sbmf_log_level log_level, const char* msg) {
@@ -39,24 +53,28 @@ int main() {
 			.data.spatial_guess = gaussian0,
 		},
 	};
+#elif USE_TF_GUESS
+	struct nlse_guess guesses[] = {
+		[0] = {
+			.type = SPATIAL_GUESS,
+			.data.spatial_guess = tf,
+		},
+	};
 #else
 	struct nlse_guess* guesses = NULL;
 #endif
 
-	f64 g0[] = { GAA };
-
-	i64 occupations[] = {NA};
 
 	//u32 bs[] = {4,8,12,16,24,32,48,64};
 	//u32 os[] = {5,10,50,100,200,300,400,500,600,700,800,900,1000};
-	i64 os[] = {ORDER, 2*ORDER, 3*ORDER, 4*ORDER, 5*ORDER, 6*ORDER, 7*ORDER, 8*ORDER, 9*ORDER};
+	i64 os[] = {/*ORDER, 2*ORDER, 3*ORDER, 4*ORDER, 5*ORDER, 6*ORDER, 7*ORDER,*/ 8*ORDER, 9*ORDER};
 	struct nlse_settings settings = {
         .spatial_pot_perturbation = perturbation,
 		.max_iterations = 1000,
 		.max_integration_evals = 1e5,
 		.error_tol = 1e-9,
 
-        .num_basis_funcs = 48,
+        .num_basis_funcs = 16,
 		.basis = ho_basis,
 
 		.hamiltonian_mixing = 0.6,

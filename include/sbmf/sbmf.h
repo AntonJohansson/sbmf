@@ -133,33 +133,32 @@ extern struct gk_data gk10;
 extern struct gk_data gk15;
 extern struct gk_data gk20;
 
-typedef f64 integrand(f64,void*);
-typedef struct integration_settings {
+struct quadgk_settings {
 	struct gk_data gk;
 
-	// Aboslute and relative error tolarences.
+	/* Aboslute and relative error tolarences. */
 	f64 abs_error_tol;
 	f64 rel_error_tol;
 
-	// The maximum allowed function evaluations of
-	// the supplied integrand.
+	/*
+	 * The maximum allowed function evaluations of
+	 * the supplied integrand.
+	 */
 	i32 max_evals;
 
-	bool print_error;
-
 	void* userdata;
-} integration_settings;
+};
 
-typedef struct integration_result {
+struct quadgk_result {
 	f64 integral;
 	f64 error;
 	i32 performed_evals;
 	bool converged;
-} integration_result;
+};
 
-typedef void integrand_vec(f64*,f64*,u32,void*);
+typedef void integrand_func(f64*,f64*,u32,void*);
 
-integration_result quadgk(integrand_vec* f, f64 start, f64 end, integration_settings settings);
+void quadgk_infinite_interval(integrand_func* f, const struct quadgk_settings* settings, struct quadgk_result* res);
 
 /*
  * Basis

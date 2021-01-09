@@ -128,7 +128,7 @@ f64 full_energy(struct nlse_settings settings,
 		.basis = settings.basis,
 	};
 
-	integration_settings int_settings = {
+	struct quadgk_settings int_settings = {
 		.max_evals = 1e5,
 		.abs_error_tol = 1e-10,
 		.userdata = &ppot,
@@ -137,15 +137,17 @@ f64 full_energy(struct nlse_settings settings,
 
 	/* pot terms */
 	if (settings.spatial_pot_perturbation) {
+		struct quadgk_result ires;
 		for (u32 i = 0; i < comp_count; ++i) {
 			ppot.coeff_a = &coeff[i*coeff_count];
-			integration_result ires = quadgk(full_energy_integrand_pot, -INFINITY, INFINITY, int_settings);
+			quadgk_infinite_interval(full_energy_integrand_pot, &int_settings, &ires);
 			E += occupations[i]*ires.integral;
 		}
 	}
 
 	/* |a|^2|b|^2 terms */
 	int_settings.userdata = &p;
+	struct quadgk_result ires;
 	for (u32 i = 0; i < comp_count; ++i) {
 		for (u32 j = 0; j < comp_count; ++j) {
 			f64 factor = 0.0;
@@ -157,7 +159,7 @@ f64 full_energy(struct nlse_settings settings,
 
 			p.coeff_a = &coeff[i*coeff_count];
 			p.coeff_b = &coeff[j*coeff_count];
-			integration_result ires = quadgk(full_energy_integrand, -INFINITY, INFINITY, int_settings);
+			quadgk_infinite_interval(full_energy_integrand, &int_settings, &ires);
 			E += g0[i*comp_count + j] * occupations[i] * factor * ires.integral;
 		}
 	}

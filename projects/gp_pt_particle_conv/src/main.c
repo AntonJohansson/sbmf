@@ -11,7 +11,7 @@
 #define GAA (1.0/ORDER)
 
 #define USE_GAUSSIAN_GUESS 0
-#define USE_TF_GUESS 1
+#define USE_TF_GUESS 0
 
 static f64 g0[] = { GAA };
 static i64 occupations[] = {NA};
@@ -67,14 +67,14 @@ int main() {
 
 	//u32 bs[] = {4,8,12,16,24,32,48,64};
 	//u32 os[] = {5,10,50,100,200,300,400,500,600,700,800,900,1000};
-	i64 os[] = {/*ORDER, 2*ORDER, 3*ORDER, 4*ORDER, 5*ORDER, 6*ORDER, 7*ORDER,*/ 8*ORDER, 9*ORDER};
+	i64 os[] = {ORDER, 2*ORDER, 3*ORDER, 4*ORDER , 5*ORDER, 6*ORDER, 7*ORDER, 8*ORDER, 9*ORDER};
 	struct nlse_settings settings = {
         .spatial_pot_perturbation = perturbation,
 		.max_iterations = 1000,
 		.max_integration_evals = 1e5,
-		.error_tol = 1e-9,
+		.error_tol = 1e-10,
 
-        .num_basis_funcs = 16,
+        .num_basis_funcs = 32,
 		.basis = ho_basis,
 
 		.hamiltonian_mixing = 0.6,

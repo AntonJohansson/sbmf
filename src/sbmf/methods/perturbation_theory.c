@@ -57,8 +57,8 @@ static inline f64 V(struct pt_settings* pt, u32 A, u32 B, u32 i, u32 j, u32 k, u
 	};
 
     struct quadgk_settings settings = {
-        .abs_error_tol = 1e-10,
-        .rel_error_tol = 1e-7,
+        .abs_error_tol = 1e-15,
+        .rel_error_tol = 1e-8,
 		.gk = gk15,
         .max_evals = 1e5,
 		.userdata = &p,
@@ -193,6 +193,7 @@ struct pt_result rayleigh_schroedinger_pt(struct nlse_result res, f64* g0, i64* 
 	sbmf_log_info("\tE0+E1+E2: %.10lf", E0+E1+E2);
 
 	f64 E3 = 0.0;
+	f64 E3_before = 0.0;
 #if 1
 	{
 		struct index {u32 m, n, p, q;};
@@ -204,8 +205,9 @@ struct pt_result rayleigh_schroedinger_pt(struct nlse_result res, f64* g0, i64* 
 		/* mm,mm */
 		/* states_to_include */
 		sbmf_log_info("mm,mm");
+		E3_before = E3;
 		for (u32 A = 0; A < res.component_count; ++A) {
-#pragma omp parallel for reduction(+: E3)
+//#pragma omp parallel for reduction(+: E3)
 			for (u32 m = 1; m < states_to_include; ++m) {
 				//sbmf_log_info("\t(%u,%u),(%u,%u)", m,m,m,m);
 				f64 v_AA_mmmm = V(&pt, A,A, m,m,m,m);
@@ -235,13 +237,14 @@ struct pt_result rayleigh_schroedinger_pt(struct nlse_result res, f64* g0, i64* 
 				E3 += (me1*me0*me1)/(Ediff*Ediff);
 			}
 		}
-		sbmf_log_info("\tE3: %lf", E3);
+		sbmf_log_info("\tE3: %lf -- contrib: %lf", E3, E3-E3_before);
 
 		/* mn,mn */
 		/* states_to_include * (states_to_include - 1)/2 */
 		sbmf_log_info("mn,mn");
+		E3_before = E3;
 		for (u32 A = 0; A < res.component_count; ++A) {
-#pragma omp parallel for reduction(+: E3)
+//#pragma omp parallel for reduction(+: E3)
 			for (u32 m = 1; m < states_to_include; ++m) {
 				for (u32 n = m+1; n < states_to_include; ++n) {
 					//sbmf_log_info("\t(%u,%u),(%u,%u)", m,n,m,n);
@@ -274,13 +277,14 @@ struct pt_result rayleigh_schroedinger_pt(struct nlse_result res, f64* g0, i64* 
 				}
 			}
 		}
-		sbmf_log_info("\tE3: %lf", E3);
+		sbmf_log_info("\tE3: %lf -- contrib: %lf", E3, E3-E3_before);
 
 		/* mm,nn */
 		/* states_to_include * (states_to_include - 1)/2 */
 		sbmf_log_info("mm,nn");
+		E3_before = E3;
 		for (u32 A = 0; A < res.component_count; ++A) {
-#pragma omp parallel for reduction(+: E3)
+//#pragma omp parallel for reduction(+: E3)
 			for (u32 m = 1; m < states_to_include; ++m) {
 				for (u32 n = m+1; n < states_to_include; ++n) {
 					//sbmf_log_info("\t(%u,%u),(%u,%u)", m,m,n,n);
@@ -299,13 +303,14 @@ struct pt_result rayleigh_schroedinger_pt(struct nlse_result res, f64* g0, i64* 
 				}
 			}
 		}
-		sbmf_log_info("\tE3: %lf", E3);
+		sbmf_log_info("\tE3: %lf -- contrib: %lf", E3, E3-E3_before);
 
 		/* mm,mp */
 		/* states_to_include * (states_to_include - 1) */
 		sbmf_log_info("mm,mp");
+		E3_before = E3;
 		for (u32 A = 0; A < res.component_count; ++A) {
-#pragma omp parallel for reduction(+: E3) collapse(2)
+//#pragma omp parallel for reduction(+: E3) collapse(2)
 			for (u32 m = 1; m < states_to_include; ++m) {
 				for (u32 p = 1; p < states_to_include; ++p) {
 					if (m == p)
@@ -328,11 +333,12 @@ struct pt_result rayleigh_schroedinger_pt(struct nlse_result res, f64* g0, i64* 
 				}
 			}
 		}
-		sbmf_log_info("\tE3: %lf", E3);
+		sbmf_log_info("\tE3: %lf -- contrib: %lf", E3, E3-E3_before);
 
 		/* mm,pq */
 		/* (states_to_include-1)*(states_to_include - 2)*(states_to_include-3) */
 		sbmf_log_info("mm,pq");
+		E3_before = E3;
 		{
 			const u32 len = (states_to_include-1)*(states_to_include - 2)*(states_to_include-3)/2;
 			struct index inds[len];
@@ -350,8 +356,9 @@ struct pt_result rayleigh_schroedinger_pt(struct nlse_result res, f64* g0, i64* 
 			}
 
 			for (u32 A = 0; A < res.component_count; ++A) {
-#pragma omp parallel for reduction(+: E3)
+//#pragma omp parallel for reduction(+: E3)
 				for (u32 i = 0; i < len; ++i) {
+					//sbmf_log_info("\t(%u,%u),(%u,%u)", inds[i].m,  inds[i].n, inds[i].p, inds[i].q);
 					f64 v_AA_mmpq = V(&pt, A,A, inds[i].m, inds[i].n, inds[i].p, inds[i].q);
 
 					/* Two double substitutions */
@@ -369,11 +376,12 @@ struct pt_result rayleigh_schroedinger_pt(struct nlse_result res, f64* g0, i64* 
 				}
 			}
 		}
-		sbmf_log_info("\tE3: %lf", E3);
+		sbmf_log_info("\tE3: %lf -- contrib: %lf", E3, E3-E3_before);
 
 		/* mp,mq */
 		/* states_to_include*(states_to_include - 1)*(states_to_include-2)/2 */
 		sbmf_log_info("mp,mq");
+		E3_before = E3;
 		{
 			const u32 len = (states_to_include-1)*(states_to_include-2)*(states_to_include-3)/2;
 			u32 inds[len][4];
@@ -395,8 +403,9 @@ struct pt_result rayleigh_schroedinger_pt(struct nlse_result res, f64* g0, i64* 
 			}
 
 			for (u32 A = 0; A < res.component_count; ++A) {
-#pragma omp parallel for reduction(+: E3)
+//#pragma omp parallel for reduction(+: E3)
 				for (u32 i = 0; i < len; ++i) {
+					//sbmf_log_info("\t(%u,%u),(%u,%u)", inds[i][0],  inds[i][1], inds[i][2], inds[i][3]);
 					/* p0q0 */
 					f64 v_AA_p0q0 = V(&pt, A,A, inds[i][1],0,inds[i][3],0);
 					/* mpmq */
@@ -414,11 +423,12 @@ struct pt_result rayleigh_schroedinger_pt(struct nlse_result res, f64* g0, i64* 
 				}
 			}
 		}
-		sbmf_log_info("\tE3: %lf", E3);
+		sbmf_log_info("\tE3: %lf -- contrib: %lf", E3, E3-E3_before);
 
 		/* mn,pq */
 		/* states_to_include choose 4 */
 		sbmf_log_info("mn,pq");
+		E3_before = E3;
 		{
 			const u32 len = n_choose_k(states_to_include-1, 4);
 			u32 inds[len][4];
@@ -438,9 +448,9 @@ struct pt_result rayleigh_schroedinger_pt(struct nlse_result res, f64* g0, i64* 
 			}
 
 			for (u32 A = 0; A < res.component_count; ++A) {
-#pragma omp parallel for reduction(+: E3)
+//#pragma omp parallel for reduction(+: E3)
 				for (u32 i = 0; i < len; ++i) {
-					//sbmf_log_info("\t(%u,%u),(%u,%u)", m,n,p,q);
+					//sbmf_log_info("\t(%u,%u),(%u,%u)", inds[i][0],  inds[i][1], inds[i][2], inds[i][3]);
 					f64 v_AA_mnpq = V(&pt, A,A, inds[i][0], inds[i][1], inds[i][2], inds[i][3]);
 
 					/* Two double substitutions */
@@ -456,7 +466,7 @@ struct pt_result rayleigh_schroedinger_pt(struct nlse_result res, f64* g0, i64* 
 				}
 			}
 		}
-		sbmf_log_info("\tE3: %lf", E3);
+		sbmf_log_info("\tE3: %lf -- contrib: %lf", E3, E3-E3_before);
 
 #if 1
 		/* AmBn,AmBn */
@@ -464,9 +474,10 @@ struct pt_result rayleigh_schroedinger_pt(struct nlse_result res, f64* g0, i64* 
 		sbmf_log_info("E3 before: %e", E3);
 		for (u32 A = 0; A < res.component_count; ++A) {
 			for (u32 B = A+1; B < res.component_count; ++B) {
-#pragma omp parallel for reduction(+: E3)
+//#pragma omp parallel for reduction(+: E3)
 				for (u32 m = 1; m < states_to_include; ++m) {
 					for (u32 n = 1; n < states_to_include; ++n) {
+						sbmf_log_info("\t(%u,%u) -- (%u,%u),(%u,%u)", A,B, m,n,m,n);
 						f64 v_AA_0000 = V(&pt, A,A, 0,0,0,0);
 						f64 v_BB_0000 = V(&pt, B,B, 0,0,0,0);
 						f64 v_AA_m0m0 = V(&pt, A,A, m,0,m,0);
@@ -509,12 +520,13 @@ struct pt_result rayleigh_schroedinger_pt(struct nlse_result res, f64* g0, i64* 
 				if (B == A)
 					continue;
 
-#pragma omp parallel for reduction(+: E3)
+//#pragma omp parallel for reduction(+: E3)
 				for (u32 m = 1; m < states_to_include; ++m) {
 					for (u32 n = 1; n < states_to_include; ++n) {
 						if (n == m) continue;
 						for (u32 p = n+1; p < states_to_include; ++p) {
 							if (p == m) continue;
+							sbmf_log_info("\t(%u,%u) -- (%u,%u),(%u,%u)", A,B, m,n,m,p);
 							f64 v_BB_0n0p = V(&pt, B,B, 0,n,0,p);
 							f64 v_AB_mnmp = V(&pt, A,B, m,n,m,p);
 							f64 v_AB_0n0p = V(&pt, A,B, 0,n,0,p);
@@ -543,7 +555,7 @@ struct pt_result rayleigh_schroedinger_pt(struct nlse_result res, f64* g0, i64* 
 			for (u32 B = A+1; B < res.component_count; ++B) {
 
 		/* states_to_include * (states_to_include - 1) */
-#pragma omp parallel for reduction(+: E3)
+//#pragma omp parallel for reduction(+: E3)
 				for (u32 m = 1; m < states_to_include; ++m) {
 					for (u32 n = 1; n < states_to_include; ++n){
 						if (n == m) continue;
@@ -551,6 +563,7 @@ struct pt_result rayleigh_schroedinger_pt(struct nlse_result res, f64* g0, i64* 
 							if (p == n || p == m) continue;
 							for (u32 q = 1; q < states_to_include; ++q) {
 								if (q == p || q == m || q == n) continue;
+								sbmf_log_info("\t(%u,%u) -- (%u,%u),(%u,%u)", A,B, m,n,p,q);
 
 								/* Making sure we avoid mnpq <-> pqmn */
 								if (m*10+n > p*10+q) continue;

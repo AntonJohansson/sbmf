@@ -4,16 +4,16 @@
 
 #include <stdio.h>
 
-#define NA (4)
+#define NA 4
 #define NB 0
 
-#define GAA (1.0/3.0)
+//#define GAA (1.0/1e5)
 //#define GAA (-4.0)
 //#define GAA (-10.0/(NA-1))
-//#define GAA (+0.5/1000)
-#define GAB (+1.0/1000)
-#define GBA (+1.0/1000)
-#define GBB (+0.5/1000)
+#define GAA (1.0/3.0)
+#define GAB (0.5)
+#define GBA (0.5)
+#define GBB (0)
 
 #define USE_TF_GUESS 0
 #define USE_GAUSSIAN_GUESS 0

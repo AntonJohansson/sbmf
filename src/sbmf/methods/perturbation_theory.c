@@ -194,6 +194,8 @@ struct pt_result rayleigh_schroedinger_pt(struct nlse_result res, f64* g0, i64* 
 
 	f64 E3 = 0.0;
 	f64 E3_before = 0.0;
+	f64 E3_0a_0b = 0.0;
+	f64 E3_ab_cd = 0.0;
 #if 1
 	{
 		struct index {u32 m, n, p, q;};
@@ -207,7 +209,7 @@ struct pt_result rayleigh_schroedinger_pt(struct nlse_result res, f64* g0, i64* 
 		sbmf_log_info("mm,mm");
 		E3_before = E3;
 		for (u32 A = 0; A < res.component_count; ++A) {
-//#pragma omp parallel for reduction(+: E3)
+#pragma omp parallel for reduction(+: E3)
 			for (u32 m = 1; m < states_to_include; ++m) {
 				//sbmf_log_info("\t(%u,%u),(%u,%u)", m,m,m,m);
 				f64 v_AA_mmmm = V(&pt, A,A, m,m,m,m);
@@ -235,6 +237,13 @@ struct pt_result rayleigh_schroedinger_pt(struct nlse_result res, f64* g0, i64* 
 				f64 Ediff = rs_2nd_order_ediff(&pt, A,A, m,m);
 
 				E3 += (me1*me0*me1)/(Ediff*Ediff);
+				E3_0a_0b += ((me1*me1)/(Ediff*Ediff)) * (
+						0.5*G0(&pt,A,A)*8*(particle_count[A]-2)*v_AA_m0m0
+						- G0(&pt,A,A)*(particle_count[A]-1)*(2*v_AA_m0m0)
+					);
+				E3_ab_cd += ((me1*me1)/(Ediff*Ediff)) * (
+						0.5*G0(&pt,A,A)*2*v_AA_mmmm
+					);
 			}
 		}
 		sbmf_log_info("\tE3: %lf -- contrib: %lf", E3, E3-E3_before);
@@ -244,7 +253,7 @@ struct pt_result rayleigh_schroedinger_pt(struct nlse_result res, f64* g0, i64* 
 		sbmf_log_info("mn,mn");
 		E3_before = E3;
 		for (u32 A = 0; A < res.component_count; ++A) {
-//#pragma omp parallel for reduction(+: E3)
+#pragma omp parallel for reduction(+: E3)
 			for (u32 m = 1; m < states_to_include; ++m) {
 				for (u32 n = m+1; n < states_to_include; ++n) {
 					//sbmf_log_info("\t(%u,%u),(%u,%u)", m,n,m,n);
@@ -274,6 +283,13 @@ struct pt_result rayleigh_schroedinger_pt(struct nlse_result res, f64* g0, i64* 
 					f64 me1 = rs_2nd_order_me(&pt, A,A, m,n);
 					f64 Ediff = rs_2nd_order_ediff(&pt, A,A, m,n);
 					E3 += (me1*me0*me1)/(Ediff*Ediff);
+					E3_0a_0b += ((me1*me1)/(Ediff*Ediff)) * (
+							0.5*G0(&pt,A,A)*(4*(particle_count[A]-2)*v_AA_m0m0 + 4*(particle_count[A]-2)*v_AA_n0n0)
+							- G0(&pt,A,A)*(particle_count[A]-1)*(v_AA_m0m0 + v_AA_n0n0)
+							);
+					E3_ab_cd += ((me1*me1)/(Ediff*Ediff)) * (
+							0.5*G0(&pt,A,A)*(4*v_AA_mnmn)
+							);
 				}
 			}
 		}
@@ -284,7 +300,7 @@ struct pt_result rayleigh_schroedinger_pt(struct nlse_result res, f64* g0, i64* 
 		sbmf_log_info("mm,nn");
 		E3_before = E3;
 		for (u32 A = 0; A < res.component_count; ++A) {
-//#pragma omp parallel for reduction(+: E3)
+#pragma omp parallel for reduction(+: E3)
 			for (u32 m = 1; m < states_to_include; ++m) {
 				for (u32 n = m+1; n < states_to_include; ++n) {
 					//sbmf_log_info("\t(%u,%u),(%u,%u)", m,m,n,n);
@@ -300,6 +316,9 @@ struct pt_result rayleigh_schroedinger_pt(struct nlse_result res, f64* g0, i64* 
 					f64 Ediff1 = rs_2nd_order_ediff(&pt, A,A, n,n);
 
 					E3 += (me1*me0*me2)/(Ediff0*Ediff1);
+					E3_ab_cd += ((me1*me2)/(Ediff0*Ediff1)) * (
+							G0(&pt,A,A)*(v_AA_mmnn)
+							);
 				}
 			}
 		}
@@ -310,7 +329,7 @@ struct pt_result rayleigh_schroedinger_pt(struct nlse_result res, f64* g0, i64* 
 		sbmf_log_info("mm,mp");
 		E3_before = E3;
 		for (u32 A = 0; A < res.component_count; ++A) {
-//#pragma omp parallel for reduction(+: E3) collapse(2)
+#pragma omp parallel for reduction(+: E3) collapse(2)
 			for (u32 m = 1; m < states_to_include; ++m) {
 				for (u32 p = 1; p < states_to_include; ++p) {
 					if (m == p)
@@ -330,6 +349,12 @@ struct pt_result rayleigh_schroedinger_pt(struct nlse_result res, f64* g0, i64* 
 					f64 Ediff1  = rs_2nd_order_ediff(&pt, A,A, m,p);
 
 					E3 += (me1*me0*me2)/(Ediff0*Ediff1);
+					E3_0a_0b += ((me1*me2)/(Ediff0*Ediff1)) * (
+							G0(&pt,A,A) * (particle_count[A]-3)*v_AA_m0p0
+							);
+					E3_ab_cd += ((me1*me2)/(Ediff0*Ediff1)) * (
+							G0(&pt,A,A)*(sqrt(2)*v_AA_mmmp)
+							);
 				}
 			}
 		}
@@ -356,7 +381,7 @@ struct pt_result rayleigh_schroedinger_pt(struct nlse_result res, f64* g0, i64* 
 			}
 
 			for (u32 A = 0; A < res.component_count; ++A) {
-//#pragma omp parallel for reduction(+: E3)
+#pragma omp parallel for reduction(+: E3)
 				for (u32 i = 0; i < len; ++i) {
 					//sbmf_log_info("\t(%u,%u),(%u,%u)", inds[i].m,  inds[i].n, inds[i].p, inds[i].q);
 					f64 v_AA_mmpq = V(&pt, A,A, inds[i].m, inds[i].n, inds[i].p, inds[i].q);
@@ -373,6 +398,9 @@ struct pt_result rayleigh_schroedinger_pt(struct nlse_result res, f64* g0, i64* 
 					f64 Ediff1  = rs_2nd_order_ediff(&pt, A,A, inds[i].p, inds[i].q);
 
 					E3 += (me1*me0*me2)/(Ediff0*Ediff1);
+					E3_ab_cd += ((me1*me2)/(Ediff0*Ediff1)) * (
+							G0(&pt,A,A)*(sqrt(2)*v_AA_mmpq)
+							);
 				}
 			}
 		}
@@ -403,7 +431,7 @@ struct pt_result rayleigh_schroedinger_pt(struct nlse_result res, f64* g0, i64* 
 			}
 
 			for (u32 A = 0; A < res.component_count; ++A) {
-//#pragma omp parallel for reduction(+: E3)
+#pragma omp parallel for reduction(+: E3)
 				for (u32 i = 0; i < len; ++i) {
 					//sbmf_log_info("\t(%u,%u),(%u,%u)", inds[i][0],  inds[i][1], inds[i][2], inds[i][3]);
 					/* p0q0 */
@@ -420,10 +448,18 @@ struct pt_result rayleigh_schroedinger_pt(struct nlse_result res, f64* g0, i64* 
 					f64 me2 	= rs_2nd_order_me(&pt,    A,A, inds[i][2], inds[i][3]);
 					f64 Ediff1  = rs_2nd_order_ediff(&pt, A,A, inds[i][2], inds[i][3]);
 					E3 += (me1*me0*me2)/(Ediff0*Ediff1);
+					E3_0a_0b += ((me1*me2)/(Ediff0*Ediff1)) * (
+							G0(&pt,A,A)*(particle_count[A]-3)*v_AA_p0q0
+							);
+					E3_ab_cd += ((me1*me2)/(Ediff0*Ediff1)) * (
+							G0(&pt,A,A)*(2*v_AA_mpmq)
+							);
 				}
 			}
 		}
 		sbmf_log_info("\tE3: %lf -- contrib: %lf", E3, E3-E3_before);
+
+		sbmf_log_info("--------: 0a,0b %e", E3_0a_0b);
 
 		/* mn,pq */
 		/* states_to_include choose 4 */
@@ -448,7 +484,7 @@ struct pt_result rayleigh_schroedinger_pt(struct nlse_result res, f64* g0, i64* 
 			}
 
 			for (u32 A = 0; A < res.component_count; ++A) {
-//#pragma omp parallel for reduction(+: E3)
+#pragma omp parallel for reduction(+: E3)
 				for (u32 i = 0; i < len; ++i) {
 					//sbmf_log_info("\t(%u,%u),(%u,%u)", inds[i][0],  inds[i][1], inds[i][2], inds[i][3]);
 					f64 v_AA_mnpq = V(&pt, A,A, inds[i][0], inds[i][1], inds[i][2], inds[i][3]);
@@ -463,21 +499,28 @@ struct pt_result rayleigh_schroedinger_pt(struct nlse_result res, f64* g0, i64* 
 					f64 Ediff1  = rs_2nd_order_ediff(&pt, A,A, inds[i][2], inds[i][3]);
 
 					E3 += (me1*me0*me2)/(Ediff0*Ediff1);
+					E3_ab_cd += ((me1*me2)/(Ediff0*Ediff1)) * (
+							G0(&pt,A,A)*(2*v_AA_mnpq)
+							);
 				}
 			}
 		}
 		sbmf_log_info("\tE3: %lf -- contrib: %lf", E3, E3-E3_before);
 
-#if 1
+		sbmf_log_info("----------: ab,cd: %e", E3_ab_cd);
+
+#if 0
 		/* AmBn,AmBn */
 		sbmf_log_info("AmBn,AmBn; AmBm,AmBm");
-		sbmf_log_info("E3 before: %e", E3);
+		E3_before = E3;
 		for (u32 A = 0; A < res.component_count; ++A) {
 			for (u32 B = A+1; B < res.component_count; ++B) {
-//#pragma omp parallel for reduction(+: E3)
+#pragma omp parallel for reduction(+: E3)
 				for (u32 m = 1; m < states_to_include; ++m) {
 					for (u32 n = 1; n < states_to_include; ++n) {
-						sbmf_log_info("\t(%u,%u) -- (%u,%u),(%u,%u)", A,B, m,n,m,n);
+						if (((m ^ n) & 1) != 0)
+							continue;
+
 						f64 v_AA_0000 = V(&pt, A,A, 0,0,0,0);
 						f64 v_BB_0000 = V(&pt, B,B, 0,0,0,0);
 						f64 v_AA_m0m0 = V(&pt, A,A, m,0,m,0);
@@ -504,6 +547,7 @@ struct pt_result rayleigh_schroedinger_pt(struct nlse_result res, f64* g0, i64* 
 						/* One double substituion */
 						f64 me1 	= rs_2nd_order_me(&pt,    A,B, m,n);
 						f64 Ediff0  = rs_2nd_order_ediff(&pt, A,B, m,n);
+						sbmf_log_info("\t(%u,%u) -- (%u,%u),(%u,%u) -- %lf, %e", A,B, m,n,m,n, me0,me1);
 
 						E3 += (me1*me0*me1)/(Ediff0*Ediff0);
 					}
@@ -511,22 +555,28 @@ struct pt_result rayleigh_schroedinger_pt(struct nlse_result res, f64* g0, i64* 
 
 			}
 		}
+		sbmf_log_info("\tE3: %lf -- contrib: %lf", E3, E3-E3_before);
 
 		/* AmBn,AmBp */
+		/* Bn,Bp have to have the same parity */
 		sbmf_log_info("AmBn,AmBp");
-		sbmf_log_info("E3 before: %e", E3);
+		E3_before = E3;
 		for (u32 A = 0; A < res.component_count; ++A) {
 			for (u32 B = 0; B < res.component_count; ++B) {
 				if (B == A)
 					continue;
 
-//#pragma omp parallel for reduction(+: E3)
+#pragma omp parallel for reduction(+: E3)
 				for (u32 m = 1; m < states_to_include; ++m) {
 					for (u32 n = 1; n < states_to_include; ++n) {
 						if (n == m) continue;
 						for (u32 p = n+1; p < states_to_include; ++p) {
 							if (p == m) continue;
-							sbmf_log_info("\t(%u,%u) -- (%u,%u),(%u,%u)", A,B, m,n,m,p);
+							if (((m ^ n) & 1) != 0)
+								continue;
+							if (((m ^ p) & 1) != 0)
+								continue;
+
 							f64 v_BB_0n0p = V(&pt, B,B, 0,n,0,p);
 							f64 v_AB_mnmp = V(&pt, A,B, m,n,m,p);
 							f64 v_AB_0n0p = V(&pt, A,B, 0,n,0,p);
@@ -540,30 +590,33 @@ struct pt_result rayleigh_schroedinger_pt(struct nlse_result res, f64* g0, i64* 
 							f64 me2 	= rs_2nd_order_me(&pt,    A,B, m,p);
 							f64 Ediff1  = rs_2nd_order_ediff(&pt, A,B, m,p);
 
+							//sbmf_log_info("\t(%u,%u) -- (%u,%u),(%u,%u) -- %lf, %lf,    %lf, %lf, %lf", A,B, m,n,m,p, v_AB_mnmp, v_AB_0n0p, me0,me1,me2);
+
 							E3 += (me1*me0*me2)/(Ediff0*Ediff1);
 						}
 					}
 				}
 			}
 		}
+		sbmf_log_info("\tE3: %lf -- contrib: %lf", E3, E3-E3_before);
 
 
 		/* AmBn,ApBq */
 		sbmf_log_info("AmBn,ApBq");
-		sbmf_log_info("E3 before: %e", E3);
+		E3_before = E3;
 		for (u32 A = 0; A < res.component_count; ++A) {
 			for (u32 B = A+1; B < res.component_count; ++B) {
 
 		/* states_to_include * (states_to_include - 1) */
-//#pragma omp parallel for reduction(+: E3)
+#pragma omp parallel for reduction(+: E3)
 				for (u32 m = 1; m < states_to_include; ++m) {
 					for (u32 n = 1; n < states_to_include; ++n){
 						if (n == m) continue;
-						for (u32 p = 1; p < states_to_include; ++p) {
+						for (u32 p = m+1; p < states_to_include; ++p) {
 							if (p == n || p == m) continue;
-							for (u32 q = 1; q < states_to_include; ++q) {
+							for (u32 q = n+1; q < states_to_include; ++q) {
 								if (q == p || q == m || q == n) continue;
-								sbmf_log_info("\t(%u,%u) -- (%u,%u),(%u,%u)", A,B, m,n,p,q);
+								//sbmf_log_info("\t(%u,%u) -- (%u,%u),(%u,%u)", A,B, m,n,p,q);
 
 								/* Making sure we avoid mnpq <-> pqmn */
 								if (m*10+n > p*10+q) continue;
@@ -586,8 +639,10 @@ struct pt_result rayleigh_schroedinger_pt(struct nlse_result res, f64* g0, i64* 
 
 			}
 		}
+		sbmf_log_info("\tE3: %lf -- contrib: %lf", E3, E3-E3_before);
 #endif
 
+		sbmf_log_info("\tE3 last term: %lf", E1*E3_last_term);
 		E3 -= E1 * E3_last_term;
 	}
 #endif
@@ -597,5 +652,273 @@ struct pt_result rayleigh_schroedinger_pt(struct nlse_result res, f64* g0, i64* 
 		.E1 = E1,
 		.E2 = E2,
 		.E3 = E3,
+	};
+}
+
+struct pt_result rayleigh_schroedinger_pt_rf(struct nlse_result res, u32 component, f64* g0, i64* particle_count) {
+	/* order of hamiltonians, that is include all states */
+	const u32 states_to_include = res.coeff_count;
+	const i64* N = particle_count;
+	sbmf_log_info("running rayleigh schödinger PT rf:\n    components: %u\n    states: %u\n", res.component_count, states_to_include);
+
+	struct eigen_result_real states[res.component_count];
+	for (u32 i = 0; i < res.component_count; ++i) {
+		states[i] = find_eigenpairs_full_real(res.hamiltonian[i]);
+		for (u32 j = 0; j < states_to_include; ++j) {
+			f64_normalize(&states[i].eigenvectors[j*res.coeff_count], &states[i].eigenvectors[j*res.coeff_count], res.coeff_count);
+		}
+	}
+
+	struct pt_settings pt = {
+		.res = &res,
+		.g0 = g0,
+		.particle_count = particle_count,
+		.states = states,
+		.N = states_to_include,
+		.L = res.coeff_count,
+	};
+
+	/* Zeroth order PT */
+	sbmf_log_info("Starting zeroth order PT");
+	f64 E0 = 0.0;
+	{
+		E0 += N[component] * E(&pt, component, 0);
+	}
+	sbmf_log_info("\tE0: %e", E0);
+
+	/* First order PT */
+	sbmf_log_info("Starting first order PT");
+	f64 E1 = 0.0;
+	{
+		/* Handles interaction within component */
+		E1 += -0.5 * G0(&pt,component,component) * N[component] * (N[component]-1) * V(&pt, component,component, 0,0,0,0);
+	}
+	sbmf_log_info("\tE1: %e", E1);
+
+	const u32 pt2_cache_size = ((states_to_include-1)*(states_to_include))/2;
+	f64 pt2_cache[pt2_cache_size];
+
+	/* Assumes i in [0,states_to_include), j in [0,states_to_include) */
+#define PT2_CACHE_INDEX(i, j) \
+	((i)*states_to_include - (((i)*(i+1))/2) + j)
+
+
+	/* Second order PT */
+	sbmf_log_info("Starting second order PT");
+	f64 E2 = 0.0;
+	{
+		/*
+		 * Double substitutions (both excitations within same component),
+		 * loop over unique pairs (j,k).
+		 */
+#pragma omp parallel for reduction(+: E2)
+		for (u32 i = 1; i < states_to_include; ++i) {
+			for (u32 j = i; j < states_to_include; ++j) {
+				f64 me = rs_2nd_order_me(&pt, component,component, i,j);
+				f64 Ediff = rs_2nd_order_ediff(&pt, component,component, i,j);
+
+				pt2_cache[PT2_CACHE_INDEX(i-1, j-i)] = me/Ediff;
+
+				E2 += me*me/(Ediff);
+			}
+		}
+	}
+	sbmf_log_info("\tE2: %e", E2);
+
+	/* Third order PT */
+	sbmf_log_info("Starting third order PT");
+	f64 E3 = 0.0;
+	{
+		f64 E_00_00 = 0;
+		{
+#pragma omp parallel for reduction(+: E_00_00)
+			for (u32 m = 1; m < states_to_include; ++m) {
+				for (u32 n = m; n < states_to_include; ++n) {
+					f64 tmn = pt2_cache[PT2_CACHE_INDEX(m-1,n-m)];
+					E_00_00 += tmn*tmn;
+				}
+			}
+
+			f64 v_00_00 = G0(&pt,component,component)*V(&pt, component,component, 0,0,0,0);
+			E_00_00 *= v_00_00;
+		}
+		sbmf_log_info("\t\t00,00: %e", E_00_00);
+
+		f64 E_m0_n0 = 0;
+		{
+			const f64 c_root_2_minus_1 = sqrt(2.0) - 1.0;
+			const f64 c_3_minus_2_root_2 = 3.0 - 2.0*sqrt(2.0);
+
+#pragma omp parallel for reduction(+: E_m0_n0)
+			for (u32 m = 1; m < states_to_include; ++m) {
+				for (u32 n = 1; n < states_to_include; ++n) {
+					const f64 v_m0_n0 = G0(&pt,component,component)*V(&pt, component,component, m,0,n,0);
+
+					f64 sum = 0.0;
+					for (u32 p = 1; p < states_to_include; ++p) {
+
+						f64 tmp = 0;
+						if (p >= m)
+							tmp = pt2_cache[PT2_CACHE_INDEX(m-1, p-m)];
+						else
+							tmp = pt2_cache[PT2_CACHE_INDEX(p-1, m-p)];
+
+						f64 tnp = 0;
+						if (p >= n)
+							tnp = pt2_cache[PT2_CACHE_INDEX(n-1, p-n)];
+						else
+							tnp = pt2_cache[PT2_CACHE_INDEX(p-1, n-p)];
+
+						const f64 delta_mp = (m == p) ? 1.0 : 0.0;
+						const f64 delta_np = (n == p) ? 1.0 : 0.0;
+
+						const f64 coeff = 1 + c_root_2_minus_1*(delta_mp + delta_np) + c_3_minus_2_root_2*(delta_mp*delta_np);
+						sum += coeff * tmp * tnp;
+					}
+
+					E_m0_n0 += v_m0_n0 * sum;
+
+				}
+			}
+
+			E_m0_n0 *= (N[component] - 3);
+		}
+		sbmf_log_info("\t\tm0,n0: %e", E_m0_n0);
+
+		f64 E_mn_pq = 0;
+		{
+			const f64 c_root_2_minus_2 = sqrt(2.0) - 2.0;
+			const f64 c_3_minus_2_root_2 = 3.0 - 2.0*sqrt(2.0);
+
+#pragma omp parallel for reduction(+: E_mn_pq)
+			for (u32 m = 1; m < states_to_include; ++m) {
+				for (u32 n = m; n < states_to_include; ++n) {
+					if (((m ^ n) & 1) != 0)
+						continue;
+
+					f64 tmn = pt2_cache[PT2_CACHE_INDEX(m-1,n-m)];
+					const f64 delta_mn = (m == n) ? 1.0 : 0.0;
+
+					for (u32 p = 1; p < states_to_include; ++p) {
+						for (u32 q = p; q < states_to_include; ++q) {
+							if (((m ^ n) & 1) != 0)
+								continue;
+
+							f64 v_mn_pq = G0(&pt,component,component)*V(&pt, component,component, m,n,p,q);
+							f64 tpq = pt2_cache[PT2_CACHE_INDEX(p-1,q-p)];
+
+							const f64 delta_pq = (p == q) ? 1.0 : 0.0;
+							const f64 coeff = 2.0 + c_root_2_minus_2*(delta_mn + delta_pq) + c_3_minus_2_root_2*(delta_mn*delta_pq);
+							E_mn_pq += coeff*tmn*tpq*v_mn_pq;
+						}
+					}
+
+				}
+			}
+		}
+		sbmf_log_info("\t\tmn,pq: %e", E_mn_pq);
+
+		E3 = E_00_00 + E_m0_n0 + E_mn_pq;
+	}
+	sbmf_log_info("\tE3: %e", E3);
+
+	return (struct pt_result) {
+		.E0 = E0,
+		.E1 = E1,
+		.E2 = E2,
+		.E3 = E3,
+	};
+}
+
+struct pt_result rayleigh_schroedinger_pt_rf_2comp(struct nlse_result res, f64* g0, i64* particle_count) {
+	/* order of hamiltonians, that is include all states */
+	const u32 states_to_include = res.coeff_count;
+	const i64* N = particle_count;
+	sbmf_log_info("running rayleigh schödinger PT rf:\n    components: %u\n    states: %u\n", res.component_count, states_to_include);
+
+	struct eigen_result_real states[res.component_count];
+	for (u32 i = 0; i < res.component_count; ++i) {
+		states[i] = find_eigenpairs_full_real(res.hamiltonian[i]);
+		for (u32 j = 0; j < states_to_include; ++j) {
+			f64_normalize(&states[i].eigenvectors[j*res.coeff_count], &states[i].eigenvectors[j*res.coeff_count], res.coeff_count);
+		}
+	}
+
+	struct pt_settings pt = {
+		.res = &res,
+		.g0 = g0,
+		.particle_count = particle_count,
+		.states = states,
+		.N = states_to_include,
+		.L = res.coeff_count,
+	};
+
+	struct pt_result res_comp_A = rayleigh_schroedinger_pt_rf(res, 0, g0, particle_count);
+	struct pt_result res_comp_B = rayleigh_schroedinger_pt_rf(res, 1, g0, particle_count);
+
+	/* Zeroth order PT */
+	sbmf_log_info("Starting zeroth order PT");
+	f64 E0 = 0.0;
+	{
+		E0 = res_comp_A.E0 + res_comp_B.E0;
+	}
+	sbmf_log_info("\tE0: %e", E0);
+
+	/* First order PT */
+	sbmf_log_info("Starting first order PT");
+	f64 E1 = 0.0;
+	{
+		E1 = res_comp_A.E1 + res_comp_B.E1;
+		/* Handles interaction between components */
+		for (u32 A = 0; A < res.component_count; ++A) {
+			for (u32 B = A+1; B < res.component_count; ++B) {
+				E1 += -G0(&pt,A,B) * N[A] * N[B] * V(&pt, A,B, 0,0,0,0);
+			}
+		}
+	}
+	sbmf_log_info("\tE1: %e", E1);
+
+	const u32 pt2_cache_size = (states_to_include-1)*(states_to_include-1);
+	f64 pt2_cache_AB[pt2_cache_size];
+
+	/* Assumes i in [0,states_to_include), j in [0,states_to_include) */
+#define PT2_CACHE_AB_INDEX(i, j) \
+	(i)*(states_to_include-1) + (j)
+
+	/* Second order PT */
+	sbmf_log_info("Starting second order PT");
+	f64 E2 = 0.0;
+	{
+		/*
+		 * Double substitutions (separate components).
+		 * A,B refers to components.
+		 */
+		for (u32 A = 0; A < res.component_count; ++A) {
+			for (u32 B = A+1; B < res.component_count; ++B) {
+				/*
+				 * loop over all combinations of states in components
+				 * A,B.
+				 */
+				#pragma omp parallel for reduction(+: E2)
+				for (u32 i = 1; i < states_to_include; ++i) {
+					for (u32 j = 1; j < states_to_include; ++j) {
+						f64 me = rs_2nd_order_me(&pt, A,B, i,j);
+						f64 Ediff = rs_2nd_order_ediff(&pt, A,B, i,j);
+
+						pt2_cache_AB[PT2_CACHE_AB_INDEX(i-1, j-1)] = me/Ediff;
+
+						E2 += me*me/(Ediff);
+					}
+				}
+			}
+		}
+	}
+	sbmf_log_info("\tE2: %e", E2);
+
+	return (struct pt_result) {
+		.E0 = E0,
+		.E1 = E1,
+		.E2 = E2,
+		.E3 = 0,
 	};
 }

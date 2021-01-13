@@ -25,10 +25,10 @@ int main() {
 
 	i64 occupations[] = {NA,NB};
 
-	struct nlse_result res = nlse_read_from_binary_file("outbin_1comp");
+	struct nlse_result res = nlse_read_from_binary_file("outbin_50");
 
 	{
-		struct pt_result ptres = rayleigh_schroedinger_pt(res, g0, occupations);
+		struct pt_result ptres = rayleigh_schroedinger_pt_rf(res, g0, occupations);
 		printf("E0:          %.15lf\n", ptres.E0);
 		printf("E1:          %.15lf\n", ptres.E1);
 		printf("E2:          %.15lf\n", ptres.E2);

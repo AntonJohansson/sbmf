@@ -5,19 +5,19 @@
 #include <stdio.h>
 
 #define NA 4
-#define NB 0
+#define NB 4
 
 //#define GAA (1.0/1e5)
 //#define GAA (-4.0)
 //#define GAA (-10.0/(NA-1))
-#define GAA (1.0/3.0)
+#define GAA (0)
 #define GAB (0.5)
 #define GBA (0.5)
 #define GBB (0)
 
 #define USE_TF_GUESS 0
 #define USE_GAUSSIAN_GUESS 0
-#define COMPONENT_COUNT 1
+#define COMPONENT_COUNT 2
 
 //#define PERTURBATION(x) 2*gaussian(x, 0, 0.2)
 #define PERTURBATION(x) 0.0
@@ -186,7 +186,7 @@ int main() {
 		.max_integration_evals = 1e5,
 		.error_tol = 1e-10,
 
-        .num_basis_funcs = 50,
+        .num_basis_funcs = 14,
 		.basis = ho_basis,
 
 		.zero_threshold = 1e-10,
@@ -282,7 +282,7 @@ int main() {
 
 #if 1
 	{
-		struct pt_result ptres = rayleigh_schroedinger_pt(res, g0, occupations);
+		struct pt_result ptres = rayleigh_schroedinger_pt_rf_2comp(res, g0, occupations);
 		printf("E0:          %.15lf\n", ptres.E0);
 		printf("E1:          %.15lf\n", ptres.E1);
 		printf("E2:          %.15lf\n", ptres.E2);

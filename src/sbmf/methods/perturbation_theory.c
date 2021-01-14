@@ -1052,8 +1052,7 @@ static inline f64 en_nHn(struct pt_settings* pt, u32 A, u32 i, u32 j) {
 		}
 
 		/* <mm|H|mm> */
-		return 2*en_nhn(pt, A, i, i)
-			+ (pt->particle_count[A]-2) * en_nhn(pt, A, 0, 0)
+		return 2*en_nhn(pt, A, i,i) + (pt->particle_count[A]-2) * en_nhn(pt, A, 0,0)
 			+ 0.5 * G0(pt,A,A) * (
 						2*V(pt, A,A, i,i,i,i)
 						+8*(pt->particle_count[A]-2)*V(pt, A,A, i,0,i,0)
@@ -1063,7 +1062,7 @@ static inline f64 en_nHn(struct pt_settings* pt, u32 A, u32 i, u32 j) {
 		/* <mn|H|mn> */
 		return en_nhn(pt, A, i,i) + en_nhn(pt, A, j,j) + (pt->particle_count[A]-2) * en_nhn(pt, A, 0,0)
 			+ 0.5 * G0(pt,A,A) * (
-						2*V(pt, A,A, i,j,i,j)
+						4*V(pt, A,A, i,j,i,j)
 						+4*(pt->particle_count[A]-2)*V(pt, A,A, i,0,i,0)
 						+4*(pt->particle_count[A]-2)*V(pt, A,A, j,0,j,0)
 						+(pt->particle_count[A]-2)*(pt->particle_count[A]-3)*V(pt, A,A, 0,0,0,0)

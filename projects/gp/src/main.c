@@ -186,7 +186,7 @@ int main() {
 		.max_integration_evals = 1e5,
 		.error_tol = 1e-10,
 
-        .num_basis_funcs = 18,
+        .num_basis_funcs = 14,
 		.basis = ho_basis,
 
 		.zero_threshold = 1e-10,

@@ -91,7 +91,7 @@ int main() {
 		GBA, GBB
 	};
 
-	u32 occupations[] = {NA,NB};
+	i64 occupations[] = {NA,NB};
 
 	u32 bs[] = {4,8,12,16,24,32,48,64};
 	struct nlse_settings settings = {
@@ -117,7 +117,7 @@ int main() {
 		struct nlse_result res = grosspitaevskii(settings, component_count, occupations, guesses, g0);
 		f64 Egp = full_energy(settings, res.coeff_count, component_count, res.coeff, occupations, g0);
 
-		struct pt_result ptres = rayleigh_schroedinger_pt(res, g0, occupations);
+		struct pt_result ptres = rayleigh_schroedinger_pt_rf(res, 0, g0, occupations);
 		printf("E0:          %.15lf\n", ptres.E0);
 		printf("E1:          %.15lf\n", ptres.E1);
 		printf("E2:          %.15lf\n", ptres.E2);

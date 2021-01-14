@@ -5,6 +5,7 @@
 gnuplot -p -e "
 	set size 0.75,0.75;
 	set key box;
+	set key spacing 1.5;
 	set key outside right;
 	set format y '%.1f';
 

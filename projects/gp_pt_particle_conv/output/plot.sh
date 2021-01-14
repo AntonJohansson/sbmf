@@ -9,8 +9,8 @@ gnuplot -p -e "
 	set format y '%.3e';
 	set grid;
 
-	set xlabel 'Basis size (unitless)';
-	set ylabel 'Energy (a.u.)';
+	set xlabel 'Basis size (a.\,u.)';
+	set ylabel 'Energy (a.\,u.)';
 	plot
 		'out_32' u 1:4 	w linespoints lw 2 title '2',
 "

@@ -664,6 +664,7 @@ struct pt_result rayleigh_schroedinger_pt_rf(struct nlse_result res, u32 compone
 	struct eigen_result_real states[res.component_count];
 	for (u32 i = 0; i < res.component_count; ++i) {
 		states[i] = find_eigenpairs_full_real(res.hamiltonian[i]);
+		//states[i] = find_eigenpairs_sparse_real(res.hamiltonian[i], states_to_include, EV_SMALLEST);
 		for (u32 j = 0; j < states_to_include; ++j) {
 			f64_normalize(&states[i].eigenvectors[j*res.coeff_count], &states[i].eigenvectors[j*res.coeff_count], res.coeff_count);
 		}
@@ -915,10 +916,113 @@ struct pt_result rayleigh_schroedinger_pt_rf_2comp(struct nlse_result res, f64* 
 	}
 	sbmf_log_info("\tE2: %e", E2);
 
+	sbmf_log_info("Starting third order PT");
+	f64 E3 = 0.0;
+	{
+		E3 = res_comp_A.E3 + res_comp_B.E3;
+
+		f64 E_00_00 = 0.0;
+		{
+
+			f64 sum = 0;
+#pragma omp parallel for reduction(+: sum)
+			for (u32 m = 1; m < states_to_include; ++m) {
+				for (u32 n = 1; n < states_to_include; ++n) {
+					const f64 tmn = pt2_cache_AB[PT2_CACHE_AB_INDEX(m-1, n-1)];
+					sum += tmn*tmn;
+				}
+			}
+
+			for (u32 A = 0; A < res.component_count; ++A) {
+				f64 v_00_00 = V(&pt, A,A, 0,0,0,0);
+				E_00_00 += G0(&pt, A,A) * v_00_00 * sum * (-N[A]*(N[A]-1)/2);
+			}
+
+			for (u32 A = 0; A < res.component_count; ++A) {
+				for (u32 B = A+1; B < res.component_count; ++B) {
+					f64 v_00_00 = V(&pt, A,B, 0,0,0,0);
+					E_00_00 += G0(&pt, A,B) * v_00_00 * sum * (1 - N[A]*N[B]);
+				}
+			}
+
+		}
+		sbmf_log_info("\t\t00,00: %e", E_00_00);
+
+		f64 E_m0_n0 = 0.0;
+		{
+			const u32 A = 0;
+			const u32 B = 1;
+
+			{
+#pragma omp parallel for reduction(+: E_m0_n0)
+				for (u32 m = 1; m < states_to_include; ++m) {
+					for (u32 n = 1; n < states_to_include; ++n) {
+
+						f64 sum = 0;
+						for (u32 p = 1; p < states_to_include; ++p) {
+							const f64 tmp = pt2_cache_AB[PT2_CACHE_AB_INDEX(m-1, p-1)];
+							const f64 tnp = pt2_cache_AB[PT2_CACHE_AB_INDEX(n-1, p-1)];
+							sum += tmp*tnp;
+						}
+
+						f64 v_AA_m0_n0 = G0(&pt, A,A) * (N[A]-1) * V(&pt, A,A, m,0,n,0);
+						f64 v_AB_m0_n0 = - G0(&pt, A,B) * V(&pt, A,B, m,0,n,0);
+						E_m0_n0 += (v_AA_m0_n0 + v_AB_m0_n0) * sum;
+					}
+				}
+			}
+
+			{
+#pragma omp parallel for reduction(+: E_m0_n0)
+				for (u32 m = 1; m < states_to_include; ++m) {
+					for (u32 n = 1; n < states_to_include; ++n) {
+
+						f64 sum = 0;
+						for (u32 p = 1; p < states_to_include; ++p) {
+							const f64 tpm = pt2_cache_AB[PT2_CACHE_AB_INDEX(p-1, m-1)];
+							const f64 tpn = pt2_cache_AB[PT2_CACHE_AB_INDEX(p-1, n-1)];
+							sum += tpm*tpn;
+						}
+
+						f64 v_BB_m0_n0 = G0(&pt, B,B) * (N[B]-1) * V(&pt, B,B, m,0,n,0);
+						f64 v_AB_m0_n0 = - G0(&pt, A,B) * V(&pt, A,B, 0,m,0,n);
+						E_m0_n0 += (v_BB_m0_n0 + v_AB_m0_n0) * sum;
+					}
+				}
+			}
+		}
+		sbmf_log_info("\t\tm0,n0: %e", E_m0_n0);
+
+		f64 E_mn_pq = 0;
+		{
+			const u32 A = 0;
+			const u32 B = 1;
+
+#pragma omp parallel for reduction(+: E_mn_pq)
+			for (u32 m = 1; m < states_to_include; ++m) {
+				for (u32 n = 1; n < states_to_include; ++n) {
+					for (u32 p = 1; p < states_to_include; ++p) {
+						for (u32 q = 1; q < states_to_include; ++q) {
+							const f64 tmn = pt2_cache_AB[PT2_CACHE_AB_INDEX(m-1, n-1)];
+							const f64 tpq = pt2_cache_AB[PT2_CACHE_AB_INDEX(p-1, q-1)];
+							const f64 v_mn_pq = G0(&pt, A,B) * V(&pt, A,B, m,n,p,q);
+							E_mn_pq += v_mn_pq*tmn*tpq;
+						}
+					}
+				}
+			}
+		}
+		sbmf_log_info("\t\tmn,pq: %e", E_mn_pq);
+
+		E3 += E_00_00 + E_m0_n0 + E_mn_pq;
+	}
+	sbmf_log_info("\tE3: %e", E3);
+
+
 	return (struct pt_result) {
 		.E0 = E0,
 		.E1 = E1,
 		.E2 = E2,
-		.E3 = 0,
+		.E3 = E3,
 	};
 }

@@ -1,28 +1,33 @@
 struct eigen_result_real find_eigenpairs_full_real(struct symmetric_bandmat bm) {
-	f64* offdiag_elements = (f64*)sbmf_stack_push((bm.size-1)*sizeof(f64));
-	f64* colmaj_eigvecs = (f64*)sbmf_stack_push(bm.size*bm.size*sizeof(f64));
+	f64 offdiag_elements[(bm.size-1)];
+	f64 colmaj_eigvecs[bm.size*bm.size];
+	f64 temp_eigvals[bm.size];
+
+	/* Needed cuz dsbtrd overwrites diagonal of its input */
+	f64 data[bm.size*bm.size];
+	memcpy(data, bm.data, bm.size*bm.size*sizeof(f64));
 
 	struct eigen_result_real res = {
-		.eigenvalues = (f64*)sbmf_stack_push(bm.size * sizeof(f64)),
-		.eigenvectors = (f64*)sbmf_stack_push(bm.size * bm.size * sizeof(f64)),
-		.num_eigenpairs = bm.size,
+		.eigenvalues            = sbmf_stack_push(bm.size * sizeof(f64)),
+		.eigenvectors           = sbmf_stack_push(bm.size * bm.size * sizeof(f64)),
+		.num_eigenpairs         = bm.size,
 		.points_per_eigenvector = bm.size,
 	};
 
-	f64 temp_eigvals[bm.size];
-
+	sbmf_log_info("\t --- %lf", bm.data[symmetric_bandmat_index(bm, 15,15)]);
 	/* Start by reducing symmetric bandmatrix to tri-diagonal mat. */
 	{
 		i32 err = LAPACKE_dsbtrd(LAPACK_ROW_MAJOR, 'V', 'U',
 				bm.size,
 				bm.bandcount-1,
-				bm.data,
+				data,
 				bm.size,
 				temp_eigvals, offdiag_elements, colmaj_eigvecs,
 				bm.size);
 
 		assert(err == 0); // @TODO, handle these errors better
 	}
+	sbmf_log_info("\t --- %lf", bm.data[symmetric_bandmat_index(bm, 15,15)]);
 
 	/* Solve eigenvalue problem via QR factorisation of tridiagonal matrix. */
 	{

@@ -186,7 +186,7 @@ int main() {
 		.max_integration_evals = 1e5,
 		.error_tol = 1e-10,
 
-        .num_basis_funcs = 14,
+        .num_basis_funcs = 18,
 		.basis = ho_basis,
 
 		.zero_threshold = 1e-10,
@@ -216,7 +216,7 @@ int main() {
 
 	nlse_write_to_binary_file("outbin", res);
 
-#if 1
+#if 0
 	{
 		const u32 N = 256;
 		plot_init(800, 600, "gp2c");

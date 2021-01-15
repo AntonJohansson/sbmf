@@ -12,6 +12,7 @@ gnuplot -p -e "
 	set ylabel 'Energy (a.\,u.)';
 	plot
 		'out' u log(1):2:xtic(1) 	w linespoints lw 2 title '\$E_\\mathrm{GP}\$',
-		'out' u log(1):7 			w linespoints lw 2 title '\$E_\\mathrm{PT}\$',
+		'out' u log(1):7 			w linespoints lw 2 title '\$E_\\mathrm{RSPT}\$',
+		'out_en' u log(1):7 			w linespoints lw 2 title '\$E_\\mathrm{ENPT}\$',
 		2.713319038091934 lw 3 title '\$E_\\mathrm{CI}\$'
 "

@@ -42,7 +42,7 @@ void sbmf_log_panic(const char* fmt, ...);
 #include "methods/diis.c"
 #include "methods/nlse_solver.c"
 #include "methods/grosspitaevskii.c"
-//#include "methods/best_meanfield.c"
+#include "methods/best_meanfield.c"
 #include "methods/perturbation_theory.c"
 
 /*

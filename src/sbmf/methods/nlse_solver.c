@@ -193,6 +193,18 @@ struct nlse_result nlse_solver(struct nlse_settings settings, const u32 componen
 				component[i].guess.data.coeff_guess(&res.coeff[i*res.coeff_count], res.coeff_count, i);
 				break;
 			}
+			case RANDOM_GUESS: {
+				struct symmetric_bandmat bm = symmetric_bandmat_new_zero(N,N);
+				SYMMETRIC_BANDMAT_FOREACH(bm, r,c) {
+					u32 index = symmetric_bandmat_index(bm, r,c);
+					bm.data[index] = 2.0 * ((f64)rand()/(f64)RAND_MAX) - 1.0;
+				}
+				struct eigen_result_real eigres = find_eigenpairs_sparse_real(bm, 1, EV_SMALLEST);
+				for (u32 j = 0; j < res.coeff_count; ++j) {
+					res.coeff[i*res.coeff_count + j] = eigres.eigenvectors[j];
+				}
+				break;
+			}
 			default:
 				sbmf_log_error("nlse_solver: component %u has invalid guess!", i);
 				return res;

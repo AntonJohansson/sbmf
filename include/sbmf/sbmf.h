@@ -307,7 +307,8 @@ struct nlse_guess {
 	enum {
 		DEFAULT_GUESS 	= 0,
 		SPATIAL_GUESS 	= 1,
-		COEFF_GUESS   	= 2
+		COEFF_GUESS   	= 2,
+		RANDOM_GUESS 	= 3
 	} type;
 	union {
 		nlse_coeff_guess_func* 	 coeff_guess;
@@ -361,17 +362,17 @@ f64 full_energy(struct nlse_settings settings,
  * Best mean-field
  */
 
-//struct bestmf_result {
-//	f64 energy;
-//	u32 coeff_count;
-//	u32 comp_count;
-//	f64* coeff;
-//	f64 n1;
-//	f64 n2;
-//};
-//
-//struct bestmf_result best_meanfield(struct nlse_settings settings,
-//		const i64 particle_count, f64 g0, struct nlse_guess* guesses);
+struct bestmf_result {
+	f64 energy;
+	u32 coeff_count;
+	u32 comp_count;
+	f64* coeff;
+	f64 n1;
+	f64 n2;
+};
+
+struct bestmf_result best_meanfield(struct nlse_settings settings,
+		const i64 particle_count, f64 g0, struct nlse_guess* guesses);
 
 /*
  * Perturbation theory
@@ -385,3 +386,4 @@ struct pt_result rayleigh_schroedinger_pt(struct nlse_result res, f64* g0, i64* 
 struct pt_result rayleigh_schroedinger_pt_rf(struct nlse_result res, u32 component, f64* g0, i64* particle_count);
 struct pt_result rayleigh_schroedinger_pt_rf_2comp(struct nlse_result res, f64* g0, i64* particle_count);
 struct pt_result en_pt_rf(struct nlse_result res, u32 component, f64* g0, i64* particle_count);
+struct pt_result en_pt_rf_new(struct nlse_result res, u32 component, f64* g0, i64* particle_count);

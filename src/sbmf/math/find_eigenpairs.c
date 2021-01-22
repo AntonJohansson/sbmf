@@ -14,7 +14,6 @@ struct eigen_result_real find_eigenpairs_full_real(struct symmetric_bandmat bm) 
 		.points_per_eigenvector = bm.size,
 	};
 
-	sbmf_log_info("\t --- %lf", bm.data[symmetric_bandmat_index(bm, 15,15)]);
 	/* Start by reducing symmetric bandmatrix to tri-diagonal mat. */
 	{
 		i32 err = LAPACKE_dsbtrd(LAPACK_ROW_MAJOR, 'V', 'U',
@@ -27,7 +26,6 @@ struct eigen_result_real find_eigenpairs_full_real(struct symmetric_bandmat bm) 
 
 		assert(err == 0); // @TODO, handle these errors better
 	}
-	sbmf_log_info("\t --- %lf", bm.data[symmetric_bandmat_index(bm, 15,15)]);
 
 	/* Solve eigenvalue problem via QR factorisation of tridiagonal matrix. */
 	{

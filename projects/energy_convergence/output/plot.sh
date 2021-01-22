@@ -3,26 +3,26 @@
 	#set output 'imgs/econv_energy.eps';
 	#set key at graph 0.9,0.80;
 gnuplot -p -e "
+	set term epslatex;
+	set output 'imgs/econv_energy.eps';
 	set size 0.75,0.75;
 	set key box;
 	set key spacing 1.5;
 	set key outside right;
 	set format y '%.1f';
 
-	set term epslatex;
-	set output 'imgs/econv_energy.eps';
 	set xlabel 'Basis size (a.\,u.)';
 	set ylabel 'Energy per particle (a.\,u.)';
-	set yrange [-0.2:*];
+	set yrange [0:1.7];
 	plot
-		'out_H_1c_1g' 	u log(1):2:xtic(1) w linespoints lw 2 title 'System 1',
-		'out_H_1c_-1g' 	u log(1):2		   w linespoints lw 2 title 'System 2',
-		'out_HG_1c_1g' 	u log(1):2		   w linespoints lw 2 title 'System 3',
-		'out_HG_1c_-1g' u log(1):2		   w linespoints lw 2 title 'System 4',
-		'out_H_2c_+g' 	u log(1):2		   w linespoints lw 2 title 'System 5',
-		'out_H_2c_-g' 	u log(1):2		   w linespoints lw 2 title 'System 6',
-		'out_HG_2c_+g' 	u log(1):2		   w linespoints lw 2 title 'System 7',
-		'out_HG_2c_-g' 	u log(1):2		   w linespoints lw 2 title 'System 8',
+		'out_1_1c_VH' 	u log(1):2:xtic(1) w linespoints lw 2 title 'Sys. 1',
+		'out_-1_1c_VH' 	u log(1):2		   w linespoints lw 2 title 'Sys. 2',
+		'out_1_1c_VHG'	u log(1):2		   w linespoints lw 2 title 'Sys. 3',
+		'out_-1_1c_VHG'	u log(1):2		   w linespoints lw 2 title 'Sys. 4',
+		'out_+_2c_VH'	u log(1):2		   w linespoints lw 2 title 'Sys. 5',
+		'out_-_2c_VH'	u log(1):2		   w linespoints lw 2 title 'Sys. 6',
+		'out_+_2c_VHG'	u log(1):2		   w linespoints lw 2 title 'Sys. 7',
+		'out_-_2c_VHG'	u log(1):2		   w linespoints lw 2 title 'Sys. 8',
 "
 #set output 'imgs/econv_time.eps';
 #set key at graph 0.75,0.85;

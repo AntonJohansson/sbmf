@@ -72,8 +72,8 @@ static void compute_occupations(struct nlse_settings settings, const i64 particl
 		 * <p1|p2> = (n2-n1)/N = (N-n1-n1)/N
 		 *  => n1 = (N-N<p1|p2>)/2
 		 */
-		*n1 = particle_count * (1.0 - ires.integral) / 2.0;
-		*n2 = particle_count - *n1;
+		*n1 = lround(particle_count * (1.0 - ires.integral) / 2.0);
+		*n2 = lround(particle_count - *n1);
 	}
 }
 

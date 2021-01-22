@@ -6,37 +6,25 @@
 #include <string.h>
 #include <time.h>
 
-#define NA 2
-#define NB 2
+#define NA 8
+#define NB 8
 
-#define GAA (+0.5)
-#define GAB (1.0/NA)
-#define GBA (1.0/NB)
-#define GBB (+0.5)
+//#define GAA (+0.5)
+//#define GAB (1.0/NA)
+//#define GBA (1.0/NB)
+//#define GBB (+0.5)
 
-//#define GAA (-4.00/((f64)NA-1))
-//#define GAB (+1.00/((f64)NB))
-//#define GBA (+1.00/((f64)NA))
-//#define GBB (-4.00/((f64)NB-1))
+#define GAA (+0.50/((f64)NA-1))
+#define GAB (+1.00/((f64)NB))
+#define GBA (+1.00/((f64)NA))
+#define GBB (+0.50/((f64)NB-1))
 
 #define USE_GAUSSIAN_GUESS 0
+#define COMPONENT_COUNT 2
 
-//#define PERTURBATION(x) 2*gaussian(x, 0, 0.2)
-#define PERTURBATION(x) 0.0
+#define PERTURBATION(x) 2*gaussian(x, 0, 0.2)
+//#define PERTURBATION(x) 0.0
 //#define PERTURBATION(x) (-1.5015*sqrt(x*x - 1.5*1.5 + 1.5015*1.5015));
-
-static f64 elapsed_time(struct timespec t0, struct timespec t1) {
-	u64 elapsed_ns = (t1.tv_nsec - t0.tv_nsec) + (t1.tv_sec - t0.tv_sec)*(u64)1e9;
-	return elapsed_ns/((f64)1e9);
-}
-
-static struct timespec current_time() {
-	struct timespec t;
-	if (clock_gettime(CLOCK_REALTIME, &t) != 0) {
-		fprintf(stderr, "Error: Failed to get time!");
-	}
-	return t;
-}
 
 void perturbation(const u32 len, f64 out[static len],
                                 f64 in_x[static len], const u32 component_count,
@@ -119,16 +107,15 @@ int main() {
     struct nlse_guess* guesses = NULL;
 #endif
 
-
 	f64 g0[] = {
 		GAA, GAB,
 		GBA, GBB
 	};
 	i64 occupations[] = {NA,NB};
 
-	u32 comp_count = 2;
+	u32 comp_count = COMPONENT_COUNT;
 
-	u32 bs[] = {/*4, 8, 12, 16, 24, 32, 48, */64};
+	u32 bs[] = {4, 8, 12, 16, 24, 32, 48, 64};
 
 	for (u32 i = 0; i < sizeof(bs)/sizeof(bs[0]); ++i) {
 		FILE* fd = fopen("out", "a");
@@ -137,15 +124,11 @@ int main() {
 			printf("b: %u\n", b);
 			settings.num_basis_funcs = b;
 
-			struct timespec t0 = current_time();
-
 			struct nlse_result res = grosspitaevskii(settings,
 													comp_count,
 													occupations,
 													guesses,
 													g0);
-
-			struct timespec t1 = current_time();
 
 			f64 E = full_energy(settings,
 					res.coeff_count, comp_count,
@@ -153,12 +136,11 @@ int main() {
 					occupations,
 					g0);
 
-			printf("full energy: %.10lf\n", E/(occupations[0] + occupations[1]));
+			//printf("full energy: %.10lf\n", E/(occupations[0] + occupations[1]));
 
-			fprintf(fd, "%u\t%lf\t%.10lf\n",
+			fprintf(fd, "%u\t%.10e\n",
 					b,
-					E/(occupations[0] + occupations[1]),
-					elapsed_time(t0,t1)/res.iterations
+					E/(occupations[0] + occupations[1])
 					);
 		sbmf_shutdown();
 		fclose(fd);

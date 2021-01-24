@@ -470,7 +470,7 @@ struct nlse_result nlse_solver(struct nlse_settings settings, const u32 componen
 
 				for (u32 j = 0; j < res.coeff_count; ++j) {
 					res.coeff[i*res.coeff_count + j] =
-						(1.0 - settings.orbital_mixing) * settings.orbital_mixing * res.coeff[i*res.coeff_count + j] + settings.orbital_mixing * old_coeff[i*res.coeff_count + j];
+						(1.0 - settings.orbital_mixing) * res.coeff[i*res.coeff_count + j] + settings.orbital_mixing * old_coeff[i*res.coeff_count + j];
 				}
 				f64_normalize(&res.coeff[i*res.coeff_count], &res.coeff[i*res.coeff_count], res.coeff_count);
 			}

@@ -4,28 +4,28 @@
 
 #include <stdio.h>
 
-#define NA 20
+#define NA 4
 #define NB 0
 
 //#define GAA (1.0/1e5)
 //#define GAA (-4.0)
 //#define GAA (-10.0/(NA-1))
 //#define GAA (0.5/(NA-1))
-#define GAA (-0.1)
-#define GAB (-0.2)
-#define GBA (-0.2)
-#define GBB (-0.1)
+#define GAA (4.0/3.0)
+#define GAB (1)
+#define GBA (1)
+#define GBB (0.5)
 //#define GAB (-1.0/(NB))
 //#define GBA (-1.0/(NA))
 //#define GBB (0.5/(NB-1))
 
 #define USE_TF_GUESS 0
 #define USE_GAUSSIAN_GUESS 0
-#define USE_RANDOM_GUESS 1
+#define USE_RANDOM_GUESS 0
 #define COMPONENT_COUNT 1
 
-#define PERTURBATION(x) 2*gaussian(x, 0, 0.2)
-//#define PERTURBATION(x) 0.0
+//#define PERTURBATION(x) 2*gaussian(x, 0, 0.2)
+#define PERTURBATION(x) 0.0
 //#define PERTURBATION(x) (-1.5015*sqrt(x*x - 1.5*1.5 + 1.5015*1.5015));
 
 void perturbation(const u32 len, f64 out[static len],
@@ -85,7 +85,7 @@ void debug_callback(struct nlse_settings settings, struct nlse_result res) {
 		plot_shutdown();
 #endif
 
-#if 0
+#if 1
 		{
 			FILE* fd = fopen("debug_out", "a");
 			fprintf(fd, "%u\t%lf\n", res.iterations, res.energy[0]);
@@ -194,19 +194,17 @@ int main() {
 
 	struct nlse_settings settings = {
         .spatial_pot_perturbation = perturbation,
-		.max_iterations = 100,
+		.max_iterations = 1000,
 		.max_integration_evals = 1e5,
-		.error_tol = 1e-15,
+		.error_tol = 1e-14,
 
         .num_basis_funcs = 16,
 		.basis = ho_basis,
 
 		.zero_threshold = 1e-10,
 		.orbital_mixing = 0.0,
-		.hamiltonian_mixing = 0.7,
+		.hamiltonian_mixing = 0.5,
 		.mix_until_iteration = 0,
-		.diis_log_length = 8,
-		.diis_enabled = false,
 
 		.orbital_choice = NLSE_ORBITAL_LOWEST_ENERGY,
 		//.orbital_choice = NLSE_ORBITAL_MAXIMUM_OVERLAP,
@@ -214,7 +212,7 @@ int main() {
 		.mom_enable_at_iteration = 0,
 
 
-		.measure_every = 0,
+		.measure_every = 1,
 		.debug_callback = debug_callback,
 		.gk=gk20
     };
@@ -320,6 +318,7 @@ int main() {
 #if 1
 	{
 		//struct pt_result ptres = en_pt_rf(settings, res, 0, g0, occupations);
+		//struct pt_result ptres = en_pt_2comp(settings, res, g0, occupations);
 		//struct pt_result ptres = rayleigh_schroedinger_pt_rf_2comp(settings, res, g0, occupations);
 		struct pt_result ptres = rayleigh_schroedinger_pt_rf(settings, res, 0, g0, occupations);
 		printf("E0:          %.15e\n", ptres.E0);

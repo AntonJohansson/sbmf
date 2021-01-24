@@ -13,12 +13,16 @@ gnuplot -p -e "
 	set multiplot layout 1,2;
 	set size 0.5,0.6;
 	set key at graph 0.75,0.5;
+
 	plot
 		'out_no_aux' 	u 1:2 w linespoints lw 2 title 'SCF';
 	set size 0.5,0.6;
 	set key at graph 0.9,0.5;
+
+	set format y '';
+	set ylabel '';
+	set xrange [0:30];
 	plot
-		'out_diis_2' 	u 1:2 w linespoints lw 2 lc 2 title 'DIIS',
 		'out_orb_mix' 	u 1:2 w linespoints lw 2 lc 4 title 'orb. mix.',
 		'out_ham_mix' 	u 1:2 w linespoints lw 2 lc 7 title 'ham. mix.';
 "

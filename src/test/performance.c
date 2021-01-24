@@ -1,4 +1,4 @@
-#define SNOW_ENABLED
+#definp SNOW_ENABLED
 #include "snow.h"
 
 snow_main();

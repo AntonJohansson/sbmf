@@ -385,3 +385,4 @@ struct pt_result {
 struct pt_result rayleigh_schroedinger_pt_rf(struct nlse_settings settings, struct nlse_result res, u32 component, f64* g0, i64* particle_count);
 struct pt_result rayleigh_schroedinger_pt_rf_2comp(struct nlse_settings settings, struct nlse_result res, f64* g0, i64* particle_count);
 struct pt_result en_pt_rf(struct nlse_settings settings, struct nlse_result res, u32 component, f64* g0, i64* particle_count);
+struct pt_result en_pt_2comp(struct nlse_settings settings, struct nlse_result res, f64* g0, i64* particle_count);

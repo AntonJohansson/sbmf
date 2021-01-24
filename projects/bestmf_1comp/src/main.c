@@ -7,9 +7,9 @@
 #define USE_GAUSSIAN_GUESS 1
 #define USE_RANDOM_GUESS 0
 
-#define PERTURBATION(x) (-1.5015*sqrt(x*x - 1.5*1.5 + 1.5015*1.5015));
+//#define PERTURBATION(x) (-1.5015*sqrt(x*x - 1.5*1.5 + 1.5015*1.5015));
 //#define PERTURBATION(x) 2*gaussian(x,0,0.2)
-//#define PERTURBATION(x) 0.0
+#define PERTURBATION(x) 0.0
 
 void perturbation(const u32 len, f64 out[static len],
                                 f64 in_x[static len], const u32 component_count,
@@ -89,12 +89,12 @@ int main() {
         .spatial_pot_perturbation = perturbation,
 		.max_iterations = 1e5,
 		.max_integration_evals = 1e5,
-		.error_tol = 1e-9,
+		.error_tol = 1e-10,
 
         .num_basis_funcs = 32,
 		.basis = ho_basis,
 
-		.hamiltonian_mixing = 0.6,
+		.hamiltonian_mixing = 0.0,
 		//.diis_enabled=true,
 		//.diis_log_length=8,
 
@@ -104,7 +104,7 @@ int main() {
     };
 
 	const i64 particle_count = 1000;
-	const f64 g0 = (+5.0)/(particle_count-1);
+	const f64 g0 = (-4.0)/(particle_count-1);
 
 	struct bestmf_result res = best_meanfield(settings, particle_count, g0, guesses);
 

@@ -60,7 +60,7 @@ static inline f64 V(struct pt_settings* pt, u32 A, u32 B, u32 i, u32 j, u32 k, u
     struct quadgk_settings settings = {
         .abs_error_tol = 1e-15,
         .rel_error_tol = 1e-8,
-		.gk = gk15,
+		.gk = gk20,
         .max_evals = 1e5,
 		.userdata = &p,
     };
@@ -194,35 +194,75 @@ struct pt_result rayleigh_schroedinger_pt_rf(struct nlse_settings settings, stru
 			const f64 c_3_minus_2_root_2 = 3.0 - 2.0*sqrt(2.0);
 
 #pragma omp parallel for reduction(+: E_m0_n0)
-			for (u32 m = 1; m < states_to_include; ++m) {
-				for (u32 n = 1; n < states_to_include; ++n) {
-					const f64 v_m0_n0 = G0(&pt,component,component)*V(&pt, component,component, m,0,n,0);
-
-					f64 sum = 0.0;
-					for (u32 p = 1; p < states_to_include; ++p) {
-
-						f64 tmp = 0;
-						if (p >= m)
-							tmp = pt2_cache[PT2_CACHE_INDEX(m-1, p-m)];
-						else
-							tmp = pt2_cache[PT2_CACHE_INDEX(p-1, m-p)];
-
-						f64 tnp = 0;
-						if (p >= n)
-							tnp = pt2_cache[PT2_CACHE_INDEX(n-1, p-n)];
-						else
-							tnp = pt2_cache[PT2_CACHE_INDEX(p-1, n-p)];
-
-						const f64 delta_mp = (m == p) ? 1.0 : 0.0;
-						const f64 delta_np = (n == p) ? 1.0 : 0.0;
-
-						const f64 coeff = 1 + c_root_2_minus_1*(delta_mp + delta_np) + c_3_minus_2_root_2*(delta_mp*delta_np);
-						sum += coeff * tmp * tnp;
-					}
-
-					E_m0_n0 += v_m0_n0 * sum;
+			for (u32 k = 0; k < ((states_to_include-1)*states_to_include)/2; ++k) {
+				u32 m = k/(states_to_include-1);
+				u32 n = k%(states_to_include-1);
+				if (m > n) {
+					m = (states_to_include-1) - m - 0;
+					n = (states_to_include-1) - n - 1;
 				}
+				m += 1;
+				n += 1;
+
+				const f64 v_m0_n0 = G0(&pt,component,component)*V(&pt, component,component, m,0,n,0);
+
+				f64 sum = 0.0;
+				for (u32 p = 1; p < states_to_include; ++p) {
+
+					f64 tmp = 0;
+					if (p >= m)
+						tmp = pt2_cache[PT2_CACHE_INDEX(m-1, p-m)];
+					else
+						tmp = pt2_cache[PT2_CACHE_INDEX(p-1, m-p)];
+
+					f64 tnp = 0;
+					if (p >= n)
+						tnp = pt2_cache[PT2_CACHE_INDEX(n-1, p-n)];
+					else
+						tnp = pt2_cache[PT2_CACHE_INDEX(p-1, n-p)];
+
+					const f64 delta_mp = (m == p) ? 1.0 : 0.0;
+					const f64 delta_np = (n == p) ? 1.0 : 0.0;
+
+					const f64 coeff = 1 + c_root_2_minus_1*(delta_mp + delta_np) + c_3_minus_2_root_2*(delta_mp*delta_np);
+					sum += coeff * tmp * tnp;
+				}
+
+				f64 factor = (m == n) ? 1.0 : 2.0;
+
+				E_m0_n0 += factor * v_m0_n0 * sum;
 			}
+			//for (u32 m = 1; m < states_to_include; ++m) {
+			//	for (u32 n = m; n < states_to_include; ++n) {
+			//		const f64 v_m0_n0 = G0(&pt,component,component)*V(&pt, component,component, m,0,n,0);
+
+			//		f64 sum = 0.0;
+			//		for (u32 p = 1; p < states_to_include; ++p) {
+
+			//			f64 tmp = 0;
+			//			if (p >= m)
+			//				tmp = pt2_cache[PT2_CACHE_INDEX(m-1, p-m)];
+			//			else
+			//				tmp = pt2_cache[PT2_CACHE_INDEX(p-1, m-p)];
+
+			//			f64 tnp = 0;
+			//			if (p >= n)
+			//				tnp = pt2_cache[PT2_CACHE_INDEX(n-1, p-n)];
+			//			else
+			//				tnp = pt2_cache[PT2_CACHE_INDEX(p-1, n-p)];
+
+			//			const f64 delta_mp = (m == p) ? 1.0 : 0.0;
+			//			const f64 delta_np = (n == p) ? 1.0 : 0.0;
+
+			//			const f64 coeff = 1 + c_root_2_minus_1*(delta_mp + delta_np) + c_3_minus_2_root_2*(delta_mp*delta_np);
+			//			sum += coeff * tmp * tnp;
+			//		}
+
+			//		f64 factor = (m == n) ? 1.0 : 2.0;
+
+			//		E_m0_n0 += factor * v_m0_n0 * sum;
+			//	}
+			//}
 
 			E_m0_n0 *= (N[component] - 3);
 		}
@@ -233,31 +273,47 @@ struct pt_result rayleigh_schroedinger_pt_rf(struct nlse_settings settings, stru
 			const f64 c_root_2_minus_2 = sqrt(2.0) - 2.0;
 			const f64 c_3_minus_2_root_2 = 3.0 - 2.0*sqrt(2.0);
 
-#pragma omp parallel for reduction(+: E_mn_pq)
+			const u32 INDS_N = ((states_to_include-1)*states_to_include)/2;
+			u8 inds[INDS_N][2];
+			u32 iter = 0;
 			for (u32 m = 1; m < states_to_include; ++m) {
 				for (u32 n = m; n < states_to_include; ++n) {
-					//if (((m ^ n) & 1) != 0)
-					//	continue;
-
-					f64 tmn = pt2_cache[PT2_CACHE_INDEX(m-1,n-m)];
-					const f64 delta_mn = (m == n) ? 1.0 : 0.0;
-
-					for (u32 p = 1; p < states_to_include; ++p) {
-						for (u32 q = p; q < states_to_include; ++q) {
-							//if (((m ^ n) & 1) != 0)
-							//	continue;
-
-							f64 v_mn_pq = G0(&pt,component,component)*V(&pt, component,component, m,n,p,q);
-							f64 tpq = pt2_cache[PT2_CACHE_INDEX(p-1,q-p)];
-
-							const f64 delta_pq = (p == q) ? 1.0 : 0.0;
-							const f64 coeff = 2.0 + c_root_2_minus_2*(delta_mn + delta_pq) + c_3_minus_2_root_2*(delta_mn*delta_pq);
-							E_mn_pq += coeff*tmn*tpq*v_mn_pq;
-						}
-					}
-
+					inds[iter][0] = m;
+					inds[iter][1] = n;
+					iter++;
 				}
 			}
+
+#pragma omp parallel for reduction(+: E_mn_pq)
+			for (int k = 0; k < INDS_N*(INDS_N+1)/2; ++k) {
+				int k0 = k/(INDS_N);
+				int k1 = k%(INDS_N);
+				if (k0 > k1) {
+					k0 = (INDS_N) - k0 - 0;
+					k1 = (INDS_N) - k1 - 1;
+				}
+
+				const u32 m = inds[k0][0];
+				const u32 n = inds[k0][1];
+				const u32 p = inds[k1][0];
+				const u32 q = inds[k1][1];
+
+				f64 factor = 2.0;
+				if (k0 == k1)
+					factor = 1.0;
+
+				f64 tmn = pt2_cache[PT2_CACHE_INDEX(m-1,n-m)];
+				const f64 delta_mn = (m == n) ? 1.0 : 0.0;
+
+
+				f64 v_mn_pq = G0(&pt,component,component)*V(&pt, component,component, m,n,p,q);
+				f64 tpq = pt2_cache[PT2_CACHE_INDEX(p-1,q-p)];
+
+				const f64 delta_pq = (p == q) ? 1.0 : 0.0;
+				const f64 coeff = 2.0 + c_root_2_minus_2*(delta_mn + delta_pq) + c_3_minus_2_root_2*(delta_mn*delta_pq);
+				E_mn_pq += factor*coeff*tmn*tpq*v_mn_pq;
+			}
+
 		}
 		sbmf_log_info("\t\tmn,pq: %.10e", E_mn_pq);
 
@@ -512,7 +568,7 @@ static inline f64 Vp(struct pt_settings* pt, u32 A, u32 i, u32 j) {
     struct quadgk_settings settings = {
         .abs_error_tol = 1e-15,
         .rel_error_tol = 1e-8,
-		.gk = gk15,
+		.gk = gk20,
         .max_evals = 1e5,
 		.userdata = &p,
     };
@@ -597,7 +653,6 @@ struct pt_result en_pt_rf(struct nlse_settings settings, struct nlse_result res,
 		}
 	}
 
-
 	struct pt_settings pt = {
 		.res = &res,
 		.g0 = g0,
@@ -664,39 +719,46 @@ struct pt_result en_pt_rf(struct nlse_settings settings, struct nlse_result res,
 			const f64 c_3_minus_2_root_2 = 3.0 - 2.0*sqrt(2.0);
 
 #pragma omp parallel for reduction(+: E_m0_n0)
-			for (u32 m = 1; m < states_to_include; ++m) {
-				for (u32 n = 1; n < states_to_include; ++n) {
-					/* avoid <mn|V|mn> = 0 */
-					if (m == n)
-						continue;
+			for (u32 k = 0; k < ((states_to_include-1)*states_to_include)/2; ++k) {
+				u32 m = k/(states_to_include-1);
+				u32 n = k%(states_to_include-1);
 
-					const f64 v_m0_n0 = G0(&pt,component,component)*V(&pt, component,component, m,0,n,0);
-
-					f64 sum = 0.0;
-					for (u32 p = 1; p < states_to_include; ++p) {
-
-						f64 tmp = 0;
-						if (p >= m)
-							tmp = pt2_cache[PT2_CACHE_INDEX(m-1, p-m)];
-						else
-							tmp = pt2_cache[PT2_CACHE_INDEX(p-1, m-p)];
-
-						f64 tnp = 0;
-						if (p >= n)
-							tnp = pt2_cache[PT2_CACHE_INDEX(n-1, p-n)];
-						else
-							tnp = pt2_cache[PT2_CACHE_INDEX(p-1, n-p)];
-
-						const f64 delta_mp = (m == p) ? 1.0 : 0.0;
-						const f64 delta_np = (n == p) ? 1.0 : 0.0;
-
-						const f64 coeff = 1 + c_root_2_minus_1*(delta_mp + delta_np) + c_3_minus_2_root_2*(delta_mp*delta_np);
-						sum += coeff * tmp * tnp;
-					}
-
-					E_m0_n0 += v_m0_n0 * sum;
-
+				if (m > n) {
+					m = (states_to_include-1) - m - 0;
+					n = (states_to_include-1) - n - 1;
 				}
+
+				if (m == n)
+					continue;
+
+				m += 1;
+				n += 1;
+
+				const f64 v_m0_n0 = G0(&pt,component,component)*V(&pt, component,component, m,0,n,0);
+
+				f64 sum = 0.0;
+				for (u32 p = 1; p < states_to_include; ++p) {
+
+					f64 tmp = 0;
+					if (p >= m)
+						tmp = pt2_cache[PT2_CACHE_INDEX(m-1, p-m)];
+					else
+						tmp = pt2_cache[PT2_CACHE_INDEX(p-1, m-p)];
+
+					f64 tnp = 0;
+					if (p >= n)
+						tnp = pt2_cache[PT2_CACHE_INDEX(n-1, p-n)];
+					else
+						tnp = pt2_cache[PT2_CACHE_INDEX(p-1, n-p)];
+
+					const f64 delta_mp = (m == p) ? 1.0 : 0.0;
+					const f64 delta_np = (n == p) ? 1.0 : 0.0;
+
+					const f64 coeff = 1 + c_root_2_minus_1*(delta_mp + delta_np) + c_3_minus_2_root_2*(delta_mp*delta_np);
+					sum += coeff * tmp * tnp;
+				}
+
+				E_m0_n0 += 2.0 * v_m0_n0 * sum;
 			}
 
 			E_m0_n0 *= (N[component] - 3);
@@ -708,29 +770,45 @@ struct pt_result en_pt_rf(struct nlse_settings settings, struct nlse_result res,
 			const f64 c_root_2_minus_2 = sqrt(2.0) - 2.0;
 			const f64 c_3_minus_2_root_2 = 3.0 - 2.0*sqrt(2.0);
 
-#pragma omp parallel for reduction(+: E_mn_pq)
+			const u32 INDS_N = ((states_to_include-1)*states_to_include)/2;
+			u8 inds[INDS_N][2];
+			u32 iter = 0;
 			for (u32 m = 1; m < states_to_include; ++m) {
 				for (u32 n = m; n < states_to_include; ++n) {
-
-					f64 tmn = pt2_cache[PT2_CACHE_INDEX(m-1,n-m)];
-					const f64 delta_mn = (m == n) ? 1.0 : 0.0;
-
-					for (u32 p = 1; p < states_to_include; ++p) {
-						for (u32 q = p; q < states_to_include; ++q) {
-							if (m*states_to_include + n == p*states_to_include + q)
-								continue;
-
-							f64 v_mn_pq = G0(&pt,component,component)*V(&pt, component,component, m,n,p,q);
-							f64 tpq = pt2_cache[PT2_CACHE_INDEX(p-1,q-p)];
-
-							const f64 delta_pq = (p == q) ? 1.0 : 0.0;
-							const f64 coeff = 2.0 + c_root_2_minus_2*(delta_mn + delta_pq) + c_3_minus_2_root_2*(delta_mn*delta_pq);
-							E_mn_pq += coeff*tmn*tpq*v_mn_pq;
-						}
-					}
-
+					inds[iter][0] = m;
+					inds[iter][1] = n;
+					iter++;
 				}
 			}
+
+#pragma omp parallel for reduction(+: E_mn_pq)
+			for (int k = 0; k < INDS_N*(INDS_N+1)/2; ++k) {
+				int k0 = k/(INDS_N);
+				int k1 = k%(INDS_N);
+				if (k0 > k1) {
+					k0 = (INDS_N) - k0 - 0;
+					k1 = (INDS_N) - k1 - 1;
+				}
+
+				if (k0 == k1)
+					continue;
+
+				const u32 m = inds[k0][0];
+				const u32 n = inds[k0][1];
+				const u32 p = inds[k1][0];
+				const u32 q = inds[k1][1];
+
+				f64 tmn = pt2_cache[PT2_CACHE_INDEX(m-1,n-m)];
+				const f64 delta_mn = (m == n) ? 1.0 : 0.0;
+
+				f64 v_mn_pq = G0(&pt,component,component)*V(&pt, component,component, m,n,p,q);
+				f64 tpq = pt2_cache[PT2_CACHE_INDEX(p-1,q-p)];
+
+				const f64 delta_pq = (p == q) ? 1.0 : 0.0;
+				const f64 coeff = 2.0 + c_root_2_minus_2*(delta_mn + delta_pq) + c_3_minus_2_root_2*(delta_mn*delta_pq);
+				E_mn_pq += 2.0*coeff*tmn*tpq*v_mn_pq;
+			}
+
 		}
 		sbmf_log_info("\t\tmn,pq: %.10e", E_mn_pq);
 

@@ -11,7 +11,7 @@
 //#define GAA (-4.0)
 //#define GAA (-10.0/(NA-1))
 //#define GAA (0.5/(NA-1))
-#define GAA (4.0/3.0)
+#define GAA (1.0/3.0)
 #define GAB (1)
 #define GBA (1)
 #define GBB (0.5)
@@ -85,7 +85,7 @@ void debug_callback(struct nlse_settings settings, struct nlse_result res) {
 		plot_shutdown();
 #endif
 
-#if 1
+#if 0
 		{
 			FILE* fd = fopen("debug_out", "a");
 			fprintf(fd, "%u\t%lf\n", res.iterations, res.energy[0]);
@@ -198,7 +198,7 @@ int main() {
 		.max_integration_evals = 1e5,
 		.error_tol = 1e-14,
 
-        .num_basis_funcs = 16,
+        .num_basis_funcs = 32,
 		.basis = ho_basis,
 
 		.zero_threshold = 1e-10,
@@ -212,7 +212,7 @@ int main() {
 		.mom_enable_at_iteration = 0,
 
 
-		.measure_every = 1,
+		.measure_every = 0,
 		.debug_callback = debug_callback,
 		.gk=gk20
     };
@@ -220,14 +220,14 @@ int main() {
 	const u32 component_count = COMPONENT_COUNT;
 
 	struct nlse_result res = grosspitaevskii(settings, component_count, occupations, guesses, g0);
-	f64 Efull = full_energy(settings, res.coeff_count, component_count, res.coeff, occupations, g0);
+	f64 Efull = grosspitaevskii_energy(settings, res.coeff_count, component_count, res.coeff, occupations, g0);
 	printf("\nfull energy: %lf\n", Efull);
 	printf("\nfull energy per particle: %lf\n", Efull/((f64)NA+(f64)NB));
 
 
 	nlse_write_to_binary_file("outbin", res);
 
-#if 1
+#if 0
 	{
 		const u32 N = 256;
 		plot_init(800, 600, "gp2c");
@@ -317,10 +317,10 @@ int main() {
 
 #if 1
 	{
-		//struct pt_result ptres = en_pt_rf(settings, res, 0, g0, occupations);
+		struct pt_result ptres = en_pt_rf(settings, res, 0, g0, occupations);
 		//struct pt_result ptres = en_pt_2comp(settings, res, g0, occupations);
 		//struct pt_result ptres = rayleigh_schroedinger_pt_rf_2comp(settings, res, g0, occupations);
-		struct pt_result ptres = rayleigh_schroedinger_pt_rf(settings, res, 0, g0, occupations);
+		//struct pt_result ptres = rayleigh_schroedinger_pt_rf(settings, res, 0, g0, occupations);
 		printf("E0:          %.15e\n", ptres.E0);
 		printf("E1:          %.15e\n", ptres.E1);
 		printf("E2:          %.15e\n", ptres.E2);

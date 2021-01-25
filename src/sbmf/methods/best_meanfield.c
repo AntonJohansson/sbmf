@@ -140,6 +140,9 @@ static void compute_wavefunctions(struct nlse_settings settings, const u32 parti
 
 
 
+f64 best_meanfield_energy(struct nlse_settings settings, const u32 coeff_count, f64 coeff[static coeff_count], i64 n1, i64 n2, f64 g0) {
+	return grosspitaevskii_energy(settings, coeff_count, 2, coeff, (i64[]){n1, n2}, (f64[]){g0,g0,g0,g0});
+}
 
 
 
@@ -180,11 +183,8 @@ struct bestmf_result best_meanfield(struct nlse_settings settings, const i64 par
 	memset(p, 0, 2*res.coeff_count*sizeof(f64));
 	compute_wavefunctions(settings, particle_count, res.coeff_count, res.coeff, n1, n2, p);
 
-	sbmf_log_info("best_meanfield: finding energy");
-	f64 E = full_energy(settings,
-			res.coeff_count, res.component_count,
-			p, (i64[]){(i64)n1, particle_count - (i64)n1},
-			(f64[]){g0,g0,g0,g0});
+	//sbmf_log_info("best_meanfield: finding energy");
+	f64 E = best_meanfield_energy(settings, res.coeff_count, p, n1,n2, g0);
 
 	return (struct bestmf_result) {
 		.energy = E,

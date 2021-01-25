@@ -351,7 +351,7 @@ struct nlse_result grosspitaevskii(struct nlse_settings settings,
 		struct nlse_guess guesses[static comp_count],
 		f64 g0[static comp_count*comp_count]);
 
-f64 full_energy(struct nlse_settings settings,
+f64 grosspitaevskii_energy(struct nlse_settings settings,
 		const u32 coeff_count, const u32 comp_count,
 		f64 coeff[static coeff_count*comp_count],
 		i64 occupations[static comp_count],
@@ -373,6 +373,8 @@ struct bestmf_result {
 
 struct bestmf_result best_meanfield(struct nlse_settings settings,
 		const i64 particle_count, f64 g0, struct nlse_guess* guesses);
+
+f64 best_meanfield_energy(struct nlse_settings settings, const u32 coeff_count, f64 coeff[static coeff_count], i64 n1, i64 n2, f64 g0);
 
 /*
  * Perturbation theory

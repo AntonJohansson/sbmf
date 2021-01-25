@@ -102,7 +102,7 @@ void full_energy_integrand(f64* out, f64* in, u32 len, void* data) {
 	}
 }
 
-f64 full_energy(struct nlse_settings settings,
+f64 grosspitaevskii_energy(struct nlse_settings settings,
 		const u32 coeff_count, const u32 comp_count,
 		f64 coeff[static coeff_count*comp_count],
 		i64 occupations[static comp_count],
@@ -130,9 +130,9 @@ f64 full_energy(struct nlse_settings settings,
 
 	struct quadgk_settings int_settings = {
 		.max_evals = 1e5,
-		.abs_error_tol = 1e-10,
+		.abs_error_tol = 1e-15,
 		.userdata = &ppot,
-		.gk = gk15
+		.gk = gk20
 	};
 
 	/* pot terms */

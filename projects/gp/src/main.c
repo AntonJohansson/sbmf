@@ -317,10 +317,10 @@ int main() {
 
 #if 1
 	{
-		struct pt_result ptres = en_pt_rf(settings, res, 0, g0, occupations);
+		//struct pt_result ptres = en_pt_rf(settings, res, 0, g0, occupations);
 		//struct pt_result ptres = en_pt_2comp(settings, res, g0, occupations);
 		//struct pt_result ptres = rayleigh_schroedinger_pt_rf_2comp(settings, res, g0, occupations);
-		//struct pt_result ptres = rayleigh_schroedinger_pt_rf(settings, res, 0, g0, occupations);
+		struct pt_result ptres = rayleigh_schroedinger_pt_rf(settings, res, 0, g0, occupations);
 		printf("E0:          %.15e\n", ptres.E0);
 		printf("E1:          %.15e\n", ptres.E1);
 		printf("E2:          %.15e\n", ptres.E2);

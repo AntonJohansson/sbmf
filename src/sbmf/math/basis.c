@@ -1,3 +1,5 @@
+#define OMEGA (1.0)
+
 /* Currently doesnt handle 2d/3d/... case */
 void ho_eigenfunc(const u32 n, const u32 len, f64 out[static len], f64 in[static len]) {
 	/*
@@ -6,13 +8,15 @@ void ho_eigenfunc(const u32 n, const u32 len, f64 out[static len], f64 in[static
 	 */
 	assert(n < 270);
 
-	const f64 pi_factor = 1.0/pow(M_PI,0.25);
+	const f64 pi_factor = pow(OMEGA/M_PI,0.25);
 	const f64 normalization_factor = pi_factor / sqrt(pow(2,n) * factorial_128(n));
+
+	const f64 sqrt_omega = sqrt(OMEGA);
 
 	for (u32 i = 0; i < len; ++i) {
 		f64 x = in[i];
 
-		f64 init_value = exp(-x*x/2.0) * normalization_factor;
+		f64 init_value = exp(-OMEGA*x*x/2.0) * normalization_factor;
 		f64 H[3] = {
 			init_value,
 			init_value,
@@ -20,7 +24,7 @@ void ho_eigenfunc(const u32 n, const u32 len, f64 out[static len], f64 in[static
 		};
 
 		for (u32 j = 1; j <= n; ++j) {
-			H[2] = 2*(x*H[1] - (j-1)*H[0]);
+			H[2] = 2*(sqrt_omega*x*H[1] - (j-1)*H[0]);
 			H[0] = H[1];
 			H[1] = H[2];
 		}
@@ -38,7 +42,7 @@ f64 ho_eigenval(const u32 n) {
 
 	return sum + dims/2.0;
 	*/
-	return (f64)n + 0.5;
+	return OMEGA*((f64)n + 0.5);
 }
 
 /* Currently doesnt handle 2d/3d/... case */

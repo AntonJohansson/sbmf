@@ -293,10 +293,6 @@ struct nlse_settings {
 	f64 orbital_mixing;
 	f64 hamiltonian_mixing;
 	u32 mix_until_iteration;
-
-	/* ... */
-	u32 diis_log_length;
-	bool diis_enabled;
 };
 
 /* Initial Guess */

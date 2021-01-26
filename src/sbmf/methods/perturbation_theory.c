@@ -1,3 +1,11 @@
+static inline void map_to_triangular_index(u32 k, u32 N, u32* m, u32* n) {
+	*m = k / N;
+	*n = k % N;
+	if (*m > *n) {
+		*m = N - *m - 0;
+		*n = N - *n - 1;
+	}
+}
 /*
  * Holds all information needed to do the PT,
  * easy to pass around. Basicly params to
@@ -232,37 +240,6 @@ struct pt_result rayleigh_schroedinger_pt_rf(struct nlse_settings settings, stru
 
 				E_m0_n0 += factor * v_m0_n0 * sum;
 			}
-			//for (u32 m = 1; m < states_to_include; ++m) {
-			//	for (u32 n = m; n < states_to_include; ++n) {
-			//		const f64 v_m0_n0 = G0(&pt,component,component)*V(&pt, component,component, m,0,n,0);
-
-			//		f64 sum = 0.0;
-			//		for (u32 p = 1; p < states_to_include; ++p) {
-
-			//			f64 tmp = 0;
-			//			if (p >= m)
-			//				tmp = pt2_cache[PT2_CACHE_INDEX(m-1, p-m)];
-			//			else
-			//				tmp = pt2_cache[PT2_CACHE_INDEX(p-1, m-p)];
-
-			//			f64 tnp = 0;
-			//			if (p >= n)
-			//				tnp = pt2_cache[PT2_CACHE_INDEX(n-1, p-n)];
-			//			else
-			//				tnp = pt2_cache[PT2_CACHE_INDEX(p-1, n-p)];
-
-			//			const f64 delta_mp = (m == p) ? 1.0 : 0.0;
-			//			const f64 delta_np = (n == p) ? 1.0 : 0.0;
-
-			//			const f64 coeff = 1 + c_root_2_minus_1*(delta_mp + delta_np) + c_3_minus_2_root_2*(delta_mp*delta_np);
-			//			sum += coeff * tmp * tnp;
-			//		}
-
-			//		f64 factor = (m == n) ? 1.0 : 2.0;
-
-			//		E_m0_n0 += factor * v_m0_n0 * sum;
-			//	}
-			//}
 
 			E_m0_n0 *= (N[component] - 3);
 		}
@@ -274,29 +251,19 @@ struct pt_result rayleigh_schroedinger_pt_rf(struct nlse_settings settings, stru
 			const f64 c_3_minus_2_root_2 = 3.0 - 2.0*sqrt(2.0);
 
 			const u32 INDS_N = ((states_to_include-1)*states_to_include)/2;
-			u8 inds[INDS_N][2];
-			u32 iter = 0;
-			for (u32 m = 1; m < states_to_include; ++m) {
-				for (u32 n = m; n < states_to_include; ++n) {
-					inds[iter][0] = m;
-					inds[iter][1] = n;
-					iter++;
-				}
-			}
 
 #pragma omp parallel for reduction(+: E_mn_pq)
-			for (int k = 0; k < INDS_N*(INDS_N+1)/2; ++k) {
-				int k0 = k/(INDS_N);
-				int k1 = k%(INDS_N);
-				if (k0 > k1) {
-					k0 = (INDS_N) - k0 - 0;
-					k1 = (INDS_N) - k1 - 1;
-				}
+			for (u32 k = 0; k < INDS_N*(INDS_N+1)/2; ++k) {
+				u32 k0, k1;
+				map_to_triangular_index(k, INDS_N, &k0, &k1);
 
-				const u32 m = inds[k0][0];
-				const u32 n = inds[k0][1];
-				const u32 p = inds[k1][0];
-				const u32 q = inds[k1][1];
+				u32 m, n;
+				map_to_triangular_index(k0, states_to_include-1, &m, &n);
+				m += 1; n += 1;
+
+				u32 p, q;
+				map_to_triangular_index(k1, states_to_include-1, &p, &q);
+				p += 1; q += 1;
 
 				f64 factor = 2.0;
 				if (k0 == k1)
@@ -304,7 +271,6 @@ struct pt_result rayleigh_schroedinger_pt_rf(struct nlse_settings settings, stru
 
 				f64 tmn = pt2_cache[PT2_CACHE_INDEX(m-1,n-m)];
 				const f64 delta_mn = (m == n) ? 1.0 : 0.0;
-
 
 				f64 v_mn_pq = G0(&pt,component,component)*V(&pt, component,component, m,n,p,q);
 				f64 tpq = pt2_cache[PT2_CACHE_INDEX(p-1,q-p)];
@@ -315,6 +281,7 @@ struct pt_result rayleigh_schroedinger_pt_rf(struct nlse_settings settings, stru
 			}
 
 		}
+
 		sbmf_log_info("\t\tmn,pq: %.10e", E_mn_pq);
 
 		E3 = E_00_00 + E_m0_n0 + E_mn_pq;
@@ -624,12 +591,6 @@ static inline f64 en_nHn(struct pt_settings* pt, u32 A, u32 i, u32 j) {
 }
 
 
-static inline f64 en_2comp_nHn(struct pt_settings* pt, u32 A, u32 B, u32 i, u32 j) {
-	if (A == B) {
-	} else {
-	}
-}
-
 
 
 
@@ -771,32 +732,24 @@ struct pt_result en_pt_rf(struct nlse_settings settings, struct nlse_result res,
 			const f64 c_3_minus_2_root_2 = 3.0 - 2.0*sqrt(2.0);
 
 			const u32 INDS_N = ((states_to_include-1)*states_to_include)/2;
-			u8 inds[INDS_N][2];
-			u32 iter = 0;
-			for (u32 m = 1; m < states_to_include; ++m) {
-				for (u32 n = m; n < states_to_include; ++n) {
-					inds[iter][0] = m;
-					inds[iter][1] = n;
-					iter++;
-				}
-			}
 
 #pragma omp parallel for reduction(+: E_mn_pq)
-			for (int k = 0; k < INDS_N*(INDS_N+1)/2; ++k) {
-				int k0 = k/(INDS_N);
-				int k1 = k%(INDS_N);
-				if (k0 > k1) {
-					k0 = (INDS_N) - k0 - 0;
-					k1 = (INDS_N) - k1 - 1;
-				}
+			for (u32 k = 0; k < INDS_N*(INDS_N+1)/2; ++k) {
+				u32 k0, k1;
+				map_to_triangular_index(k, INDS_N, &k0, &k1);
 
+				/* Skip <k|V|k> terms */
 				if (k0 == k1)
 					continue;
 
-				const u32 m = inds[k0][0];
-				const u32 n = inds[k0][1];
-				const u32 p = inds[k1][0];
-				const u32 q = inds[k1][1];
+				u32 m, n;
+				map_to_triangular_index(k0, states_to_include-1, &m, &n);
+				m += 1; n += 1;
+
+				u32 p, q;
+				map_to_triangular_index(k1, states_to_include-1, &p, &q);
+				p += 1; q += 1;
+
 
 				f64 tmn = pt2_cache[PT2_CACHE_INDEX(m-1,n-m)];
 				const f64 delta_mn = (m == n) ? 1.0 : 0.0;

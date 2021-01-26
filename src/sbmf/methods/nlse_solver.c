@@ -105,32 +105,6 @@ static f64 nonlinear_me_integrand_gsl(f64 in, void* data) {
 #endif
 
 struct nlse_result nlse_solver(struct nlse_settings settings, const u32 component_count, struct nlse_component component[static component_count]) {
-	//{
-	//	struct diis_data* d = diis_data_new(2, 5);
-
-	//	diis_push(d, (f64[2]){1.0, 0.9}, 0);
-	//	diis_push(d, (f64[2]){0.9, 0.7}, 0);
-	//	diis_push(d, (f64[2]){0.8, 0.4}, 0);
-	//	diis_push(d, (f64[2]){0.7, 0.2}, 0);
-	//	diis_push(d, (f64[2]){0.6, 0.1}, 0);
-	//	//for (u32 i = 0; i < d->log_items; ++i) {
-	//	//	printf("%u: ", i);
-	//	//	for (u32 j = 0; j < d->size; ++j) {
-	//	//		printf("%lf ", *(d->data_log + i*d->size + j));
-	//	//	}
-	//	//	printf("\n");
-	//	//}
-
-	//	f64 x[2], E;
-	//	diis_compute(d, x, &E);
-
-	//	//printf("\n");
-	//	//for (u32 i = 0; i < d->size; ++i) {
-	//	//	printf("%lf ", x[i]);
-	//	//}
-	//	//printf("\n");
-	//	return (struct nlse_result){};
-	//}
 	/* Lazy */
 	const u32 N = settings.num_basis_funcs;
 
@@ -293,13 +267,6 @@ struct nlse_result nlse_solver(struct nlse_settings settings, const u32 componen
 	}
 #endif
 
-	struct diis_data* ds[res.component_count];
-	if (settings.diis_log_length > 0) {
-		for (u32 i = 0; i < res.component_count; ++i) {
-			ds[i] = diis_data_new(N, settings.diis_log_length);
-		}
-	}
-
 	/* Do the actual iterations */
 	for (; res.iterations < settings.max_iterations; ++res.iterations) {
 		sbmf_log_info("nlse starting iteration %u", res.iterations);
@@ -390,31 +357,14 @@ struct nlse_result nlse_solver(struct nlse_settings settings, const u32 componen
 			switch (settings.orbital_choice) {
 				case NLSE_ORBITAL_LOWEST_ENERGY: {
 					eigres = find_eigenpairs_sparse_real(res.hamiltonian[i], 1, EV_SMALLEST);
-					f64_normalize(&eigres.eigenvectors[0],
-							&eigres.eigenvectors[0], res.coeff_count);
-					//{
-					//	eigres = find_eigenpairs_sparse_real(res.hamiltonian[i], 5, EV_SMALLEST);
-					//	f64 lowest_energy = INFINITY;
-					//	i64 occupations = 2;
-					//	f64 g0 = 4;
-					//	for (u32 k = 0; k < 5; ++k) {
-					//		f64 Efull = full_energy(settings, res.coeff_count, res.component_count, &eigres.eigenvectors[k*res.coeff_count], &occupations, &g0);
-					//		sbmf_log_info("\t efull[%u] = %e", k, Efull);
-					//		if (Efull < lowest_energy) {
-					//			lowest_energy = Efull;
-					//			new_orbital_index = k;
-					//		}
-					//	}
-					//}
+					f64_normalize(&eigres.eigenvectors[0], &eigres.eigenvectors[0], res.coeff_count);
 					break;
 				}
 				case NLSE_ORBITAL_MAXIMUM_OVERLAP: {
-					eigres = find_eigenpairs_sparse_real(res.hamiltonian[i],
-							settings.mom_orbitals_to_consider, EV_SMALLEST);
+					eigres = find_eigenpairs_sparse_real(res.hamiltonian[i], settings.mom_orbitals_to_consider, EV_SMALLEST);
 					f64 maximum_overlap = -INFINITY;
 					for (u32 j = 0; j < settings.mom_orbitals_to_consider; ++j) {
-						f64_normalize(&eigres.eigenvectors[j*res.coeff_count],
-								&eigres.eigenvectors[j*res.coeff_count], res.coeff_count);
+						f64_normalize(&eigres.eigenvectors[j*res.coeff_count], &eigres.eigenvectors[j*res.coeff_count], res.coeff_count);
 						f64 overlap = 0.0;
 						for (u32 k = 0; k < res.coeff_count; ++k) {
 							f64 a = eigres.eigenvectors[j*res.coeff_count + k];
@@ -430,39 +380,18 @@ struct nlse_result nlse_solver(struct nlse_settings settings, const u32 componen
 					}
 					break;
 				}
+				default: {
+					sbmf_log_panic("nlse_solver(...): Unspecified energy selection method!");
+					assert(0);
+				}
 			};
-
 
 			/* Copy energies and coeffs */
 			res.energy[i] = eigres.eigenvalues[new_orbital_index];
-			sbmf_log_info("\t[%u]: energy before diis %lf", i, res.energy[i]);
 			for (u32 j = 0; j < res.coeff_count; ++j) {
 				res.coeff[i*res.coeff_count + j] = eigres.eigenvectors[res.coeff_count*new_orbital_index + j];
 			}
 			f64_normalize(&res.coeff[i*res.coeff_count], &res.coeff[i*res.coeff_count], res.coeff_count);
-
-			/* DIIS */
-			if (settings.diis_enabled && settings.diis_log_length > 0) {
-				diis_push(ds[i], &res.coeff[i*res.coeff_count], res.energy[i]);
-
-				f64 err = 0;
-				f64 E = 0;
-				f64 coeff[res.coeff_count];
-				memset(coeff, 0, res.coeff_count*sizeof(f64));
-				//if (diis_compute(ds[i], &res.coeff[i*res.coeff_count], &E, &err)) {
-				enum diis_status status = diis_compute(ds[i], coeff, &E, &err, settings.zero_threshold);
-				if (status == DIIS_SUCCESS) {
-					sbmf_log_info("\t[%u]: ran diis compute", i);
-					memcpy(&res.coeff[i*res.coeff_count], coeff, res.coeff_count*sizeof(f64));
-					res.energy[i] = E;
-					f64_normalize(&res.coeff[i*res.coeff_count], &res.coeff[i*res.coeff_count], res.coeff_count);
-				} else if (status == DIIS_LINEARLY_DEP_SUBSPACE) {
-					//settings.mixing = 0.9;
-					//settings.diis_enabled = false;
-				}
-
-			}
-
 
 			/* Apply orbital mixing */
 			if (settings.orbital_mixing > 0.0) {

@@ -200,6 +200,7 @@ struct basis {
 	basis_energy_eigenval_func* eigenval;
 	basis_sample_func*          sample;
 };
+extern f64 OMEGA;
 
 /*
  * Harmonic oscillator stuff

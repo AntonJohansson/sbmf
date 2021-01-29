@@ -4,28 +4,27 @@
 
 #include <stdio.h>
 
-#define NA 4
-#define NB 0
+//#define NA 4
+//#define NB 4
+//#define GAA (1.0/(3.0))
+//#define GAB (-1.0/6.0)
+//#define GBA (-1.0/6.0)
+//#define GBB (1.0/3.0)
 
-//#define GAA (1.0/1e5)
-//#define GAA (-4.0)
-//#define GAA (-10.0/(NA-1))
-//#define GAA (0.5/(NA-1))
-#define GAA (1.0/3.0)
-#define GAB (1)
-#define GBA (1)
-#define GBB (0.5)
-//#define GAB (-1.0/(NB))
-//#define GBA (-1.0/(NA))
-//#define GBB (0.5/(NB-1))
+#define NA 100
+#define NB 100
+#define GAA (1.0/199.0)
+#define GAB (-1.0/6.0)
+#define GBA (-1.0/6.0)
+#define GBB (1.0/3.0)
 
 #define USE_TF_GUESS 0
-#define USE_GAUSSIAN_GUESS 0
+#define USE_GAUSSIAN_GUESS 1
 #define USE_RANDOM_GUESS 0
 #define COMPONENT_COUNT 1
 
-//#define PERTURBATION(x) 2*gaussian(x, 0, 0.2)
-#define PERTURBATION(x) 0.0
+#define PERTURBATION(x) 2*gaussian(x, 0, 0.2)
+//#define PERTURBATION(x) 0.0
 //#define PERTURBATION(x) (-1.5015*sqrt(x*x - 1.5*1.5 + 1.5015*1.5015));
 
 void perturbation(const u32 len, f64 out[static len],
@@ -36,10 +35,6 @@ void perturbation(const u32 len, f64 out[static len],
         out[i] = PERTURBATION(in_x[i]);
     }
 }
-
-
-
-
 
 
 void debug_callback(struct nlse_settings settings, struct nlse_result res) {
@@ -147,6 +142,7 @@ void expnx(f64* out, f64* in, u32 len, void* p) {
 
 
 int main() {
+	//OMEGA = 1.0;
 	sbmf_set_log_callback(log_callback);
 	sbmf_init();
 
@@ -198,7 +194,7 @@ int main() {
 		.max_integration_evals = 1e5,
 		.error_tol = 1e-14,
 
-        .num_basis_funcs = 32,
+        .num_basis_funcs = 48,
 		.basis = ho_basis,
 
 		.zero_threshold = 1e-10,
@@ -317,10 +313,28 @@ int main() {
 
 #if 1
 	{
-		//struct pt_result ptres = en_pt_rf(settings, res, 0, g0, occupations);
-		//struct pt_result ptres = en_pt_2comp(settings, res, g0, occupations);
-		//struct pt_result ptres = rayleigh_schroedinger_pt_rf_2comp(settings, res, g0, occupations);
-		struct pt_result ptres = rayleigh_schroedinger_pt_rf(settings, res, 0, g0, occupations);
+		struct pt_result ptres;
+		if (component_count == 2)
+			ptres = rayleigh_schroedinger_pt_rf_2comp(settings, res, g0, occupations);
+		else
+			ptres = rayleigh_schroedinger_pt_rf(settings, res, 0, g0, occupations);
+		printf("E0:          %.15e\n", ptres.E0);
+		printf("E1:          %.15e\n", ptres.E1);
+		printf("E2:          %.15e\n", ptres.E2);
+		printf("E3:          %.15e\n", ptres.E3);
+		printf("E0+E1:       %.15e\n", ptres.E0+ptres.E1);
+		printf("E0+E1+E2:    %.15e\n", ptres.E0+ptres.E1+ptres.E2);
+		printf("E0+E1+E2+E3: %.15e\n", ptres.E0+ptres.E1+ptres.E2+ptres.E3);
+
+		printf("diff: %.15lf\n", Efull - (ptres.E0+ptres.E1+ptres.E2+ptres.E3));
+	}
+
+	{
+		struct pt_result ptres;
+		if (component_count == 2)
+			ptres = en_pt_2comp(settings, res, g0, occupations);
+		else
+			ptres = en_pt_rf(settings, res, 0, g0, occupations);
 		printf("E0:          %.15e\n", ptres.E0);
 		printf("E1:          %.15e\n", ptres.E1);
 		printf("E2:          %.15e\n", ptres.E2);

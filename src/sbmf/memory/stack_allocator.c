@@ -35,6 +35,7 @@ static void sa_destroy(struct stack_allocator* sa) {
 static u8* sa_push(struct stack_allocator* sa, u32 size_in_bytes) {
 	if (sa->top + size_in_bytes > sa->size) {
 		sbmf_log_panic("stack allocator %p out of memory (%u/%u bytes)\n\ttrying to allocate %u bytes\n", sa, sa->top, sa->size, size_in_bytes);
+		assert(0);
 	}
 
 	u32 alignment_padding = 8 - (sa->top % 8);

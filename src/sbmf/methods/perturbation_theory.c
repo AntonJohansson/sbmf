@@ -814,7 +814,7 @@ struct pt_result en_pt_2comp(struct nlse_settings settings, struct nlse_result r
 	/* order of hamiltonians, that is include all states */
 	const u32 states_to_include = res.coeff_count;
 	const i64* N = particle_count;
-	sbmf_log_info("running 2comp RSPT:\n    components: %u\n    states: %u\n", res.component_count, states_to_include);
+	sbmf_log_info("running 2comp ENPT:\n    components: %u\n    states: %u\n", res.component_count, states_to_include);
 
 	struct eigen_result_real states[res.component_count];
 	for (u32 i = 0; i < res.component_count; ++i) {
@@ -865,7 +865,6 @@ struct pt_result en_pt_2comp(struct nlse_settings settings, struct nlse_result r
 	sbmf_log_info("Starting second order PT");
 	f64 E2 = 0.0;
 	{
-
 #pragma omp parallel for reduction(+: E2)
 		for (u32 m = 1; m < states_to_include; ++m) {
 			for (u32 n = m; n < states_to_include; ++n) {
@@ -880,7 +879,7 @@ struct pt_result en_pt_2comp(struct nlse_settings settings, struct nlse_result r
 							+ G0(&pt,A,B)*N[B]*(V(&pt, A,B, m,0,m,0) + V(&pt, A,B, n,0,n,0) + (N[A]-2)*V(&pt, A,B, 0,0,0,0))
 							);
 
-				pt2_cache_AA[PT2_AA_CACHE_INDEX(m-1, n-1)] = me/Ediff;
+				pt2_cache_AA[PT2_AA_CACHE_INDEX(m-1, n-m)] = me/Ediff;
 
 				E2 += me*me/(Ediff);
 			}
@@ -900,7 +899,7 @@ struct pt_result en_pt_2comp(struct nlse_settings settings, struct nlse_result r
 							+ G0(&pt,A,B)*N[A]*(V(&pt, B,A, m,0,m,0) + V(&pt, B,A, n,0,n,0) + (N[B]-2)*V(&pt, B,A, 0,0,0,0))
 							);
 
-				pt2_cache_BB[PT2_AA_CACHE_INDEX(m-1, n-1)] = me/Ediff;
+				pt2_cache_BB[PT2_AA_CACHE_INDEX(m-1, n-m)] = me/Ediff;
 
 				E2 += me*me/(Ediff);
 			}
@@ -911,14 +910,14 @@ struct pt_result en_pt_2comp(struct nlse_settings settings, struct nlse_result r
 			for (u32 n = 1; n < states_to_include; ++n) {
 				f64 me = rs_2nd_order_me(&pt, A,B, m,n);
 				f64 Ediff = E0 - (
-							  en_nhn(&pt,A,m,n) + (N[A]-1)*en_nhn(&pt,A,0,0)
+							  en_nhn(&pt,A,m,m) + (N[A]-1)*en_nhn(&pt,A,0,0)
 							+ 0.5*G0(&pt,A,A)*(4.0*(N[A]-1)*V(&pt,A,A,m,0,m,0) + (N[A]-1)*(N[A]-2)*V(&pt,A,A,0,0,0,0))
-							+ en_nhn(&pt,B,m,n) + (N[B]-1)*en_nhn(&pt,B,0,0)
-							+ 0.5*G0(&pt,B,B)*(4.0*(N[B]-1)*V(&pt,B,B,m,0,m,0) + (N[B]-1)*(N[B]-2)*V(&pt,B,B,0,0,0,0))
+							+ en_nhn(&pt,B,n,n) + (N[B]-1)*en_nhn(&pt,B,0,0)
+							+ 0.5*G0(&pt,B,B)*(4.0*(N[B]-1)*V(&pt,B,B,n,0,n,0) + (N[B]-1)*(N[B]-2)*V(&pt,B,B,0,0,0,0))
 							+ G0(&pt,A,B)*((N[B]-1)*V(&pt,A,B,m,0,m,0) + (N[A]-1)*V(&pt,A,B,0,n,0,n) + V(&pt, A,B, m,n,m,n) + (N[A]-1)*(N[B]-1)*V(&pt,A,B,0,0,0,0))
 						);
 
-				pt2_cache_AB[PT2_CACHE_AB_INDEX(m-1, n-1)] = me/Ediff;
+				pt2_cache_AB[PT2_CACHE_AB_INDEX(m-1, n-m)] = me/Ediff;
 
 				E2 += me*me/(Ediff);
 			}
@@ -936,7 +935,7 @@ struct pt_result en_pt_2comp(struct nlse_settings settings, struct nlse_result r
 			const f64 c_root_2_minus_1 = sqrt(2.0) - 1.0;
 			const f64 c_3_minus_2_root_2 = 3.0 - 2.0*sqrt(2.0);
 
-#pragma omp parallel for reduction(+: E_AA_m0_n0)
+#pragma omp parallel for collapse(2) reduction(+: E_AA_m0_n0)
 			for (u32 m = 1; m < states_to_include; ++m) {
 				for (u32 n = 1; n < states_to_include; ++n) {
 					/* avoid <mn|V|mn> = 0 */
@@ -981,28 +980,34 @@ struct pt_result en_pt_2comp(struct nlse_settings settings, struct nlse_result r
 			const f64 c_3_minus_2_root_2 = 3.0 - 2.0*sqrt(2.0);
 
 #pragma omp parallel for reduction(+: E_AA_mn_pq)
-			for (u32 m = 1; m < states_to_include; ++m) {
-				for (u32 n = m; n < states_to_include; ++n) {
+			for (u32 k = 0; k < (pt2_AA_cache_size*(pt2_AA_cache_size+1))/2; ++k) {
 
-					f64 tmn = pt2_cache_AA[PT2_AA_CACHE_INDEX(m-1,n-m)];
-					const f64 delta_mn = (m == n) ? 1.0 : 0.0;
+				u32 k0, k1;
+				map_to_triangular_index(k, pt2_AA_cache_size, &k0, &k1);
 
-					for (u32 p = 1; p < states_to_include; ++p) {
-						for (u32 q = p; q < states_to_include; ++q) {
-							if (m*states_to_include + n == p*states_to_include + q)
-								continue;
+				/* Skip <k|V|k> terms */
+				if (k0 == k1)
+					continue;
 
-							f64 v_mn_pq = G0(&pt,A,A)*V(&pt, A,A, m,n,p,q);
-							f64 tpq = pt2_cache_AA[PT2_AA_CACHE_INDEX(p-1,q-p)];
+				u32 m, n;
+				map_to_triangular_index(k0, states_to_include-1, &m, &n);
+				m += 1; n += 1;
 
-							const f64 delta_pq = (p == q) ? 1.0 : 0.0;
-							const f64 coeff = 2.0 + c_root_2_minus_2*(delta_mn + delta_pq) + c_3_minus_2_root_2*(delta_mn*delta_pq);
-							E_AA_mn_pq += coeff*tmn*tpq*v_mn_pq;
-						}
-					}
+				u32 p, q;
+				map_to_triangular_index(k1, states_to_include-1, &p, &q);
+				p += 1; q += 1;
 
-				}
+				f64 tmn = pt2_cache_AA[PT2_AA_CACHE_INDEX(m-1,n-m)];
+				const f64 delta_mn = (m == n) ? 1.0 : 0.0;
+
+				f64 v_mn_pq = G0(&pt,A,A)*V(&pt, A,A, m,n,p,q);
+				f64 tpq = pt2_cache_AA[PT2_AA_CACHE_INDEX(p-1,q-p)];
+
+				const f64 delta_pq = (p == q) ? 1.0 : 0.0;
+				const f64 coeff = 2.0 + c_root_2_minus_2*(delta_mn + delta_pq) + c_3_minus_2_root_2*(delta_mn*delta_pq);
+				E_AA_mn_pq += 2.0*coeff*tmn*tpq*v_mn_pq;
 			}
+
 		}
 		sbmf_log_info("\t\tAA mn,pq: %.10e", E_AA_mn_pq);
 
@@ -1012,7 +1017,7 @@ struct pt_result en_pt_2comp(struct nlse_settings settings, struct nlse_result r
 			const f64 c_root_2_minus_1 = sqrt(2.0) - 1.0;
 			const f64 c_3_minus_2_root_2 = 3.0 - 2.0*sqrt(2.0);
 
-#pragma omp parallel for reduction(+: E_BB_m0_n0)
+#pragma omp parallel for collapse(2) reduction(+: E_BB_m0_n0)
 			for (u32 m = 1; m < states_to_include; ++m) {
 				for (u32 n = 1; n < states_to_include; ++n) {
 					/* avoid <mn|V|mn> = 0 */
@@ -1047,7 +1052,7 @@ struct pt_result en_pt_2comp(struct nlse_settings settings, struct nlse_result r
 				}
 			}
 
-			E_BB_m0_n0 *= (N[A] - 3);
+			E_BB_m0_n0 *= (N[B] - 3);
 		}
 		sbmf_log_info("\t\tBB m0,n0: %.10e", E_BB_m0_n0);
 
@@ -1057,27 +1062,32 @@ struct pt_result en_pt_2comp(struct nlse_settings settings, struct nlse_result r
 			const f64 c_3_minus_2_root_2 = 3.0 - 2.0*sqrt(2.0);
 
 #pragma omp parallel for reduction(+: E_BB_mn_pq)
-			for (u32 m = 1; m < states_to_include; ++m) {
-				for (u32 n = m; n < states_to_include; ++n) {
+			for (u32 k = 0; k < (pt2_AA_cache_size*(pt2_AA_cache_size+1))/2; ++k) {
 
-					f64 tmn = pt2_cache_BB[PT2_AA_CACHE_INDEX(m-1,n-m)];
-					const f64 delta_mn = (m == n) ? 1.0 : 0.0;
+				u32 k0, k1;
+				map_to_triangular_index(k, pt2_AA_cache_size, &k0, &k1);
 
-					for (u32 p = 1; p < states_to_include; ++p) {
-						for (u32 q = p; q < states_to_include; ++q) {
-							if (m*states_to_include + n == p*states_to_include + q)
-								continue;
+				/* Skip <k|V|k> terms */
+				if (k0 == k1)
+					continue;
 
-							f64 v_mn_pq = G0(&pt,B,B)*V(&pt, B,B, m,n,p,q);
-							f64 tpq = pt2_cache_BB[PT2_AA_CACHE_INDEX(p-1,q-p)];
+				u32 m, n;
+				map_to_triangular_index(k0, states_to_include-1, &m, &n);
+				m += 1; n += 1;
 
-							const f64 delta_pq = (p == q) ? 1.0 : 0.0;
-							const f64 coeff = 2.0 + c_root_2_minus_2*(delta_mn + delta_pq) + c_3_minus_2_root_2*(delta_mn*delta_pq);
-							E_BB_mn_pq += coeff*tmn*tpq*v_mn_pq;
-						}
-					}
+				u32 p, q;
+				map_to_triangular_index(k1, states_to_include-1, &p, &q);
+				p += 1; q += 1;
 
-				}
+				f64 tmn = pt2_cache_BB[PT2_AA_CACHE_INDEX(m-1,n-m)];
+				const f64 delta_mn = (m == n) ? 1.0 : 0.0;
+
+				f64 v_mn_pq = G0(&pt,B,B)*V(&pt, B,B, m,n,p,q);
+				f64 tpq = pt2_cache_BB[PT2_AA_CACHE_INDEX(p-1,q-p)];
+
+				const f64 delta_pq = (p == q) ? 1.0 : 0.0;
+				const f64 coeff = 2.0 + c_root_2_minus_2*(delta_mn + delta_pq) + c_3_minus_2_root_2*(delta_mn*delta_pq);
+				E_BB_mn_pq += 2.0*coeff*tmn*tpq*v_mn_pq;
 			}
 		}
 		sbmf_log_info("\t\tBB mn,pq: %.10e", E_BB_mn_pq);
@@ -1087,7 +1097,7 @@ struct pt_result en_pt_2comp(struct nlse_settings settings, struct nlse_result r
 		{
 
 			{
-#pragma omp parallel for reduction(+: E_AB_m0_n0)
+#pragma omp parallel for collapse(2) reduction(+: E_AB_m0_n0)
 				for (u32 m = 1; m < states_to_include; ++m) {
 					for (u32 n = 1; n < states_to_include; ++n) {
 						/* avoid <mn|V|mn> = 0 */
@@ -1109,7 +1119,7 @@ struct pt_result en_pt_2comp(struct nlse_settings settings, struct nlse_result r
 			}
 
 			{
-#pragma omp parallel for reduction(+: E_AB_m0_n0)
+#pragma omp parallel for collapse(2) reduction(+: E_AB_m0_n0)
 				for (u32 m = 1; m < states_to_include; ++m) {
 					for (u32 n = 1; n < states_to_include; ++n) {
 						/* avoid <mn|V|mn> = 0 */
@@ -1134,7 +1144,7 @@ struct pt_result en_pt_2comp(struct nlse_settings settings, struct nlse_result r
 
 		f64 E_AB_mn_pq = 0;
 		{
-#pragma omp parallel for reduction(+: E_AB_mn_pq)
+#pragma omp parallel for collapse(4) reduction(+: E_AB_mn_pq)
 			for (u32 m = 1; m < states_to_include; ++m) {
 				for (u32 n = 1; n < states_to_include; ++n) {
 					for (u32 p = 1; p < states_to_include; ++p) {

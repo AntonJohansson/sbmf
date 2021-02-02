@@ -124,8 +124,7 @@ void tf(f64* out, f64* in, u32 len, void* data) {
 
 void gaussian0(f64* out, f64* in, u32 len, void* data) {
 	for (u32 i = 0; i < len; ++i) {
-		//out[i] = (1 - 0.5 * in[i]*in[i]);
-		out[i] = gaussian(in[i] + 1.0, 0.0, 0.1) + gaussian(in[i] - 1.0, 0.0, 0.2);
+		out[i] = gaussian(in[i] + 1.0, 0.0, 0.1);
 	}
 }
 void gaussian1(f64* out, f64* in, u32 len, void* data) {

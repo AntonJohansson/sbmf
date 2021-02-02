@@ -8,8 +8,8 @@
 #define USE_RANDOM_GUESS 0
 
 //#define PERTURBATION(x) (-1.5015*sqrt(x*x - 1.5*1.5 + 1.5015*1.5015));
-//#define PERTURBATION(x) 2*gaussian(x,0,0.2)
-#define PERTURBATION(x) 0.0
+#define PERTURBATION(x) 2*gaussian(x,0,0.2)
+//#define PERTURBATION(x) 0.0
 
 void perturbation(const u32 len, f64 out[static len],
                                 f64 in_x[static len], const u32 component_count,
@@ -91,7 +91,7 @@ int main() {
 		.max_integration_evals = 1e5,
 		.error_tol = 1e-10,
 
-        .num_basis_funcs = 32,
+        .num_basis_funcs = 16,
 		.basis = ho_basis,
 
 		.hamiltonian_mixing = 0.0,
@@ -103,8 +103,8 @@ int main() {
 		.gk=gk15
     };
 
-	const i64 particle_count = 1000;
-	const f64 g0 = (-4.0)/(particle_count-1);
+	const i64 particle_count = 100;
+	const f64 g0 = (-1.5)/(particle_count-1);
 
 	struct bestmf_result res = best_meanfield(settings, particle_count, g0, guesses);
 

@@ -865,18 +865,35 @@ struct pt_result en_pt_2comp(struct nlse_settings settings, struct nlse_result r
 	sbmf_log_info("Starting second order PT");
 	f64 E2 = 0.0;
 	{
+		f64 temp = 0;
+
+		temp = E2;
 #pragma omp parallel for reduction(+: E2)
 		for (u32 m = 1; m < states_to_include; ++m) {
 			for (u32 n = m; n < states_to_include; ++n) {
 				f64 me = rs_2nd_order_me(&pt, A,A, m,n);
-				f64 Ediff = E0 - (
-							en_nhn(&pt, A, m,m) + en_nhn(&pt, A, n,n) + (N[A]-2)*en_nhn(&pt, A, 0,0)
-							+ 0.5*G0(&pt,A,A)*(((m==n)?2.0:4.0)*V(&pt, A,A, m,n,m,n)
-									+ 4.0*(N[A]-2)*V(&pt, A,A, m,0,m,0)
-									+ 4.0*(N[A]-2)*V(&pt, A,A, n,0,n,0)
-									+ (N[A]-3)*(N[A]-2)*V(&pt, A,A, 0,0,0,0))
-							+ N[B]*en_nhn(&pt, B, 0,0) + 0.5*G0(&pt,B,B)*N[B]*(N[B]-1)*V(&pt,B,B,0,0,0,0)
-							+ G0(&pt,A,B)*N[B]*(V(&pt, A,B, m,0,m,0) + V(&pt, A,B, n,0,n,0) + (N[A]-2)*V(&pt, A,B, 0,0,0,0))
+				//f64 Ediff = E0 - (
+				//			en_nhn(&pt, A, m,m) + en_nhn(&pt, A, n,n) + (N[A]-2)*en_nhn(&pt, A, 0,0)
+				//			+ 0.5*G0(&pt,A,A)*(((m==n)?2.0:4.0)*V(&pt, A,A, m,n,m,n)
+				//					+ 4.0*(N[A]-2)*V(&pt, A,A, m,0,m,0)
+				//					+ 4.0*(N[A]-2)*V(&pt, A,A, n,0,n,0)
+				//					+ (N[A]-3)*(N[A]-2)*V(&pt, A,A, 0,0,0,0))
+				//			+ N[B]*en_nhn(&pt, B, 0,0) + 0.5*G0(&pt,B,B)*N[B]*(N[B]-1)*V(&pt,B,B,0,0,0,0)
+				//			+ G0(&pt,A,B)*N[B]*(V(&pt, A,B, m,0,m,0) + V(&pt, A,B, n,0,n,0) + (N[A]-2)*V(&pt, A,B, 0,0,0,0))
+				//			);
+
+				const f64 dmn = (m == n) ? 1.0 : 0.0;
+				f64 Ediff =
+					2.0*en_nhn(&pt,A,0,0) - en_nhn(&pt,A,m,m) - en_nhn(&pt,A,n,n)
+					- G0(&pt,A,A)*(
+								(2.0-dmn)*V(&pt,A,A,m,n,m,n)
+								+ 2.0*(N[A]-2.0)*(V(&pt,A,A,m,0,m,0) + V(&pt,A,A,n,0,n,0))
+								- (2.0*N[A]-3.0)*V(&pt,A,A,0,0,0,0)
+							)
+					- G0(&pt,A,B)*N[B]*(
+								V(&pt,A,B,m,0,m,0)
+								+V(&pt,A,B,n,0,n,0)
+								-2.0*V(&pt,A,B,0,0,0,0)
 							);
 
 				pt2_cache_AA[PT2_AA_CACHE_INDEX(m-1, n-m)] = me/Ediff;
@@ -884,7 +901,9 @@ struct pt_result en_pt_2comp(struct nlse_settings settings, struct nlse_result r
 				E2 += me*me/(Ediff);
 			}
 		}
+		sbmf_log_info("-----------: %e", E2 - temp);
 
+		temp = E2;
 #pragma omp parallel for reduction(+: E2)
 		for (u32 m = 1; m < states_to_include; ++m) {
 			for (u32 n = m; n < states_to_include; ++n) {
@@ -904,24 +923,40 @@ struct pt_result en_pt_2comp(struct nlse_settings settings, struct nlse_result r
 				E2 += me*me/(Ediff);
 			}
 		}
+		sbmf_log_info("-----------: %e", E2 - temp);
 
+		temp = E2;
 #pragma omp parallel for reduction(+: E2)
 		for (u32 m = 1; m < states_to_include; ++m) {
 			for (u32 n = 1; n < states_to_include; ++n) {
 				f64 me = rs_2nd_order_me(&pt, A,B, m,n);
-				f64 Ediff = E0 - (
-							  en_nhn(&pt,A,m,m) + (N[A]-1)*en_nhn(&pt,A,0,0)
-							+ 0.5*G0(&pt,A,A)*(4.0*(N[A]-1)*V(&pt,A,A,m,0,m,0) + (N[A]-1)*(N[A]-2)*V(&pt,A,A,0,0,0,0))
-							+ en_nhn(&pt,B,n,n) + (N[B]-1)*en_nhn(&pt,B,0,0)
-							+ 0.5*G0(&pt,B,B)*(4.0*(N[B]-1)*V(&pt,B,B,n,0,n,0) + (N[B]-1)*(N[B]-2)*V(&pt,B,B,0,0,0,0))
-							+ G0(&pt,A,B)*((N[B]-1)*V(&pt,A,B,m,0,m,0) + (N[A]-1)*V(&pt,A,B,0,n,0,n) + V(&pt, A,B, m,n,m,n) + (N[A]-1)*(N[B]-1)*V(&pt,A,B,0,0,0,0))
-						);
+				//f64 Ediff = E0 - (
+				//			  en_nhn(&pt,A,m,m) + (N[A]-1)*en_nhn(&pt,A,0,0)
+				//				+ 0.5*G0(&pt,A,A)*(4.0*(N[A]-1)*V(&pt,A,A,m,0,m,0) + (N[A]-1)*(N[A]-2)*V(&pt,A,A,0,0,0,0))
+				//			+ en_nhn(&pt,B,n,n) + (N[B]-1)*en_nhn(&pt,B,0,0)
+				//				+ 0.5*G0(&pt,B,B)*(4.0*(N[B]-1)*V(&pt,B,B,n,0,n,0) + (N[B]-1)*(N[B]-2)*V(&pt,B,B,0,0,0,0))
+				//			+ G0(&pt,A,B)*(
+				//				  (N[B]-1)*V(&pt,A,B,m,0,m,0)
+				//				+ (N[A]-1)*V(&pt,A,B,0,n,0,n)
+				//				+ V(&pt, A,B, m,n,m,n)
+				//				+ (N[A]-1)*(N[B]-1)*V(&pt,A,B,0,0,0,0)));
 
-				pt2_cache_AB[PT2_CACHE_AB_INDEX(m-1, n-m)] = me/Ediff;
+				f64 Ediff =
+					  en_nhn(&pt,A,0,0) - en_nhn(&pt,A,m,m) - G0(&pt,A,A)*(2.0*(N[A]-1.0)*V(&pt,A,A,m,0,m,0) - (N[A]-1.0)*V(&pt,A,A,0,0,0,0))
+					+ en_nhn(&pt,B,0,0) - en_nhn(&pt,B,n,n) - G0(&pt,B,B)*(2.0*(N[B]-1.0)*V(&pt,B,B,n,0,n,0) - (N[B]-1.0)*V(&pt,B,B,0,0,0,0))
+					- G0(&pt,A,B)*(
+								V(&pt,A,B,m,n,m,n)
+								+ (N[A]-1.0)*V(&pt,A,B,m,0,m,0)
+								+ (N[B]-1.0)*V(&pt,A,B,0,n,0,n)
+								+ (1.0-N[A]-N[B])*V(&pt,A,B,0,0,0,0)
+							);
+
+				pt2_cache_AB[PT2_CACHE_AB_INDEX(m-1, n-1)] = me/Ediff;
 
 				E2 += me*me/(Ediff);
 			}
 		}
+		sbmf_log_info("-----------: %e", E2 - temp);
 	}
 	sbmf_log_info("\tE2: %e", E2);
 
@@ -1096,7 +1131,10 @@ struct pt_result en_pt_2comp(struct nlse_settings settings, struct nlse_result r
 		f64 E_AB_m0_n0 = 0.0;
 		{
 
+			f64 tmp = 0;
 			{
+				tmp = E_AB_m0_n0;
+				/* Contribution from A component */
 #pragma omp parallel for collapse(2) reduction(+: E_AB_m0_n0)
 				for (u32 m = 1; m < states_to_include; ++m) {
 					for (u32 n = 1; n < states_to_include; ++n) {
@@ -1116,9 +1154,12 @@ struct pt_result en_pt_2comp(struct nlse_settings settings, struct nlse_result r
 						E_AB_m0_n0 += (v_AA_m0_n0 + v_AB_m0_n0) * sum;
 					}
 				}
+				sbmf_log_info("-----: %e", E_AB_m0_n0 - tmp);
 			}
 
 			{
+				tmp = E_AB_m0_n0;
+				/* Contribution from B component */
 #pragma omp parallel for collapse(2) reduction(+: E_AB_m0_n0)
 				for (u32 m = 1; m < states_to_include; ++m) {
 					for (u32 n = 1; n < states_to_include; ++n) {
@@ -1138,6 +1179,7 @@ struct pt_result en_pt_2comp(struct nlse_settings settings, struct nlse_result r
 						E_AB_m0_n0 += (v_BB_m0_n0 + v_AB_0m_0n) * sum;
 					}
 				}
+				sbmf_log_info("-----: %e", E_AB_m0_n0 - tmp);
 			}
 		}
 		sbmf_log_info("\t\tAB m0,n0: %.10e", E_AB_m0_n0);

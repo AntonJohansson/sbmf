@@ -28,6 +28,27 @@ static inline f128 factorial_128(const u32 n) {
 	return prod;
 }
 
+static inline f128 double_factorial_positive_128(const u32 n) {
+	f128 prod = 1.0;
+	f128 current_value = (f128) n;
+	while (current_value > 0.0) {
+		prod *= current_value;
+		current_value -= 2.0;
+	}
+	return prod;
+}
+
+static inline f128 double_factorial_128(const i32 n) {
+	if (n < 0) {
+		assert(n % 2 != 0);
+		f128 n_double_fact = double_factorial_positive_128((u32)(-n));
+		f128 sign = (((n-1)/2) % 2 == 0) ? 1.0 : -1.0;
+		return sign*n/n_double_fact;
+	}
+
+	return double_factorial_positive_128((u32)n);
+}
+
 static inline u64 n_choose_k(const u32 n, const u32 k) {
 	f128 n_fact = factorial_128(n);
 	f128 k_fact = factorial_128(k);

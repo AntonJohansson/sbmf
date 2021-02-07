@@ -1,8 +1,15 @@
 //#define OMEGA (1.0)
 f64 OMEGA = 1.0;
 
+static inline f64 ho_K(const u32 n) {
+	const f64 pi_factor = pow(OMEGA/M_PI,0.25);
+	const f64 normalization_factor = pi_factor / sqrt(pow(2,n) * (f64)factorial_128(n));
+
+	return normalization_factor;
+}
+
 /* Currently doesnt handle 2d/3d/... case */
-void ho_eigenfunc(const u32 n, const u32 len, f64 out[static len], f64 in[static len]) {
+void ho_eigenfunc(const u32 n, const u32 len, f64* out, f64* in) {
 	/*
 	 * HN = 2xH_{N-1} - 2(N-1)H_{N-2}
 	 * psiN = 1/sqrt(2^N * N!) * (1/pi^(1/4)) * exp(-x^2/2) * HN
@@ -10,7 +17,7 @@ void ho_eigenfunc(const u32 n, const u32 len, f64 out[static len], f64 in[static
 	assert(n < 270);
 
 	const f64 pi_factor = pow(OMEGA/M_PI,0.25);
-	const f64 normalization_factor = pi_factor / sqrt(pow(2,n) * factorial_128(n));
+	const f64 normalization_factor = pi_factor / sqrt(pow(2,n) * (f64)factorial_128(n));
 
 	const f64 sqrt_omega = sqrt(OMEGA);
 	const f64 half_omega = OMEGA/2.0;
@@ -48,11 +55,7 @@ f64 ho_eigenval(const u32 n) {
 }
 
 /* Currently doesnt handle 2d/3d/... case */
-void ho_sample(const u32 coeff_count,
-		f64 coeffs[static coeff_count],
-		const u32 len,
-		f64 out[static len],
-		f64 in[static len]) {
+void ho_sample(const u32 coeff_count, f64* coeffs, const u32 len, f64* out, f64* in) {
 	for (u32 i = 0; i < len; ++i)
 		out[i] = 0;
 
@@ -79,43 +82,6 @@ struct basis ho_basis = {
 
 
 
-#if 0
-#include <gsl/gsl_sf_hermite.h>
-
-static void ho_gsl_eigenfunc(const u32 n, const u32 len, f64 out[static len], f64 in[static len]) {
-	for (u32 i = 0; i < len; ++i) {
-		out[i] = gsl_sf_hermite_func(n, in[i]);
-	}
-}
-
-static f64 ho_gsl_eigenval(const u32 n) {
-	return n + 0.5;
-}
-
-static void ho_gsl_sample(const u32 coeff_count,
-		f64 coeffs[static coeff_count],
-		const u32 len,
-		f64 out[static len],
-		f64 in[static len]) {
-	for (u32 i = 0; i < len; ++i)
-		out[i] = 0;
-
-	f64 eigenfunc_out[len];
-	for (u32 i = 0; i < coeff_count; ++i) {
-		ho_gsl_eigenfunc(i, len, eigenfunc_out, in);
-		for (u32 j = 0; j < len; ++j) {
-			out[j] += coeffs[i]*eigenfunc_out[j];
-		}
-	}
-}
-
-
-static struct basis ho_gsl_basis = {
-	.eigenfunc = ho_gsl_eigenfunc,
-	.eigenval  = ho_gsl_eigenval,
-	.sample    = ho_gsl_sample
-};
-#endif
 
 
 
@@ -134,17 +100,7 @@ static struct basis ho_gsl_basis = {
 
 
 
-
-
-
-
-
-
-
-
-
-
-f64 ho_potential(f64* v, i32 n, c64 u) {
+f64 ho_potential(f64* v, i32 n, f64 u) {
 	SBMF_UNUSED(u);
 
 	f64 temp = 0.0;

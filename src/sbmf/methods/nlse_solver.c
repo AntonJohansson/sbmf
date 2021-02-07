@@ -19,7 +19,7 @@ struct integrand_params {
 static void sbmf_log_integration_result(struct quadgk_result* res) {
 	sbmf_log_info("integral: %.10e", res->integral);
 	sbmf_log_info("error: %.10e", res->error);
-	sbmf_log_info("performed evals: %d", res->performed_evals);
+	//sbmf_log_info("performed evals: %d", res->performed_evals);
 	sbmf_log_info("converged: %s", (res->converged) ? "yes" : "no");
 }
 
@@ -104,7 +104,7 @@ static f64 nonlinear_me_integrand_gsl(f64 in, void* data) {
 }
 #endif
 
-struct nlse_result nlse_solver(struct nlse_settings settings, const u32 component_count, struct nlse_component component[static component_count]) {
+struct nlse_result nlse_solver(struct nlse_settings settings, const u32 component_count, struct nlse_component* component) {
 	/* Lazy */
 	const u32 N = settings.num_basis_funcs;
 
@@ -132,7 +132,7 @@ struct nlse_result nlse_solver(struct nlse_settings settings, const u32 componen
 		.gk = (settings.gk.gauss_size > 0) ? settings.gk : gk15,
 		.abs_error_tol = 1e-15,
 		.rel_error_tol = 1e-8,
-		.max_evals = settings.max_integration_evals,
+		.max_iters = settings.max_quadgk_iters,
 	};
 
 	/* Setup intial guess values for coeffs */
@@ -156,7 +156,9 @@ struct nlse_result nlse_solver(struct nlse_settings settings, const u32 componen
 				for (u32 j = 0; j < res.coeff_count; ++j) {
 					p.n = j;
 					struct quadgk_result r;
-					quadgk_infinite_interval(guess_integrand, &int_settings, &r);
+
+					u8 quadgk_memory[quadgk_required_memory_size(&int_settings)];
+					quadgk_infinite_interval(guess_integrand, &int_settings, quadgk_memory, &r);
 					out[j] = r.integral;
 				}
 				f64_normalize(out, out, res.coeff_count);
@@ -232,8 +234,9 @@ struct nlse_result nlse_solver(struct nlse_settings settings, const u32 componen
 				params.n[0] = r;
 				params.n[1] = c;
 
+				u8 quadgk_memory[quadgk_required_memory_size(&int_settings)];
 				struct quadgk_result int_res;
-				quadgk_infinite_interval(linear_me_integrand, &int_settings, &int_res);
+				quadgk_infinite_interval(linear_me_integrand, &int_settings, quadgk_memory, &int_res);
 
 				if (fabs(int_res.integral) <= settings.zero_threshold)
 					int_res.integral = 0.0;
@@ -319,8 +322,10 @@ struct nlse_result nlse_solver(struct nlse_settings settings, const u32 componen
 				gsl_integration_qagi(&F, 1e-10, 1e-7, settings.max_iterations, ws[omp_get_thread_num()], &int_res.integral, &int_res.error);
 				int_res.converged = true;
 #else
+				u8 quadgk_memory[quadgk_required_memory_size(&int_settings)];
+
 				struct quadgk_result int_res;
-				quadgk_infinite_interval(nonlinear_me_integrand, &int_settings, &int_res);
+				quadgk_infinite_interval(nonlinear_me_integrand, &int_settings, quadgk_memory, &int_res);
 #endif
 
 				/* Check if the resultant integral is less than what we can resolve,

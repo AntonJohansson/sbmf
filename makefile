@@ -2,6 +2,8 @@ PROJECT = sbmf
 BUILDDIR = build
 INSTALLDIR = ~/.local
 
+CC = gcc
+
 PROJ_SRCS = src/sbmf/sbmf.c
 PROJ_OBJS = $(patsubst %.c, $(BUILDDIR)/%.o, $(PROJ_SRCS))
 
@@ -10,8 +12,7 @@ PROJ_LIBS = 							\
 	-fopenmp 							\
 	-l:third_party/lib/libarpack.a 		\
 	-l:third_party/lib/libopenblas.a 	\
-	-lgfortran 							\
-	-lgsl
+	-lgfortran
 
 RELEASE_FLAGS = -O3
 DEBUG_FLAGS = -g \
@@ -23,14 +24,16 @@ DEBUG_FLAGS = -g \
 			  -fsanitize=float-cast-overflow \
 			  -fsanitize=signed-integer-overflow
 
-PROJ_FLAGS = -c -fpic -pedantic -Wall -Wextra -Ithird_party/include -Iinclude
+PROJ_FLAGS = -c -fPIC -pedantic -Wall -Wextra -Ithird_party/include -Iinclude
 
 .PHONY: release
 release: PROJ_FLAGS += $(RELEASE_FLAGS)
+release: PROJ_FLAGS += $(PROJ_LIBS)
 release: $(BUILDDIR)/$(PROJECT).a
 
 .PHONY: debug
 debug: PROJ_FLAGS += $(DEBUG_FLAGS)
+debug: PROJ_FLAGS += $(PROJ_LIBS)
 debug: $(BUILDDIR)/$(PROJECT).a
 
 .PHONY: install
@@ -47,7 +50,7 @@ third_party/lib:
 	cd third_party && sh build.sh
 
 $(BUILDDIR)/%.o: %.c
-	$(CC) -o $@ $^ -static $(PROJ_FLAGS) $(PROJ_LIBS)
+	$(CC) -o $@ $^ $(PROJ_FLAGS)
 
 $(BUILDDIR)/$(PROJECT).a: $(BUILDDIR) $(PROJ_OBJS)
 	mkdir -p $(BUILDDIR)/tmp

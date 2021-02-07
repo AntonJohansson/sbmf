@@ -22,7 +22,7 @@ export FFLAGS=-O3
 export CFLAGS=-O3
 export CPPFLAGS=-O3
 export CXXFLAGS=-O3
-./configure --prefix=$basedir --with-blas=$basedir/lib/libopenblas.a --with-lapack=$basedir/lib/openblas.a --enable-icb
+./configure --prefix=$basedir --with-blas=$basedir/lib/libopenblas.a --with-lapack=$basedir/lib/openblas.a --enable-icb --enable-static=yes --enable-shared=no
 make -j4
 make check
 make install

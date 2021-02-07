@@ -13,6 +13,7 @@ static inline void map_to_triangular_index(u32 k, u32 N, u32* m, u32* n) {
  */
 struct pt_settings {
 	struct nlse_result* res;
+	struct nlse_settings* settings;
 	f64* g0;
 	i64* particle_count;
 
@@ -40,41 +41,79 @@ struct V_params {
 	f64* j;
 	f64* k;
 	f64* l;
+	f64* sample_i;
+	f64* sample_j;
+	f64* sample_k;
+	f64* sample_l;
 };
 
 void V_integrand(f64* out, f64* in, u32 len, void* data) {
 	struct V_params* p = data;
 
-	f64 sample_i[len]; ho_sample(p->coeff_count, p->i, len, sample_i, in);
-	f64 sample_j[len]; ho_sample(p->coeff_count, p->j, len, sample_j, in);
-	f64 sample_k[len]; ho_sample(p->coeff_count, p->k, len, sample_k, in);
-	f64 sample_l[len]; ho_sample(p->coeff_count, p->l, len, sample_l, in);
+	ho_sample(p->coeff_count, p->i, len, p->sample_i, in);
+	ho_sample(p->coeff_count, p->j, len, p->sample_j, in);
+	ho_sample(p->coeff_count, p->k, len, p->sample_k, in);
+	ho_sample(p->coeff_count, p->l, len, p->sample_l, in);
 
 	for (u32 i = 0; i < len; ++i) {
-		out[i] = sample_i[i]*sample_j[i]*sample_k[i]*sample_l[i];
+		out[i] = p->sample_i[i]*p->sample_j[i]*p->sample_k[i]*p->sample_l[i];
 	}
 }
 
+static inline f64 V_closed(f64* cache, struct pt_settings* pt, u32 A, u32 B, u32 i, u32 j, u32 k, u32 l) {
+	f64* phi_a = PHI(pt, A, i);
+	f64* phi_b = PHI(pt, B, j);
+	f64* phi_c = PHI(pt, A, k);
+	f64* phi_d = PHI(pt, B, l);
+
+	f64 sum = 0.0;
+	for (u32 a = 0; a < pt->L; ++a) {
+		for (u32 b = 0; b < pt->L; ++b) {
+			for (u32 c = 0; c < pt->L; ++c) {
+				for (u32 d = 0; d < pt->L; ++d) {
+					f64 L = phi_a[a]*phi_b[b]*phi_c[c]*phi_d[d];//*ho_K(a)*ho_K(b)*ho_K(c)*ho_K(d);
+					if (fabs(L) < 1e-10)
+						continue;
+					f64 integral = hermite_integral_4(a,b,c,d);
+					sum += L*integral;
+				}
+			}
+		}
+	}
+
+	return sum;
+}
+
 static inline f64 V(struct pt_settings* pt, u32 A, u32 B, u32 i, u32 j, u32 k, u32 l) {
-	/* Check if we have computed this integral already */
+    struct quadgk_settings settings = {
+        .abs_error_tol = 1e-15,
+        .rel_error_tol = 1e-8,
+		.gk = gk20,
+		.max_iters = pt->settings->max_quadgk_iters,
+    };
+
+	u8 quadgk_memory[quadgk_required_memory_size(&settings)];
+	f64 sample_i[settings.gk.sample_size];
+	f64 sample_j[settings.gk.sample_size];
+	f64 sample_k[settings.gk.sample_size];
+	f64 sample_l[settings.gk.sample_size];
+
 	struct V_params p = {
 		.coeff_count = pt->L,
 		.i = PHI(pt, A, i),
 		.j = PHI(pt, B, j),
 		.k = PHI(pt, A, k),
-		.l = PHI(pt, B, l)
+		.l = PHI(pt, B, l),
+		.sample_i = sample_i,
+		.sample_j = sample_j,
+		.sample_k = sample_k,
+		.sample_l = sample_l,
 	};
 
-    struct quadgk_settings settings = {
-        .abs_error_tol = 1e-15,
-        .rel_error_tol = 1e-8,
-		.gk = gk20,
-        .max_evals = 1e5,
-		.userdata = &p,
-    };
+	settings.userdata = &p;
 
 	struct quadgk_result res;
-	quadgk_infinite_interval(V_integrand, &settings, &res);
+	quadgk_infinite_interval(V_integrand, &settings, quadgk_memory, &res);
 	assert(res.converged);
 
 	return res.integral;
@@ -128,6 +167,7 @@ struct pt_result rayleigh_schroedinger_pt_rf(struct nlse_settings settings, stru
 		.N = states_to_include,
 		.L = res.coeff_count,
 		.pert = settings.spatial_pot_perturbation,
+		.settings = &settings,
 	};
 
 	/* Zeroth order PT */
@@ -318,6 +358,7 @@ struct pt_result rayleigh_schroedinger_pt_rf_2comp(struct nlse_settings settings
 		.N = states_to_include,
 		.L = res.coeff_count,
 		.pert = settings.spatial_pot_perturbation,
+		.settings = &settings,
 	};
 
 	struct pt_result res_comp_A = rayleigh_schroedinger_pt_rf(settings, res, 0, g0, particle_count);
@@ -536,12 +577,15 @@ static inline f64 Vp(struct pt_settings* pt, u32 A, u32 i, u32 j) {
         .abs_error_tol = 1e-15,
         .rel_error_tol = 1e-8,
 		.gk = gk20,
-        .max_evals = 1e5,
+        //.max_evals = 1e5,
+		.max_iters = pt->settings->max_quadgk_iters,
 		.userdata = &p,
     };
 
+	u8 quadgk_memory[quadgk_required_memory_size(&settings)];
+
 	struct quadgk_result res;
-	quadgk_infinite_interval(Vp_integrand, &settings, &res);
+	quadgk_infinite_interval(Vp_integrand, &settings, quadgk_memory, &res);
 	assert(res.converged);
 
 	return res.integral;
@@ -622,6 +666,7 @@ struct pt_result en_pt_rf(struct nlse_settings settings, struct nlse_result res,
 		.N = states_to_include,
 		.L = res.coeff_count,
 		.pert = settings.spatial_pot_perturbation,
+		.settings = &settings,
 	};
 
 	/* Zeroth order PT */
@@ -832,10 +877,34 @@ struct pt_result en_pt_2comp(struct nlse_settings settings, struct nlse_result r
 		.N = states_to_include,
 		.L = res.coeff_count,
 		.pert = settings.spatial_pot_perturbation,
+		.settings = &settings,
 	};
 
 	const u32 A = 0;
 	const u32 B = 1;
+
+#if 0
+	{
+		f64 f1 = 0;
+		struct timespec t0,t1;
+
+
+		t0 = current_time();
+		for (u32 i = 0; i < 1000; ++i)
+			f1 = V(&pt, A,A, 30,15,24,48);
+		t1 = current_time();
+		sbmf_log_info("-------:	%.15e ------ %lf", f1, elapsed_time(t0,t1));
+
+		f64 f2 = 0;
+		t0 = current_time();
+		for (u32 i = 0; i < 1000; ++i)
+			f2 = V_closed(&pt, A,A, 30,15,24,48);
+		t1 = current_time();
+		sbmf_log_info("-------:	%.15e ------ %lf", f2, elapsed_time(t0,t1));
+
+		sbmf_log_info("-------------------------------------------------");
+	}
+#endif
 
 	/* Zeroth order PT */
 	sbmf_log_info("Starting zeroth order PT");
@@ -872,16 +941,6 @@ struct pt_result en_pt_2comp(struct nlse_settings settings, struct nlse_result r
 		for (u32 m = 1; m < states_to_include; ++m) {
 			for (u32 n = m; n < states_to_include; ++n) {
 				f64 me = rs_2nd_order_me(&pt, A,A, m,n);
-				//f64 Ediff = E0 - (
-				//			en_nhn(&pt, A, m,m) + en_nhn(&pt, A, n,n) + (N[A]-2)*en_nhn(&pt, A, 0,0)
-				//			+ 0.5*G0(&pt,A,A)*(((m==n)?2.0:4.0)*V(&pt, A,A, m,n,m,n)
-				//					+ 4.0*(N[A]-2)*V(&pt, A,A, m,0,m,0)
-				//					+ 4.0*(N[A]-2)*V(&pt, A,A, n,0,n,0)
-				//					+ (N[A]-3)*(N[A]-2)*V(&pt, A,A, 0,0,0,0))
-				//			+ N[B]*en_nhn(&pt, B, 0,0) + 0.5*G0(&pt,B,B)*N[B]*(N[B]-1)*V(&pt,B,B,0,0,0,0)
-				//			+ G0(&pt,A,B)*N[B]*(V(&pt, A,B, m,0,m,0) + V(&pt, A,B, n,0,n,0) + (N[A]-2)*V(&pt, A,B, 0,0,0,0))
-				//			);
-
 				const f64 dmn = (m == n) ? 1.0 : 0.0;
 				f64 Ediff =
 					2.0*en_nhn(&pt,A,0,0) - en_nhn(&pt,A,m,m) - en_nhn(&pt,A,n,n)
@@ -920,6 +979,7 @@ struct pt_result en_pt_2comp(struct nlse_settings settings, struct nlse_result r
 
 				pt2_cache_BB[PT2_AA_CACHE_INDEX(m-1, n-m)] = me/Ediff;
 
+
 				E2 += me*me/(Ediff);
 			}
 		}
@@ -930,16 +990,6 @@ struct pt_result en_pt_2comp(struct nlse_settings settings, struct nlse_result r
 		for (u32 m = 1; m < states_to_include; ++m) {
 			for (u32 n = 1; n < states_to_include; ++n) {
 				f64 me = rs_2nd_order_me(&pt, A,B, m,n);
-				//f64 Ediff = E0 - (
-				//			  en_nhn(&pt,A,m,m) + (N[A]-1)*en_nhn(&pt,A,0,0)
-				//				+ 0.5*G0(&pt,A,A)*(4.0*(N[A]-1)*V(&pt,A,A,m,0,m,0) + (N[A]-1)*(N[A]-2)*V(&pt,A,A,0,0,0,0))
-				//			+ en_nhn(&pt,B,n,n) + (N[B]-1)*en_nhn(&pt,B,0,0)
-				//				+ 0.5*G0(&pt,B,B)*(4.0*(N[B]-1)*V(&pt,B,B,n,0,n,0) + (N[B]-1)*(N[B]-2)*V(&pt,B,B,0,0,0,0))
-				//			+ G0(&pt,A,B)*(
-				//				  (N[B]-1)*V(&pt,A,B,m,0,m,0)
-				//				+ (N[A]-1)*V(&pt,A,B,0,n,0,n)
-				//				+ V(&pt, A,B, m,n,m,n)
-				//				+ (N[A]-1)*(N[B]-1)*V(&pt,A,B,0,0,0,0)));
 
 				f64 Ediff =
 					  en_nhn(&pt,A,0,0) - en_nhn(&pt,A,m,m) - G0(&pt,A,A)*(2.0*(N[A]-1.0)*V(&pt,A,A,m,0,m,0) - (N[A]-1.0)*V(&pt,A,A,0,0,0,0))
@@ -952,6 +1002,7 @@ struct pt_result en_pt_2comp(struct nlse_settings settings, struct nlse_result r
 							);
 
 				pt2_cache_AB[PT2_CACHE_AB_INDEX(m-1, n-1)] = me/Ediff;
+
 
 				E2 += me*me/(Ediff);
 			}

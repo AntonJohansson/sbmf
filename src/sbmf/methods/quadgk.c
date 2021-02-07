@@ -30,6 +30,7 @@ struct gk_data gk7 = {
 	},
 	.kronod_size = 8,
 	.gauss_size = 4,
+	.sample_size = 4*6+3,
 };
 
 struct gk_data gk10 = {
@@ -68,6 +69,7 @@ struct gk_data gk10 = {
 	},
 	.kronod_size = 11,
 	.gauss_size = 5,
+	.sample_size = 4*10+3,
 };
 
 struct gk_data gk15 = {
@@ -119,6 +121,7 @@ struct gk_data gk15 = {
 	},
 	.kronod_size = 16,
 	.gauss_size = 8,
+	.sample_size = 4*14+3,
 };
 
 struct gk_data gk20 = {
@@ -182,6 +185,7 @@ struct gk_data gk20 = {
 	},
 	.kronod_size = 21,
 	.gauss_size = 10,
+	.sample_size = 4*20+3,
 };
 
 
@@ -227,11 +231,11 @@ static inline f64 norm(f64 r) {
 
 struct eval_result {
 	struct segment seg;
-	u32 func_evals;
+	//u32 func_evals;
 	bool valid;
 };
 
-static void evaluate_rule(integrand_func* f, f64 start, f64 end, const struct quadgk_settings* settings, struct eval_result* res) {
+static void evaluate_rule(integrand_func* f, f64 start, f64 end, const struct quadgk_settings* settings, f64* sample_points, f64* transformed_sample_points, f64* sample_output, struct eval_result* res) {
 	const struct gk_data* gk = &settings->gk;
 	f64 mid = 0.5 * (end - start);
 
@@ -252,8 +256,6 @@ static void evaluate_rule(integrand_func* f, f64 start, f64 end, const struct qu
 
 	/* Compute all sample points */
 	u32 sample_size = 4*size + 3;
-	f64 sample_points[sample_size];
-	f64 transformed_sample_points[sample_size];
 	for (u32 i = 0; i < size; ++i) {
 		f64 xg = gk->kronod_nodes[2*i+1];
 		f64 xk = gk->kronod_nodes[2*i];
@@ -273,22 +275,21 @@ static void evaluate_rule(integrand_func* f, f64 start, f64 end, const struct qu
 	}
 
 	/* Sample the function */
-	f64 output[sample_size];
-	f(output, transformed_sample_points, sample_size, settings->userdata);
+	f(sample_output, transformed_sample_points, sample_size, settings->userdata);
 
 	/* Apply transform output scaling */
 	f64 one_minus_t2, scale;
 	for (u32 i = 0; i < sample_size; ++i) {
 		one_minus_t2 = (1.0 - sample_points[i]*sample_points[i]);
 		scale = (1.0 + sample_points[i]*sample_points[i]) / (one_minus_t2*one_minus_t2);
-		output[i] *= scale;
+		sample_output[i] *= scale;
 	}
 
 	/* Compute the integral estimate */
 	f64 Ig = 0, Ik = 0;
 	for (u32 i = 0; i < size; ++i) {
-		f64 fg = output[4*i + 0] + output[4*i + 1];
-		f64 fk = output[4*i + 2] + output[4*i + 3];
+		f64 fg = sample_output[4*i + 0] + sample_output[4*i + 1];
+		f64 fk = sample_output[4*i + 2] + sample_output[4*i + 3];
 
 		Ig += gk->gauss_weights[i] * fg;
 		Ik += gk->kronod_weights[2*i+1] * fg + gk->kronod_weights[2*i] * fk;
@@ -297,11 +298,11 @@ static void evaluate_rule(integrand_func* f, f64 start, f64 end, const struct qu
 	// In the odd-order case, the last point has to be handled
 	// differently
 	if (is_order_odd  == 0) {
-		Ik += gk->kronod_weights[gk->kronod_size-1] * output[4*size + 0];
+		Ik += gk->kronod_weights[gk->kronod_size-1] * sample_output[4*size + 0];
 	} else {
-		Ig += gk->gauss_weights[gk->gauss_size-1] * output[4*size + 0];
-		Ik += gk->kronod_weights[gk->kronod_size-1] * output[4*size + 0]
-			+ gk->kronod_weights[gk->kronod_size-2] * (output[4*size + 1] + output[4*size + 2]);
+		Ig += gk->gauss_weights[gk->gauss_size-1] * sample_output[4*size + 0];
+		Ik += gk->kronod_weights[gk->kronod_size-1] * sample_output[4*size + 0]
+			+ gk->kronod_weights[gk->kronod_size-2] * (sample_output[4*size + 1] + sample_output[4*size + 2]);
 	}
 
 	f64 Ik_s = Ik*mid;
@@ -315,7 +316,7 @@ static void evaluate_rule(integrand_func* f, f64 start, f64 end, const struct qu
 
 	/* Setup return values */
 	res->seg = (struct segment){Ik_s, error, start, end};
-	res->func_evals = 4*gk->gauss_size + 1;
+	//res->func_evals = 4*gk->gauss_size + 1;
 	res->valid = valid;
 }
 
@@ -325,12 +326,18 @@ static bool compare_segments(void* a, void* b) {
 }
 
 static inline bool should_exit(const struct quadgk_settings* settings, struct quadgk_result* res) {
-	return (res->error <= settings->abs_error_tol ||
+	return (
+			res->error <= settings->abs_error_tol ||
 			res->error <= settings->rel_error_tol*norm(res->integral) ||
-			res->performed_evals >= settings->max_evals);
+			res->performed_iters >= settings->max_iters
+			);
 }
 
-void quadgk_infinite_interval(integrand_func* f, const struct quadgk_settings* settings, struct quadgk_result* res) {
+u32 quadgk_required_memory_size(const struct quadgk_settings* settings) {
+	return sizeof(struct segment)*(settings->max_iters+1) + 3*sizeof(f64)*settings->gk.sample_size;
+}
+
+void quadgk_infinite_interval(integrand_func* f, const struct quadgk_settings* settings, void* memory, struct quadgk_result* res) {
 	if (!settings) {
 		sbmf_log_error("You need to provide a quadgk_settings struct!");
 		return;
@@ -351,8 +358,13 @@ void quadgk_infinite_interval(integrand_func* f, const struct quadgk_settings* s
 
 	res->integral = 0;
 	res->error = 0;
-	res->performed_evals = 0;
+	//res->performed_evals = 0;
+	res->performed_iters = 0;
 	res->converged = false;
+
+	f64* sample_points = (f64*)((u8*)memory + sizeof(struct segment)*(settings->max_iters+1));
+	f64* transformed_sample_points = sample_points + settings->gk.sample_size;
+	f64* sample_output = transformed_sample_points + settings->gk.sample_size;
 
 	/*
 	 * Perform one evaluation of the rule and see if we can
@@ -360,15 +372,14 @@ void quadgk_infinite_interval(integrand_func* f, const struct quadgk_settings* s
 	 * so on.
 	 */
 	struct eval_result eval_res = {0};
-	evaluate_rule(f, start, end, settings, &eval_res);
-	res->performed_evals += eval_res.func_evals;
+	evaluate_rule(f, start, end, settings, sample_points, transformed_sample_points, sample_output, &eval_res);
 
 	struct segment s = eval_res.seg;
 	res->integral = s.integral;
 	res->error = s.error;
 
 	if (!eval_res.valid || should_exit(settings, res)) {
-		if (eval_res.valid && res->performed_evals <= settings->max_evals)
+		if (eval_res.valid && res->performed_iters < settings->max_iters)
 			res->converged = true;
 		return;
 	}
@@ -378,9 +389,9 @@ void quadgk_infinite_interval(integrand_func* f, const struct quadgk_settings* s
 	 * to get desired error tolerance.
 	 */
 
-	u32 memory_marker = sbmf_stack_marker();
+	/* max_iters + 1 to include the very first push before the loop is started */
+	struct prioqueue* pq = prioqueue_new(memory, settings->max_iters+1, sizeof(struct segment), compare_segments);
 
-	struct prioqueue* pq = prioqueue_new(64, sizeof(struct segment), compare_segments);
 	prioqueue_push(pq, &s);
 
 	struct segment largest_error_seg = {0};
@@ -390,21 +401,21 @@ void quadgk_infinite_interval(integrand_func* f, const struct quadgk_settings* s
 		prioqueue_pop(pq, &largest_error_seg);
 
 		f64 midpoint = 0.5 * (largest_error_seg.start + largest_error_seg.end);
-		evaluate_rule(f, largest_error_seg.start, midpoint, settings, &left_eval_res);
-		evaluate_rule(f, midpoint, largest_error_seg.end, settings, &right_eval_res);
+		evaluate_rule(f, largest_error_seg.start, midpoint, settings, sample_points, transformed_sample_points, sample_output, &left_eval_res);
+		evaluate_rule(f, midpoint, largest_error_seg.end, 	settings, sample_points, transformed_sample_points, sample_output, &right_eval_res);
 		if (!left_eval_res.valid || !right_eval_res.valid)
 			return;
 
-		res->performed_evals += left_eval_res.func_evals + right_eval_res.func_evals;
+		//res->performed_evals += left_eval_res.func_evals + right_eval_res.func_evals;
 		res->integral = (res->integral - largest_error_seg.integral) + left_eval_res.seg.integral + right_eval_res.seg.integral;
 		res->error = (res->error - largest_error_seg.error) + left_eval_res.seg.error + right_eval_res.seg.error;
 
 		prioqueue_push(pq, &left_eval_res.seg);
 		prioqueue_push(pq, &right_eval_res.seg);
+
+		++res->performed_iters;
 	}
 
-	sbmf_stack_free_to_marker(memory_marker);
-
-	if (res->performed_evals <= settings->max_evals)
+	if (res->performed_iters < settings->max_iters)
 		res->converged = true;
 }

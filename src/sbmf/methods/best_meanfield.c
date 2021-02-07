@@ -1,7 +1,4 @@
-static void bestmf_operator(const u32 len, f64 out[static len],
-			  f64 in[static len], const u32 component_count,
-			  f64 wf[static len*component_count],
-			  void* userdata) {
+static void bestmf_operator(const u32 len, f64* out, f64* in, const u32 component_count, f64* wf, void* userdata) {
 	SBMF_UNUSED(in);
 	for (u32 i = 0; i < len; ++i) {
 		out[i] = 0.0;
@@ -45,9 +42,7 @@ void inner_product_integrand(f64* out, f64* in, u32 len, void* data) {
     }
 }
 
-static void compute_occupations(struct nlse_settings settings, const i64 particle_count,
-		const u32 coeff_count, f64 coeff[static coeff_count],
-		i64* n1, i64* n2) {
+static void compute_occupations(struct nlse_settings settings, const i64 particle_count, const u32 coeff_count, f64* coeff, i64* n1, i64* n2) {
 	/* Calculates innner product to get n1,n2 */
 	sbmf_log_info("best_meanfield: finding occupations");
 	{
@@ -61,12 +56,14 @@ static void compute_occupations(struct nlse_settings settings, const i64 particl
 		struct quadgk_settings int_settings = {
 			.gk = gk15,
 			.abs_error_tol = 1e-10,
-			.max_evals = 1e5,
+			.max_iters = settings.max_quadgk_iters,
 			.userdata = &p,
 		};
 
+		u8 quadgk_memory[quadgk_required_memory_size(&int_settings)];
+
 		struct quadgk_result ires;
-		quadgk_infinite_interval(inner_product_integrand, &int_settings, &ires);
+		quadgk_infinite_interval(inner_product_integrand, &int_settings, quadgk_memory, &ires);
 
 		/*
 		 * <p1|p2> = (n2-n1)/N = (N-n1-n1)/N
@@ -79,9 +76,7 @@ static void compute_occupations(struct nlse_settings settings, const i64 particl
 
 
 
-static void compute_wavefunctions(struct nlse_settings settings, const u32 particle_count,
-						   const u32 coeff_count, f64 coeff[static coeff_count],
-						   const f64 n1, const f64 n2, f64* out) {
+static void compute_wavefunctions(struct nlse_settings settings, const u32 particle_count, const u32 coeff_count, f64* coeff, const f64 n1, const f64 n2, f64* out) {
 		SBMF_UNUSED(settings);
 		/* P1 = sqrt(n1/N)p1 + sqrt(n2/N)p2
 		 * P2 = sqrt(n2/N)p2 - sqrt(n1/N)p1
@@ -140,7 +135,7 @@ static void compute_wavefunctions(struct nlse_settings settings, const u32 parti
 
 
 
-f64 best_meanfield_energy(struct nlse_settings settings, const u32 coeff_count, f64 coeff[static coeff_count], i64 n1, i64 n2, f64 g0) {
+f64 best_meanfield_energy(struct nlse_settings settings, const u32 coeff_count, f64* coeff, i64 n1, i64 n2, f64 g0) {
 	return grosspitaevskii_energy(settings, coeff_count, 2, coeff, (i64[]){n1, n2}, (f64[]){g0,g0,g0,g0});
 }
 

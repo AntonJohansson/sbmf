@@ -19,16 +19,13 @@
 
 /* unix headers */
 #include <signal.h>
+#include <time.h>
 
 /*
  * Getting into actual code
  */
 
-void sbmf_log_info(const char* fmt, ...);
-void sbmf_log_warning(const char* fmt, ...);
-void sbmf_log_error(const char* fmt, ...);
-void sbmf_log_panic(const char* fmt, ...);
-
+#include "profile.c"
 #include "memory/stack_allocator.c"
 #include "global_state.c"
 #include "memory/bucketarray.c"
@@ -37,6 +34,7 @@ void sbmf_log_panic(const char* fmt, ...);
 #include "math/matrix.c"
 #include "math/find_eigenpairs.c"
 #include "math/basis.c"
+#include "math/hermite_integrals.c"
 #include "methods/quadgk.c"
 #include "methods/nlse_solver.c"
 #include "methods/grosspitaevskii.c"

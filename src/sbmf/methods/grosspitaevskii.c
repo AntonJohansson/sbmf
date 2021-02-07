@@ -1,7 +1,4 @@
-static void gp_operator(const u32 len, f64 out[static len],
-			  f64 in[static len], const u32 component_count,
-			  f64 wf[static len*component_count],
-			  void* userdata) {
+static void gp_operator(const u32 len, f64* out, f64* in, const u32 component_count, f64* wf, void* userdata) {
 	SBMF_UNUSED(in);
 	for (u32 i = 0; i < len; ++i) {
 		out[i] = 0.0;
@@ -13,11 +10,7 @@ static void gp_operator(const u32 len, f64 out[static len],
 	}
 }
 
-struct nlse_result grosspitaevskii(struct nlse_settings settings,
-		const u32 comp_count,
-		i64 occupations[static comp_count],
-		struct nlse_guess guesses[static comp_count],
-		f64 g0[static comp_count*comp_count]) {
+struct nlse_result grosspitaevskii(struct nlse_settings settings, const u32 comp_count, i64* occupations, struct nlse_guess* guesses, f64* g0) {
 
 	/* Construct new g matrix including occupations factors */
 	f64 g[comp_count * comp_count];
@@ -102,12 +95,7 @@ void full_energy_integrand(f64* out, f64* in, u32 len, void* data) {
 	}
 }
 
-f64 grosspitaevskii_energy(struct nlse_settings settings,
-		const u32 coeff_count, const u32 comp_count,
-		f64 coeff[static coeff_count*comp_count],
-		i64 occupations[static comp_count],
-		f64 g0[static comp_count*comp_count]
-		) {
+f64 grosspitaevskii_energy(struct nlse_settings settings, const u32 coeff_count, const u32 comp_count, f64* coeff, i64* occupations, f64* g0) {
 	f64 E = 0.0;
 
 	for (u32 i = 0; i < comp_count;++i) {
@@ -129,18 +117,20 @@ f64 grosspitaevskii_energy(struct nlse_settings settings,
 	};
 
 	struct quadgk_settings int_settings = {
-		.max_evals = 1e5,
+		.max_iters = settings.max_quadgk_iters,
 		.abs_error_tol = 1e-15,
 		.userdata = &ppot,
 		.gk = gk20
 	};
+
+	u8 quadgk_memory[quadgk_required_memory_size(&int_settings)];
 
 	/* pot terms */
 	if (settings.spatial_pot_perturbation) {
 		struct quadgk_result ires;
 		for (u32 i = 0; i < comp_count; ++i) {
 			ppot.coeff_a = &coeff[i*coeff_count];
-			quadgk_infinite_interval(full_energy_integrand_pot, &int_settings, &ires);
+			quadgk_infinite_interval(full_energy_integrand_pot, &int_settings, quadgk_memory, &ires);
 			E += occupations[i]*ires.integral;
 		}
 	}
@@ -159,7 +149,7 @@ f64 grosspitaevskii_energy(struct nlse_settings settings,
 
 			p.coeff_a = &coeff[i*coeff_count];
 			p.coeff_b = &coeff[j*coeff_count];
-			quadgk_infinite_interval(full_energy_integrand, &int_settings, &ires);
+			quadgk_infinite_interval(full_energy_integrand, &int_settings, quadgk_memory, &ires);
 			E += g0[i*comp_count + j] * occupations[i] * factor * ires.integral;
 		}
 	}

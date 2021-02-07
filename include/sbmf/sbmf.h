@@ -1,7 +1,7 @@
 #pragma once
 
 #include <stdint.h>
-#include <complex.h>
+//#include <complex.h>
 #include <math.h>
 #include <stdbool.h>
 
@@ -19,9 +19,9 @@ typedef __uint128_t 		u128;
 typedef float 				f32;
 typedef double 				f64;
 typedef long double 		f128;
-typedef float complex 		c32;
-typedef double complex 		c64;
-typedef long double complex c128;
+//typedef float complex 		c32;
+//typedef double complex 		c64;
+//typedef long double complex c128;
 
 /*
  * Initialization
@@ -45,6 +45,11 @@ typedef void sbmf_log_callback_func(enum sbmf_log_level, const char*);
 
 /* Sets a logging callback with the above definition, may be called anytime */
 void sbmf_set_log_callback(sbmf_log_callback_func* func);
+
+void sbmf_log_info(const char* fmt, ...);
+void sbmf_log_warning(const char* fmt, ...);
+void sbmf_log_error(const char* fmt, ...);
+void sbmf_log_panic(const char* fmt, ...);
 
 /*
  * Math functions
@@ -126,6 +131,7 @@ struct gk_data {
 	f64 gauss_weights[(MAX_GAUSS_POINTS+1)/2];
 	u32 kronod_size;
 	u32 gauss_size;
+	u32 sample_size; /* 4*(gauss_size-is_order_odd) + 3 */
 };
 
 extern struct gk_data gk7;
@@ -140,25 +146,26 @@ struct quadgk_settings {
 	f64 abs_error_tol;
 	f64 rel_error_tol;
 
-	/*
-	 * The maximum allowed function evaluations of
-	 * the supplied integrand.
-	 */
-	i32 max_evals;
+	/* Maximum allowed iterations */
+	u32 max_iters;
 
+	/* Pointer passed to the function to be integrated */
 	void* userdata;
 };
 
 struct quadgk_result {
 	f64 integral;
 	f64 error;
-	i32 performed_evals;
+	//i32 performed_evals;
+	u32 performed_iters;
 	bool converged;
 };
 
 typedef void integrand_func(f64*,f64*,u32,void*);
 
-void quadgk_infinite_interval(integrand_func* f, const struct quadgk_settings* settings, struct quadgk_result* res);
+u32 quadgk_required_memory_size(const struct quadgk_settings* settings);
+
+void quadgk_infinite_interval(integrand_func* f, const struct quadgk_settings* settings, void* memory, struct quadgk_result* res);
 
 /*
  * Basis
@@ -185,15 +192,13 @@ void quadgk_infinite_interval(integrand_func* f, const struct quadgk_settings* s
  */
 
 /* assuming 1D */
-typedef void basis_eigenfunc_func(const u32 n, const u32 len,
-		f64 out[static len], f64 in[static len]);
+
+/* out[len], in[len] */
+typedef void basis_eigenfunc_func(const u32 n, const u32 len, f64* out, f64* in);
 typedef f64  basis_energy_eigenval_func(const u32 n);
-typedef void basis_sample_func(
-		const u32 coeff_count,
-		f64 coeffs[static coeff_count],
-		const u32 len,
-		f64 out[static len],
-		f64 in[static len]);
+
+/* coeffs[coeff_count], out[len], in[len] */
+typedef void basis_sample_func(const u32 coeff_count, f64* coeffs, const u32 len, f64* out, f64* in);
 
 struct basis {
 	basis_eigenfunc_func*       eigenfunc;
@@ -206,15 +211,11 @@ extern f64 OMEGA;
  * Harmonic oscillator stuff
  */
 
-void ho_eigenfunc(const u32 n, const u32 len, f64 out[static len], f64 in[static len]);
+void ho_eigenfunc(const u32 n, const u32 len, f64* out, f64* in);
 f64 ho_eigenval(const u32 n);
-void ho_sample(const u32 coeff_count,
-		f64 coeffs[static coeff_count],
-		const u32 len,
-		f64 out[static len],
-		f64 in[static len]);
+void ho_sample(const u32 coeff_count, f64* coeffs, const u32 len, f64* out, f64* in);
 
-f64 ho_potential(f64* v, i32 n, c64 u);
+f64 ho_potential(f64* v, i32 n, f64 u);
 void ho_potential_vec(f64* out, f64* in, u32 len);
 
 extern struct basis ho_basis;
@@ -230,11 +231,8 @@ extern struct basis ho_basis;
  * a specified basis.
  */
 
-typedef void nlse_operator_func(const u32 len, f64 out[static len],
-		f64 in_x[static len], const u32 component_count,
-		f64 in_u[static len*component_count],
-		void* userdata);
-typedef void nlse_callback(c64* a, c64* b, u32 len);
+/* out[len], in_x[len], in_u[len*component_count] */
+typedef void nlse_operator_func(const u32 len, f64* out, f64* in_x, const u32 component_count, f64* in_u, void* userdata);
 
 struct nlse_settings;
 struct nlse_result;
@@ -247,7 +245,7 @@ enum nlse_orbital_choice {
 
 struct nlse_settings {
 	u32 max_iterations;
-	u32 max_integration_evals;
+	u32 max_quadgk_iters;
 	f64 error_tol;
 
 	/* Separating out the spatial potentiential
@@ -332,7 +330,8 @@ struct nlse_result {
 };
 
 /* actual interface */
-struct nlse_result nlse_solver(struct nlse_settings settings, const u32 component_count, struct nlse_component components[static component_count]);
+/* components[component_count] */
+struct nlse_result nlse_solver(struct nlse_settings settings, const u32 component_count, struct nlse_component* components);
 
 /* basic serialization */
 void nlse_write_to_binary_file(const char* file, struct nlse_result res);
@@ -342,18 +341,11 @@ struct nlse_result nlse_read_from_binary_file(const char* file);
  * Gross-pitaevskii solving
  */
 
-struct nlse_result grosspitaevskii(struct nlse_settings settings,
-		const u32 comp_count,
-		i64 occupations[static comp_count],
-		struct nlse_guess guesses[static comp_count],
-		f64 g0[static comp_count*comp_count]);
+/* occupations[comp_count], guesses[comp_count], g0[comp_count*comp_count] */
+struct nlse_result grosspitaevskii(struct nlse_settings settings, const u32 comp_count, i64* occupations, struct nlse_guess* guesses, f64* g0);
 
-f64 grosspitaevskii_energy(struct nlse_settings settings,
-		const u32 coeff_count, const u32 comp_count,
-		f64 coeff[static coeff_count*comp_count],
-		i64 occupations[static comp_count],
-		f64 g0[static comp_count*comp_count]
-		);
+/* coeff[coeff_count*comp_count], occupations[comp_count] g0[comp_count*comp_count] */
+f64 grosspitaevskii_energy(struct nlse_settings settings, const u32 coeff_count, const u32 comp_count, f64* coeff, i64* occupations, f64* g0);
 
 /*
  * Best mean-field
@@ -371,7 +363,8 @@ struct bestmf_result {
 struct bestmf_result best_meanfield(struct nlse_settings settings,
 		const i64 particle_count, f64 g0, struct nlse_guess* guesses);
 
-f64 best_meanfield_energy(struct nlse_settings settings, const u32 coeff_count, f64 coeff[static coeff_count], i64 n1, i64 n2, f64 g0);
+/* coeff[coeff_count] */
+f64 best_meanfield_energy(struct nlse_settings settings, const u32 coeff_count, f64* coeff, i64 n1, i64 n2, f64 g0);
 
 /*
  * Perturbation theory

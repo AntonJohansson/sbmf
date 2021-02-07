@@ -6,25 +6,25 @@
 
 //#define NA 4
 //#define NB 4
-//#define GAA (1.0/(3.0))
-//#define GAB (-1.0/6.0)
-//#define GBA (-1.0/6.0)
-//#define GBB (1.0/3.0)
+// #define GAA (1.0/(3.0))
+// #define GAB (-1.0/6.0)
+// #define GBA (-1.0/6.0)
+// #define GBB (1.0/3.0)
 
-#define NA 100
-#define NB 100
-#define GAA (1.0/199.0)
+#define NA 4
+#define NB 4
+#define GAA (1.0/3.0)
 #define GAB (-1.0/6.0)
 #define GBA (-1.0/6.0)
 #define GBB (1.0/3.0)
 
 #define USE_TF_GUESS 0
-#define USE_GAUSSIAN_GUESS 1
+#define USE_GAUSSIAN_GUESS 0
 #define USE_RANDOM_GUESS 0
-#define COMPONENT_COUNT 1
+#define COMPONENT_COUNT 2
 
-#define PERTURBATION(x) 2*gaussian(x, 0, 0.2)
-//#define PERTURBATION(x) 0.0
+//#define PERTURBATION(x) 2*gaussian(x, 0, 0.2)
+#define PERTURBATION(x) 0.0
 //#define PERTURBATION(x) (-1.5015*sqrt(x*x - 1.5*1.5 + 1.5015*1.5015));
 
 void perturbation(const u32 len, f64 out[static len],
@@ -190,22 +190,16 @@ int main() {
 	struct nlse_settings settings = {
         .spatial_pot_perturbation = perturbation,
 		.max_iterations = 1000,
-		.max_integration_evals = 1e5,
+		.max_quadgk_iters = 500,
 		.error_tol = 1e-14,
 
-        .num_basis_funcs = 48,
+        .num_basis_funcs = 16,
 		.basis = ho_basis,
 
 		.zero_threshold = 1e-10,
 		.orbital_mixing = 0.0,
 		.hamiltonian_mixing = 0.5,
 		.mix_until_iteration = 0,
-
-		.orbital_choice = NLSE_ORBITAL_LOWEST_ENERGY,
-		//.orbital_choice = NLSE_ORBITAL_MAXIMUM_OVERLAP,
-		.mom_orbitals_to_consider = 8,
-		.mom_enable_at_iteration = 0,
-
 
 		.measure_every = 0,
 		.debug_callback = debug_callback,
@@ -310,7 +304,7 @@ int main() {
 	}
 #endif
 
-#if 1
+#if 0
 	{
 		struct pt_result ptres;
 		if (component_count == 2)
@@ -327,7 +321,9 @@ int main() {
 
 		printf("diff: %.15lf\n", Efull - (ptres.E0+ptres.E1+ptres.E2+ptres.E3));
 	}
+#endif
 
+#if 1
 	{
 		struct pt_result ptres;
 		if (component_count == 2)

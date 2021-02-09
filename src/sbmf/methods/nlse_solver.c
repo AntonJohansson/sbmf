@@ -270,6 +270,11 @@ struct nlse_result nlse_solver(struct nlse_settings settings, const u32 componen
 	}
 #endif
 
+	struct symmetric_bandmat old_Hs[res.component_count];
+	for (u32 i = 0; i < res.component_count; ++i) {
+		old_Hs[i] = symmetric_bandmat_new(N,N);
+	}
+
 	/* Do the actual iterations */
 	for (; res.iterations < settings.max_iterations; ++res.iterations) {
 		sbmf_log_info("nlse starting iteration %u", res.iterations);
@@ -302,8 +307,7 @@ struct nlse_result nlse_solver(struct nlse_settings settings, const u32 componen
 			params.op = component[i].op;
 			params.op_userdata = component[i].userdata;
 
-			struct symmetric_bandmat old_H = symmetric_bandmat_new(N,N);
-			memcpy(old_H.data, res.hamiltonian[i].data, N*N*sizeof(f64));
+			memcpy(old_Hs[i].data, res.hamiltonian[i].data, N*N*sizeof(f64));
 
 			/* Construct the i:th component's hamiltonian */
 #pragma omp parallel for firstprivate(params, int_settings) shared(res, linear_hamiltonian)
@@ -345,7 +349,7 @@ struct nlse_result nlse_solver(struct nlse_settings settings, const u32 componen
 				res.hamiltonian[i].data[me_index] = linear_hamiltonian.data[me_index] + int_res.integral;
 
 				if (settings.hamiltonian_mixing > 0) {
-					res.hamiltonian[i].data[me_index] = (1.0 - settings.hamiltonian_mixing)*res.hamiltonian[i].data[me_index] + settings.hamiltonian_mixing*old_H.data[me_index];
+					res.hamiltonian[i].data[me_index] = (1.0 - settings.hamiltonian_mixing)*res.hamiltonian[i].data[me_index] + settings.hamiltonian_mixing*old_Hs[i].data[me_index];
 				}
 			}
 

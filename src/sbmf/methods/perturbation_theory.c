@@ -60,7 +60,7 @@ void V_integrand(f64* out, f64* in, u32 len, void* data) {
 	}
 }
 
-static inline f64 V_closed(f64* cache, struct pt_settings* pt, u32 A, u32 B, u32 i, u32 j, u32 k, u32 l) {
+static inline f64 V_closed(struct pt_settings* pt, u32 A, u32 B, u32 i, u32 j, u32 k, u32 l) {
 	f64* phi_a = PHI(pt, A, i);
 	f64* phi_b = PHI(pt, B, j);
 	f64* phi_c = PHI(pt, A, k);
@@ -87,7 +87,7 @@ static inline f64 V_closed(f64* cache, struct pt_settings* pt, u32 A, u32 B, u32
 static inline f64 V(struct pt_settings* pt, u32 A, u32 B, u32 i, u32 j, u32 k, u32 l) {
     struct quadgk_settings settings = {
         .abs_error_tol = 1e-15,
-        .rel_error_tol = 1e-8,
+        .rel_error_tol = 1e-15,
 		.gk = gk20,
 		.max_iters = pt->settings->max_quadgk_iters,
     };
@@ -575,9 +575,8 @@ static inline f64 Vp(struct pt_settings* pt, u32 A, u32 i, u32 j) {
 
     struct quadgk_settings settings = {
         .abs_error_tol = 1e-15,
-        .rel_error_tol = 1e-8,
+        .rel_error_tol = 1e-15,
 		.gk = gk20,
-        //.max_evals = 1e5,
 		.max_iters = pt->settings->max_quadgk_iters,
 		.userdata = &p,
     };
@@ -891,7 +890,7 @@ struct pt_result en_pt_2comp(struct nlse_settings settings, struct nlse_result r
 
 		t0 = current_time();
 		for (u32 i = 0; i < 1000; ++i)
-			f1 = V(&pt, A,A, 30,15,24,48);
+			f1 = V_closed(&pt, A,A, 30,15,24,48);
 		t1 = current_time();
 		sbmf_log_info("-------:	%.15e ------ %lf", f1, elapsed_time(t0,t1));
 
@@ -944,16 +943,8 @@ struct pt_result en_pt_2comp(struct nlse_settings settings, struct nlse_result r
 				const f64 dmn = (m == n) ? 1.0 : 0.0;
 				f64 Ediff =
 					2.0*en_nhn(&pt,A,0,0) - en_nhn(&pt,A,m,m) - en_nhn(&pt,A,n,n)
-					- G0(&pt,A,A)*(
-								(2.0-dmn)*V(&pt,A,A,m,n,m,n)
-								+ 2.0*(N[A]-2.0)*(V(&pt,A,A,m,0,m,0) + V(&pt,A,A,n,0,n,0))
-								- (2.0*N[A]-3.0)*V(&pt,A,A,0,0,0,0)
-							)
-					- G0(&pt,A,B)*N[B]*(
-								V(&pt,A,B,m,0,m,0)
-								+V(&pt,A,B,n,0,n,0)
-								-2.0*V(&pt,A,B,0,0,0,0)
-							);
+					- G0(&pt,A,A)*((2.0-dmn)*V(&pt,A,A,m,n,m,n) + 2.0*(N[A]-2.0)*(V(&pt,A,A,m,0,m,0) + V(&pt,A,A,n,0,n,0)) - (2.0*N[A]-3.0)*V(&pt,A,A,0,0,0,0))
+					- G0(&pt,A,B)*N[B]*(V(&pt,A,B,m,0,m,0) + V(&pt,A,B,n,0,n,0) - 2.0*V(&pt,A,B,0,0,0,0));
 
 				pt2_cache_AA[PT2_AA_CACHE_INDEX(m-1, n-m)] = me/Ediff;
 
@@ -967,18 +958,13 @@ struct pt_result en_pt_2comp(struct nlse_settings settings, struct nlse_result r
 		for (u32 m = 1; m < states_to_include; ++m) {
 			for (u32 n = m; n < states_to_include; ++n) {
 				f64 me = rs_2nd_order_me(&pt, B,B, m,n);
-				f64 Ediff = E0 - (
-							en_nhn(&pt, B, m,m) + en_nhn(&pt, B, n,n) + (N[B]-2)*en_nhn(&pt, B, 0,0)
-							+ 0.5*G0(&pt,B,B)*(((m==n)?2.0:4.0)*V(&pt, B,B, m,n,m,n)
-									+ 4.0*(N[B]-2)*V(&pt, B,B, m,0,m,0)
-									+ 4.0*(N[B]-2)*V(&pt, B,B, n,0,n,0)
-									+ (N[B]-3)*(N[B]-2)*V(&pt, B,B, 0,0,0,0))
-							+ N[A]*en_nhn(&pt, A, 0,0) + 0.5*G0(&pt,A,A)*N[A]*(N[A]-1)*V(&pt,A,A,0,0,0,0)
-							+ G0(&pt,A,B)*N[A]*(V(&pt, B,A, m,0,m,0) + V(&pt, B,A, n,0,n,0) + (N[B]-2)*V(&pt, B,A, 0,0,0,0))
-							);
+				const f64 dmn = (m == n) ? 1.0 : 0.0;
+				f64 Ediff =
+					2.0*en_nhn(&pt,B,0,0) - en_nhn(&pt,B,m,m) - en_nhn(&pt,B,n,n)
+					- G0(&pt,B,B)*((2.0-dmn)*V(&pt,B,B,m,n,m,n) + 2.0*(N[B]-2.0)*(V(&pt,B,B,m,0,m,0) + V(&pt,B,B,n,0,n,0)) - (2.0*N[B]-3.0)*V(&pt,B,B,0,0,0,0))
+					- G0(&pt,A,B)*N[A]*(V(&pt,A,B,0,m,0,m) + V(&pt,A,B,0,n,0,n) - 2.0*V(&pt,A,B,0,0,0,0));
 
 				pt2_cache_BB[PT2_AA_CACHE_INDEX(m-1, n-m)] = me/Ediff;
-
 
 				E2 += me*me/(Ediff);
 			}
@@ -992,24 +978,19 @@ struct pt_result en_pt_2comp(struct nlse_settings settings, struct nlse_result r
 				f64 me = rs_2nd_order_me(&pt, A,B, m,n);
 
 				f64 Ediff =
-					  en_nhn(&pt,A,0,0) - en_nhn(&pt,A,m,m) - G0(&pt,A,A)*(2.0*(N[A]-1.0)*V(&pt,A,A,m,0,m,0) - (N[A]-1.0)*V(&pt,A,A,0,0,0,0))
-					+ en_nhn(&pt,B,0,0) - en_nhn(&pt,B,n,n) - G0(&pt,B,B)*(2.0*(N[B]-1.0)*V(&pt,B,B,n,0,n,0) - (N[B]-1.0)*V(&pt,B,B,0,0,0,0))
-					- G0(&pt,A,B)*(
-								V(&pt,A,B,m,n,m,n)
-								+ (N[A]-1.0)*V(&pt,A,B,m,0,m,0)
-								+ (N[B]-1.0)*V(&pt,A,B,0,n,0,n)
-								+ (1.0-N[A]-N[B])*V(&pt,A,B,0,0,0,0)
-							);
+					  en_nhn(&pt,A,0,0) - en_nhn(&pt,A,m,m) - G0(&pt,A,A)*(N[A]-1.0)*(2.0*V(&pt,A,A,m,0,m,0) - V(&pt,A,A,0,0,0,0))
+					+ en_nhn(&pt,B,0,0) - en_nhn(&pt,B,n,n) - G0(&pt,B,B)*(N[B]-1.0)*(2.0*V(&pt,B,B,n,0,n,0) - V(&pt,B,B,0,0,0,0))
+					- G0(&pt,A,B)*(V(&pt,A,B,m,n,m,n) + (N[B]-1.0)*V(&pt,A,B,m,0,m,0) + (N[A]-1.0)*V(&pt,A,B,0,n,0,n) - (N[A]+N[B]-1.0)*V(&pt,A,B,0,0,0,0));
 
 				pt2_cache_AB[PT2_CACHE_AB_INDEX(m-1, n-1)] = me/Ediff;
-
 
 				E2 += me*me/(Ediff);
 			}
 		}
 		sbmf_log_info("-----------: %e", E2 - temp);
 	}
-	sbmf_log_info("\tE2: %e", E2);
+	sbmf_log_info("\tE2: %.10e", E2);
+	sbmf_log_info("\tE0+E2: %.10e", E0+E2);
 
 	sbmf_log_info("Starting third order PT");
 	f64 E3 = 0.0;

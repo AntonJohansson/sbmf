@@ -28,6 +28,7 @@
 #include "profile.c"
 #include "memory/stack_allocator.c"
 #include "global_state.c"
+#include "indices.c"
 #include "memory/bucketarray.c"
 #include "memory/prioqueue.c"
 #include "math/functions.c"

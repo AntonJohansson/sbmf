@@ -60,7 +60,7 @@ void V_integrand(f64* out, f64* in, u32 len, void* data) {
 	}
 }
 
-static inline f64 V_closed(struct pt_settings* pt, u32 A, u32 B, u32 i, u32 j, u32 k, u32 l) {
+static inline f64 V_closed(struct pt_settings* pt, f64* cache, u32 A, u32 B, u32 i, u32 j, u32 k, u32 l) {
 	f64* phi_a = PHI(pt, A, i);
 	f64* phi_b = PHI(pt, B, j);
 	f64* phi_c = PHI(pt, A, k);
@@ -74,7 +74,7 @@ static inline f64 V_closed(struct pt_settings* pt, u32 A, u32 B, u32 i, u32 j, u
 					f64 L = phi_a[a]*phi_b[b]*phi_c[c]*phi_d[d];//*ho_K(a)*ho_K(b)*ho_K(c)*ho_K(d);
 					if (fabs(L) < 1e-10)
 						continue;
-					f64 integral = hermite_integral_4(a,b,c,d);
+					f64 integral = cache[index4(a,b,c,d)];
 					sum += L*integral;
 				}
 			}
@@ -170,6 +170,22 @@ struct pt_result rayleigh_schroedinger_pt_rf(struct nlse_settings settings, stru
 		.settings = &settings,
 	};
 
+	const u64 hermite_integral_count = size4(states_to_include-1);
+	const u64 hermite_cache_size = sizeof(f64)*hermite_integral_count;
+	f64* hermite_cache = sbmf_stack_push(hermite_cache_size);
+	{
+		sbmf_log_info("Precomputing %ld hermite integrals", hermite_integral_count);
+		for (u32 i = 0; i < states_to_include; ++i) {
+			for (u32 j = i; j < states_to_include; ++j) {
+				for (u32 k = j; k < states_to_include; ++k) {
+					for (u32 l = k; l < states_to_include; ++l) {
+						hermite_cache[index4(i,j,k,l)] = hermite_integral_4(i,j,k,l);
+					}
+				}
+			}
+		}
+	}
+
 	/* Zeroth order PT */
 	sbmf_log_info("Starting zeroth order PT");
 	f64 E0 = 0.0;
@@ -183,7 +199,7 @@ struct pt_result rayleigh_schroedinger_pt_rf(struct nlse_settings settings, stru
 	f64 E1 = 0.0;
 	{
 		/* Handles interaction within component */
-		E1 += -0.5 * G0(&pt,component,component) * N[component] * (N[component]-1) * V(&pt, component,component, 0,0,0,0);
+		E1 += -0.5 * G0(&pt,component,component) * N[component] * (N[component]-1) * V_closed(&pt, hermite_cache, component,component, 0,0,0,0);
 	}
 	sbmf_log_info("\tE1: %e", E1);
 
@@ -231,7 +247,7 @@ struct pt_result rayleigh_schroedinger_pt_rf(struct nlse_settings settings, stru
 				}
 			}
 
-			f64 v_00_00 = G0(&pt,component,component)*V(&pt, component,component, 0,0,0,0);
+			f64 v_00_00 = G0(&pt,component,component)*V_closed(&pt, hermite_cache, component,component, 0,0,0,0);
 			E_00_00 *= v_00_00;
 		}
 		sbmf_log_info("\t\t00,00: %.10e", E_00_00);
@@ -252,7 +268,7 @@ struct pt_result rayleigh_schroedinger_pt_rf(struct nlse_settings settings, stru
 				m += 1;
 				n += 1;
 
-				const f64 v_m0_n0 = G0(&pt,component,component)*V(&pt, component,component, m,0,n,0);
+				const f64 v_m0_n0 = G0(&pt,component,component)*V_closed(&pt, hermite_cache, component,component, m,0,n,0);
 
 				f64 sum = 0.0;
 				for (u32 p = 1; p < states_to_include; ++p) {
@@ -312,7 +328,7 @@ struct pt_result rayleigh_schroedinger_pt_rf(struct nlse_settings settings, stru
 				f64 tmn = pt2_cache[PT2_CACHE_INDEX(m-1,n-m)];
 				const f64 delta_mn = (m == n) ? 1.0 : 0.0;
 
-				f64 v_mn_pq = G0(&pt,component,component)*V(&pt, component,component, m,n,p,q);
+				f64 v_mn_pq = G0(&pt,component,component)*V_closed(&pt, hermite_cache, component,component, m,n,p,q);
 				f64 tpq = pt2_cache[PT2_CACHE_INDEX(p-1,q-p)];
 
 				const f64 delta_pq = (p == q) ? 1.0 : 0.0;
@@ -890,18 +906,37 @@ struct pt_result en_pt_2comp(struct nlse_settings settings, struct nlse_result r
 
 		t0 = current_time();
 		for (u32 i = 0; i < 1000; ++i)
-			f1 = V_closed(&pt, A,A, 30,15,24,48);
+			f1 = V(&pt, A,A, 30,15,24,48);
 		t1 = current_time();
-		sbmf_log_info("-------:	%.15e ------ %lf", f1, elapsed_time(t0,t1));
+		sbmf_log_info("-------:	V:        %.15e ------ %lf", f1, elapsed_time(t0,t1));
+
+		f64* cache = malloc(sizeof(f64)*size4(states_to_include-1));
+		{
+			t0 = current_time();
+			for (u32 i = 0; i < states_to_include; ++i) {
+				for (u32 j = i; j < states_to_include; ++j) {
+					for (u32 k = j; k < states_to_include; ++k) {
+						for (u32 l = k; l < states_to_include; ++l) {
+							cache[index4(i,j,k,l)] = hermite_integral_4(i,j,k,l);
+						}
+					}
+				}
+			}
+			t1 = current_time();
+			sbmf_log_info("-------:	precomp: %lf", elapsed_time(t0,t1));
+		}
 
 		f64 f2 = 0;
 		t0 = current_time();
 		for (u32 i = 0; i < 1000; ++i)
-			f2 = V_closed(&pt, A,A, 30,15,24,48);
+			f2 = V_closed(&pt, cache, A,A, 30,15,24,48);
 		t1 = current_time();
-		sbmf_log_info("-------:	%.15e ------ %lf", f2, elapsed_time(t0,t1));
+		sbmf_log_info("-------:	V_closed: %.15e ------ %lf", f2, elapsed_time(t0,t1));
 
 		sbmf_log_info("-------------------------------------------------");
+
+		free(cache);
+		assert(0);
 	}
 #endif
 

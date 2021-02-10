@@ -21,7 +21,7 @@
 #define USE_TF_GUESS 0
 #define USE_GAUSSIAN_GUESS 0
 #define USE_RANDOM_GUESS 0
-#define COMPONENT_COUNT 2
+#define COMPONENT_COUNT 1
 
 //#define PERTURBATION(x) 2*gaussian(x, 0, 0.2)
 #define PERTURBATION(x) 0.0
@@ -304,7 +304,7 @@ int main() {
 	}
 #endif
 
-#if 0
+#if 1
 	{
 		struct pt_result ptres;
 		if (component_count == 2)
@@ -323,7 +323,7 @@ int main() {
 	}
 #endif
 
-#if 1
+#if 0
 	{
 		struct pt_result ptres;
 		if (component_count == 2)

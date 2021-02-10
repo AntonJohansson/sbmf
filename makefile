@@ -66,10 +66,11 @@ $(BUILDDIR)/%.o: %.cu
 
 $(BUILDDIR)/$(PROJECT).a: $(BUILDDIR) $(PROJ_OBJS) $(CUDA_OBJS)
 	mkdir -p $(BUILDDIR)/tmp
-	ar x third_party/lib/libarpack.a --output=$(BUILDDIR)/tmp
-	ar x third_party/lib/libopenblas.a --output=$(BUILDDIR)/tmp
+	cd $(BUILDDIR)/tmp && ar x ../../third_party/lib/libarpack.a
+	cd $(BUILDDIR)/tmp && ar x ../../third_party/lib/libopenblas.a
 	ar rcs $@ $(PROJ_OBJS) $(CUDA_OBJS) $(BUILDDIR)/tmp/*.o
 	rm -r $(BUILDDIR)/tmp
+
 
 .PHONY: clean
 clean:

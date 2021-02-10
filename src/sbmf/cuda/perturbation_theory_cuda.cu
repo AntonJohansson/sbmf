@@ -94,7 +94,7 @@ static void device_sum_reduction(f64* out, f64* arr, const u32 len) {
 
 __global__
 static void rspt_3_mnpq(
-		f64 g0,
+		f64* g0,
 		const u32 num_sb_states, const u32 num_mb_states, const u32 num_interactions,
 		f64* pt2_cache,
 		f64* hermite_cache,
@@ -105,11 +105,10 @@ static void rspt_3_mnpq(
 	const f64 c_3_minus_2_root_2 = 3.0 - 2.0*sqrt(2.0);
 
 	const u32 k = blockIdx.x*blockDim.x + threadIdx.x;
-	if (k < num_interactions)
+	if (k >= num_interactions)
 		return;
-
 	u32 k0, k1;
-	map_to_triangular_index(k, num_interactions, &k0, &k1);
+	map_to_triangular_index(k, num_mb_states, &k0, &k1);
 
 	u32 m, n;
 	map_to_triangular_index(k0, num_sb_states-1, &m, &n);
@@ -133,13 +132,15 @@ static void rspt_3_mnpq(
 	const f64 delta_mn = (m == n) ? 1.0 : 0.0;
 	const f64 delta_pq = (p == q) ? 1.0 : 0.0;
 
-	f64 v_mn_pq = g0*V_closed(hermite_cache,
+	f64 v_mn_pq = (*g0)*V_closed(hermite_cache,
 			&coeffs[m*num_sb_states],
 			&coeffs[n*num_sb_states],
 			&coeffs[p*num_sb_states],
 			&coeffs[q*num_sb_states],
 			num_sb_states);
 
+
+	printf("(%u,%u,%u,%u) -- %lf\n", m,n,p,q, v_mn_pq);
 	const f64 coeff = 2.0 + c_root_2_minus_2*(delta_mn + delta_pq) + c_3_minus_2_root_2*(delta_mn*delta_pq);
 	output[k] = factor*coeff*tmn*tpq*v_mn_pq;
 }
@@ -271,7 +272,7 @@ struct pt_result rspt_1comp_cuda(struct nlse_settings settings, struct nlse_resu
 			const f64 c_root_2_minus_1 = sqrt(2.0) - 1.0;
 			const f64 c_3_minus_2_root_2 = 3.0 - 2.0*sqrt(2.0);
 
-#pragma omp parallel for reduction(+: E_m0_n0)
+//#pragma omp parallel for reduction(+: E_m0_n0)
 			for (u32 k = 0; k < ((states_to_include-1)*states_to_include)/2; ++k) {
 				u32 m = k/(states_to_include-1);
 				u32 n = k%(states_to_include-1);
@@ -283,6 +284,7 @@ struct pt_result rspt_1comp_cuda(struct nlse_settings settings, struct nlse_resu
 				n += 1;
 
 				f64 v_m0_n0 = G0(&pt,component,component)*V_closed(hermite_cache, PHI(&pt,component,m), PHI(&pt,component,0), PHI(&pt,component,n), PHI(&pt,component,0), states_to_include);
+				printf(":::::::----- %lf\n", v_m0_n0);
 
 				f64 sum = 0.0;
 				for (u32 p = 1; p < states_to_include; ++p) {
@@ -324,14 +326,21 @@ struct pt_result rspt_1comp_cuda(struct nlse_settings settings, struct nlse_resu
 			f64* device_output;
 			cudaMalloc(&device_output, num_interactions*sizeof(f64));
 
-			rspt_3_mnpq<<<num_interactions/256, 256>>>(
-					G0(&pt,component,component),
+			f64* g0;
+			cudaMalloc(&g0, sizeof(f64));
+			cudaMemcpy(g0, &pt.g0[0], sizeof(f64), cudaMemcpyHostToDevice);
+
+			const u32 blocks = (num_interactions > 256) ? num_interactions/256 : 1;
+			rspt_3_mnpq<<<blocks, 256>>>(
+					g0,
 					states_to_include, num_mb_states, num_interactions,
 					device_pt2_cache,
 					hermite_cache_device,
 					device_states,
 					device_output
 					);
+
+			cudaFree(g0);
 
 			f64* res;
 			cudaMalloc(&res, sizeof(f64));

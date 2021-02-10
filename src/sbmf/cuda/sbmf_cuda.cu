@@ -1,6 +1,7 @@
 extern "C" {
 #include <sbmf/sbmf.h>
 #include <assert.h>
+#include <stdio.h>
 
 #define sbmf_stack_push(size_in_bytes) \
     sbmf_stack_push_impl(size_in_bytes, __LINE__, __FILE__, __func__)

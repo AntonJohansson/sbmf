@@ -257,7 +257,7 @@ struct pt_result rayleigh_schroedinger_pt_rf(struct nlse_settings settings, stru
 			const f64 c_root_2_minus_1 = sqrt(2.0) - 1.0;
 			const f64 c_3_minus_2_root_2 = 3.0 - 2.0*sqrt(2.0);
 
-#pragma omp parallel for reduction(+: E_m0_n0)
+//#pragma omp parallel for reduction(+: E_m0_n0)
 			for (u32 k = 0; k < ((states_to_include-1)*states_to_include)/2; ++k) {
 				u32 m = k/(states_to_include-1);
 				u32 n = k%(states_to_include-1);

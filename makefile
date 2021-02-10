@@ -1,8 +1,8 @@
 PROJECT = sbmf
 BUILDDIR = build
 INSTALLDIR = ~/.local
-#CUDADIR = /usr/local/cuda
-CUDADIR = /opt/cuda
+CUDADIR = /usr/local/cuda
+#CUDADIR = /opt/cuda
 
 CC = gcc
 NVCC = $(CUDADIR)/bin/nvcc
@@ -37,13 +37,13 @@ CUDA_FLAGS = -c -I $(CUDADIR)/include
 .PHONY: release
 release: PROJ_FLAGS += $(RELEASE_FLAGS)
 release: PROJ_FLAGS += $(PROJ_LIBS)
-release: CUDA_FLAGS := $(CUDA_FLAGS) -Xcompiler "$(CUDA_CC_FLAGS) $(RELEASE_FLAGS) $(PROJ_LIBS)"
+release: CUDA_FLAGS := $(CUDA_FLAGS) -g -G -Xcompiler "$(CUDA_CC_FLAGS) $(RELEASE_FLAGS) $(PROJ_LIBS)"
 release: $(BUILDDIR)/$(PROJECT).a
 
 .PHONY: debug
 debug: PROJ_FLAGS += $(DEBUG_FLAGS)
 debug: PROJ_FLAGS += $(PROJ_LIBS)
-debug: CUDA_FLAGS := $(CUDA_FLAGS) -Xcompiler "$(CUDA_CC_FLAGS) $(DEBUG_FLAGS) $(PROJ_LIBS)"
+debug: CUDA_FLAGS := $(CUDA_FLAGS) -g -G -Xcompiler "$(CUDA_CC_FLAGS) $(DEBUG_FLAGS) $(PROJ_LIBS)"
 debug: $(BUILDDIR)/$(PROJECT).a
 
 .PHONY: install

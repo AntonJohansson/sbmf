@@ -1,3 +1,4 @@
+extern "C" {
 #include <sbmf/sbmf.h>
 #include <assert.h>
 
@@ -12,3 +13,4 @@ void* sbmf_stack_push_impl(u32 size_in_bytes, const u32 linenumber, const char f
 #include "indices_cuda.cu"
 #include "hermite_integrals_cuda.cu"
 #include "perturbation_theory_cuda.cu"
+}

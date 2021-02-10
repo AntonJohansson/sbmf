@@ -91,7 +91,6 @@ static inline f64 rs_2nd_order_ediff(struct pt_settings* pt, u32 A, u32 B, u32 i
  * Main function for Rayleigh-Schrodinger perturbation theory
  */
 
-__host__
 struct pt_result rspt_1comp_cuda(struct nlse_settings settings, struct nlse_result res, u32 component, f64* g0, i64* particle_count) {
 	/* order of hamiltonians, that is include all states */
 	const u32 states_to_include = res.coeff_count;

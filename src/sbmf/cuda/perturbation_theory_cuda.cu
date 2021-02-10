@@ -1,3 +1,4 @@
+__host__ __device__
 static inline void map_to_triangular_index(u32 k, u32 N, u32* m, u32* n) {
 	*m = k / N;
 	*n = k % N;
@@ -40,17 +41,12 @@ static inline f64* PHI(struct pt_settings* pt, u32 A, u32 i) {
 }
 
 __host__ __device__
-static inline f64 V_closed(struct pt_settings* pt, f64* cache, u32 A, u32 B, u32 i, u32 j, u32 k, u32 l) {
-	f64* phi_a = PHI(pt, A, i);
-	f64* phi_b = PHI(pt, B, j);
-	f64* phi_c = PHI(pt, A, k);
-	f64* phi_d = PHI(pt, B, l);
-
+static inline f64 V_closed(f64* cache, f64* phi_a, f64* phi_b, f64* phi_c, f64* phi_d, const u32 size) {
 	f64 sum = 0.0;
-	for (u32 a = 0; a < pt->L; ++a) {
-		for (u32 b = 0; b < pt->L; ++b) {
-			for (u32 c = 0; c < pt->L; ++c) {
-				for (u32 d = 0; d < pt->L; ++d) {
+	for (u32 a = 0; a < size; ++a) {
+		for (u32 b = 0; b < size; ++b) {
+			for (u32 c = 0; c < size; ++c) {
+				for (u32 d = 0; d < size; ++d) {
 					f64 L = phi_a[a]*phi_b[b]*phi_c[c]*phi_d[d];//*ho_K(a)*ho_K(b)*ho_K(c)*ho_K(d);
 					if (fabs(L) < 1e-10)
 						continue;
@@ -74,10 +70,10 @@ static inline f64 rs_2nd_order_me(struct pt_settings* pt, u32 A, u32 B, u32 i, u
 	if (A == B) {
 		f64 factor = (i == j) ? 1.0/sqrt(2.0) : 1.0;
 		me = factor * G0(pt,A,A) * sqrt((f64)(pt->particle_count[A] * (pt->particle_count[A] - 1)))
-			* V_closed(pt, pt->hermite_cache, A,A, i,j,0,0);
+			* V_closed(pt->hermite_cache, PHI(pt,A,i), PHI(pt,A,j), PHI(pt,A,0), PHI(pt,A,0), pt->L);
 	} else {
 		me = G0(pt,A,B) * sqrt((f64) (pt->particle_count[A] * pt->particle_count[B]))
-			* V_closed(pt, pt->hermite_cache, A,B, i,j,0,0);
+			* V_closed(pt->hermite_cache, PHI(pt,A,i), PHI(pt,B,j), PHI(pt,A,0), PHI(pt,B,0), pt->L);
 	}
 	return me;
 }
@@ -85,6 +81,67 @@ static inline f64 rs_2nd_order_me(struct pt_settings* pt, u32 A, u32 B, u32 i, u
 __host__ __device__
 static inline f64 rs_2nd_order_ediff(struct pt_settings* pt, u32 A, u32 B, u32 i, u32 j) {
 	return E(pt,A,0) + E(pt,B,0) - E(pt,A,i) - E(pt,B,j);
+}
+
+__global__
+static void device_sum_reduction(f64* out, f64* arr, const u32 len) {
+	f64 sum = 0.0;
+	for (u32 i = 0; i < len; ++i) {
+		sum += arr[i];
+	}
+	*out = sum;
+}
+
+__global__
+static void rspt_3_mnpq(
+		f64 g0,
+		const u32 num_sb_states, const u32 num_mb_states, const u32 num_interactions,
+		f64* pt2_cache,
+		f64* hermite_cache,
+		f64* coeffs,
+		f64* output
+		) {
+	const f64 c_root_2_minus_2 = sqrt(2.0) - 2.0;
+	const f64 c_3_minus_2_root_2 = 3.0 - 2.0*sqrt(2.0);
+
+	const u32 k = blockIdx.x*blockDim.x + threadIdx.x;
+	if (k < num_interactions)
+		return;
+
+	u32 k0, k1;
+	map_to_triangular_index(k, num_interactions, &k0, &k1);
+
+	u32 m, n;
+	map_to_triangular_index(k0, num_sb_states-1, &m, &n);
+	m += 1; n += 1;
+
+	u32 p, q;
+	map_to_triangular_index(k1, num_sb_states-1, &p, &q);
+	p += 1; q += 1;
+
+	f64 factor = 2.0;
+	if (k0 == k1)
+		factor = 1.0;
+
+#define PT2_CACHE_INDEX(i, j) \
+	((i)*num_sb_states - (((i)*(i+1))/2) + j)
+
+	f64 tmn = pt2_cache[PT2_CACHE_INDEX(m-1,n-m)];
+	f64 tpq = pt2_cache[PT2_CACHE_INDEX(p-1,q-p)];
+#undef PT2_CACHE_INDEX
+
+	const f64 delta_mn = (m == n) ? 1.0 : 0.0;
+	const f64 delta_pq = (p == q) ? 1.0 : 0.0;
+
+	f64 v_mn_pq = g0*V_closed(hermite_cache,
+			&coeffs[m*num_sb_states],
+			&coeffs[n*num_sb_states],
+			&coeffs[p*num_sb_states],
+			&coeffs[q*num_sb_states],
+			num_sb_states);
+
+	const f64 coeff = 2.0 + c_root_2_minus_2*(delta_mn + delta_pq) + c_3_minus_2_root_2*(delta_mn*delta_pq);
+	output[k] = factor*coeff*tmn*tpq*v_mn_pq;
 }
 
 /*
@@ -102,6 +159,10 @@ struct pt_result rspt_1comp_cuda(struct nlse_settings settings, struct nlse_resu
 	for (u32 j = 0; j < states_to_include; ++j) {
 		f64_normalize(&states.eigenvectors[j*res.coeff_count], &states.eigenvectors[j*res.coeff_count], res.coeff_count);
 	}
+
+	f64* device_states;
+	cudaMalloc(&device_states, states_to_include*states_to_include*sizeof(f64));
+	cudaMemcpy(device_states, states.eigenvectors, states_to_include*states_to_include*sizeof(f64), cudaMemcpyHostToDevice);
 
 	const u64 hermite_integral_count = size4_cuda(states_to_include-1);
 	const u64 hermite_cache_size = sizeof(f64)*hermite_integral_count;
@@ -148,7 +209,7 @@ struct pt_result rspt_1comp_cuda(struct nlse_settings settings, struct nlse_resu
 	f64 E1 = 0.0;
 	{
 		/* Handles interaction within component */
-		E1 += -0.5 * G0(&pt,component,component) * N[component] * (N[component]-1) * V_closed(&pt, hermite_cache, component,component, 0,0,0,0);
+		E1 += -0.5 * G0(&pt,component,component) * N[component] * (N[component]-1) * V_closed(hermite_cache, PHI(&pt,component,0), PHI(&pt,component,0), PHI(&pt,component,0), PHI(&pt,component,0), states_to_include);
 	}
 	sbmf_log_info("\tE1: %e", E1);
 
@@ -182,6 +243,10 @@ struct pt_result rspt_1comp_cuda(struct nlse_settings settings, struct nlse_resu
 	}
 	sbmf_log_info("\tE2: %e", E2);
 
+	f64* device_pt2_cache;
+	cudaMalloc(&device_pt2_cache, pt2_cache_size*sizeof(f64));
+	cudaMemcpy(device_pt2_cache, pt2_cache, pt2_cache_size*sizeof(f64), cudaMemcpyHostToDevice);
+
 	/* Third order PT */
 	sbmf_log_info("Starting third order PT");
 	f64 E3 = 0.0;
@@ -196,8 +261,8 @@ struct pt_result rspt_1comp_cuda(struct nlse_settings settings, struct nlse_resu
 				}
 			}
 
-			f64 v_00_00 = G0(&pt,component,component)*V_closed(&pt, hermite_cache, component,component, 0,0,0,0);
-			E_00_00 *= v_00_00;
+			f64 v_0000 = V_closed(hermite_cache, PHI(&pt,component,0), PHI(&pt,component,0), PHI(&pt,component,0), PHI(&pt,component,0), states_to_include);
+			E_00_00 *= G0(&pt,component,component)*v_0000;
 		}
 		sbmf_log_info("\t\t00,00: %.10e", E_00_00);
 
@@ -217,7 +282,7 @@ struct pt_result rspt_1comp_cuda(struct nlse_settings settings, struct nlse_resu
 				m += 1;
 				n += 1;
 
-				const f64 v_m0_n0 = G0(&pt,component,component)*V_closed(&pt, hermite_cache, component,component, m,0,n,0);
+				f64 v_m0_n0 = G0(&pt,component,component)*V_closed(hermite_cache, PHI(&pt,component,m), PHI(&pt,component,0), PHI(&pt,component,n), PHI(&pt,component,0), states_to_include);
 
 				f64 sum = 0.0;
 				for (u32 p = 1; p < states_to_include; ++p) {
@@ -252,39 +317,29 @@ struct pt_result rspt_1comp_cuda(struct nlse_settings settings, struct nlse_resu
 
 		f64 E_mn_pq = 0;
 		{
-			const f64 c_root_2_minus_2 = sqrt(2.0) - 2.0;
-			const f64 c_3_minus_2_root_2 = 3.0 - 2.0*sqrt(2.0);
 
-			const u32 INDS_N = ((states_to_include-1)*states_to_include)/2;
+			const u32 num_mb_states = ((states_to_include-1)*states_to_include)/2;
+			const u32 num_interactions = (num_mb_states*(num_mb_states+1))/2;
 
-#pragma omp parallel for reduction(+: E_mn_pq)
-			for (u32 k = 0; k < INDS_N*(INDS_N+1)/2; ++k) {
-				u32 k0, k1;
-				map_to_triangular_index(k, INDS_N, &k0, &k1);
+			f64* device_output;
+			cudaMalloc(&device_output, num_interactions*sizeof(f64));
 
-				u32 m, n;
-				map_to_triangular_index(k0, states_to_include-1, &m, &n);
-				m += 1; n += 1;
+			rspt_3_mnpq<<<num_interactions/256, 256>>>(
+					G0(&pt,component,component),
+					states_to_include, num_mb_states, num_interactions,
+					device_pt2_cache,
+					hermite_cache_device,
+					device_states,
+					device_output
+					);
 
-				u32 p, q;
-				map_to_triangular_index(k1, states_to_include-1, &p, &q);
-				p += 1; q += 1;
+			f64* res;
+			cudaMalloc(&res, sizeof(f64));
+			device_sum_reduction<<<1,1>>>(res, device_output, num_interactions);
+			cudaMemcpy(&E_mn_pq, res, sizeof(f64), cudaMemcpyDeviceToHost);
+			cudaFree(res);
 
-				f64 factor = 2.0;
-				if (k0 == k1)
-					factor = 1.0;
-
-				f64 tmn = pt2_cache[PT2_CACHE_INDEX(m-1,n-m)];
-				const f64 delta_mn = (m == n) ? 1.0 : 0.0;
-
-				f64 v_mn_pq = G0(&pt,component,component)*V_closed(&pt, hermite_cache, component,component, m,n,p,q);
-				f64 tpq = pt2_cache[PT2_CACHE_INDEX(p-1,q-p)];
-
-				const f64 delta_pq = (p == q) ? 1.0 : 0.0;
-				const f64 coeff = 2.0 + c_root_2_minus_2*(delta_mn + delta_pq) + c_3_minus_2_root_2*(delta_mn*delta_pq);
-				E_mn_pq += factor*coeff*tmn*tpq*v_mn_pq;
-			}
-
+			cudaFree(device_output);
 		}
 
 		sbmf_log_info("\t\tmn,pq: %.10e", E_mn_pq);
@@ -294,6 +349,8 @@ struct pt_result rspt_1comp_cuda(struct nlse_settings settings, struct nlse_resu
 	sbmf_log_info("\tE3: %e", E3);
 
 	cudaFree(hermite_cache_device);
+	cudaFree(device_states);
+	cudaFree(device_pt2_cache);
 
 	return (struct pt_result) {
 		.E0 = E0,

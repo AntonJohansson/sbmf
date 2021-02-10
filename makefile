@@ -1,7 +1,8 @@
 PROJECT = sbmf
 BUILDDIR = build
 INSTALLDIR = ~/.local
-CUDADIR = /usr/local/cuda
+#CUDADIR = /usr/local/cuda
+CUDADIR = /opt/cuda
 
 CC = gcc
 NVCC = $(CUDADIR)/bin/nvcc

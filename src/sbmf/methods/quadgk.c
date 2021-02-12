@@ -262,7 +262,7 @@ static inline bool should_exit(const struct quadgk_settings* settings, struct qu
 }
 
 u32 quadgk_required_memory_size(const struct quadgk_settings* settings) {
-	return 10000*sizeof(struct segment)*(settings->max_iters+1) + 3*sizeof(f64)*settings->gk.sample_size;
+	return sizeof(struct segment)*(settings->max_iters+1) + 3*sizeof(f64)*settings->gk.sample_size;
 }
 
 void quadgk_infinite_interval(integrand_func* f, const struct quadgk_settings* settings, void* memory, struct quadgk_result* res) {
@@ -286,7 +286,6 @@ void quadgk_infinite_interval(integrand_func* f, const struct quadgk_settings* s
 
 	res->integral = 0;
 	res->error = 0;
-	//res->performed_evals = 0;
 	res->performed_iters = 0;
 	res->converged = false;
 
@@ -334,7 +333,6 @@ void quadgk_infinite_interval(integrand_func* f, const struct quadgk_settings* s
 		if (!left_eval_res.valid || !right_eval_res.valid)
 			return;
 
-		//res->performed_evals += left_eval_res.func_evals + right_eval_res.func_evals;
 		res->integral = (res->integral - largest_error_seg.integral) + left_eval_res.seg.integral + right_eval_res.seg.integral;
 		res->error = (res->error - largest_error_seg.error) + left_eval_res.seg.error + right_eval_res.seg.error;
 

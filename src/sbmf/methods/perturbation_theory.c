@@ -41,10 +41,6 @@ struct V_params {
 	f64* j;
 	f64* k;
 	f64* l;
-	f64* sample_i;
-	f64* sample_j;
-	f64* sample_k;
-	f64* sample_l;
 };
 
 void V_integrand(f64* out, f64* in, u32 len, void* data) {
@@ -165,7 +161,7 @@ struct pt_result rayleigh_schroedinger_pt_rf(struct nlse_settings settings, stru
 		.settings = &settings,
 	};
 
-	const u64 hermite_integral_count = size4(states_to_include-1);
+	const u64 hermite_integral_count = size4(states_to_include);
 	const u64 hermite_cache_size = sizeof(f64)*hermite_integral_count;
 	u32 memory_marker = sbmf_stack_marker();
 	f64* hermite_cache = sbmf_stack_push(hermite_cache_size);
@@ -206,12 +202,6 @@ struct pt_result rayleigh_schroedinger_pt_rf(struct nlse_settings settings, stru
 #define PT2_CACHE_INDEX(i, j) \
 	((i)*states_to_include - (((i)*(i+1))/2) + j)
 
-		{
-				const f64 v_m0_n0 = V_closed(&pt, hermite_cache, component,component, 1,0,1,0);
-				printf("TSET M0N0: %lf\n", v_m0_n0);
-		}
-
-
 	/* Second order PT */
 	sbmf_log_info("Starting second order PT");
 	f64 E2 = 0.0;
@@ -233,12 +223,6 @@ struct pt_result rayleigh_schroedinger_pt_rf(struct nlse_settings settings, stru
 		}
 	}
 	sbmf_log_info("\tE2: %e", E2);
-
-
-		{
-				const f64 v_m0_n0 = V_closed(&pt, hermite_cache, component,component, 1,0,1,0);
-				printf("TSET M0N0: %lf\n", v_m0_n0);
-		}
 
 	/* Third order PT */
 	sbmf_log_info("Starting third order PT");

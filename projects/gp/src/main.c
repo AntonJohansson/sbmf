@@ -193,7 +193,7 @@ int main() {
 		.max_quadgk_iters = 500,
 		.error_tol = 1e-14,
 
-        .num_basis_funcs = 32,
+        .num_basis_funcs = 4,
 		.basis = ho_basis,
 
 		.zero_threshold = 1e-10,

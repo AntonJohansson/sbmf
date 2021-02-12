@@ -191,7 +191,7 @@ struct pt_result rayleigh_schroedinger_pt_rf(struct nlse_settings settings, stru
 	f64 E1 = 0.0;
 	{
 		/* Handles interaction within component */
-		E1 += -0.5 * G0(&pt,component,component) * N[component] * (N[component]-1) * V_closed(&pt, hermite_cache, component,component, 0,0,0,0);
+		E1 += -0.5 * G0(&pt,component,component) * N[component] * (N[component]-1) * V(&pt, component,component, 0,0,0,0);
 	}
 	sbmf_log_info("\tE1: %e", E1);
 
@@ -238,7 +238,7 @@ struct pt_result rayleigh_schroedinger_pt_rf(struct nlse_settings settings, stru
 				}
 			}
 
-			f64 v_00_00 = G0(&pt,component,component)*V_closed(&pt, hermite_cache, component,component, 0,0,0,0);
+			f64 v_00_00 = G0(&pt,component,component)*V(&pt, component,component, 0,0,0,0);
 			E_00_00 *= v_00_00;
 		}
 		sbmf_log_info("\t\t00,00: %.10e", E_00_00);
@@ -259,7 +259,7 @@ struct pt_result rayleigh_schroedinger_pt_rf(struct nlse_settings settings, stru
 				m += 1;
 				n += 1;
 
-				const f64 v_m0_n0 = G0(&pt,component,component)*V_closed(&pt, hermite_cache, component,component, m,0,n,0);
+				const f64 v_m0_n0 = G0(&pt,component,component)*V(&pt, component,component, m,0,n,0);
 				printf(":::::::::::: %u,%u -- %lf -- %lf\n", m,n, G0(&pt,component,component), v_m0_n0);
 
 				f64 sum = 0.0;
@@ -320,7 +320,7 @@ struct pt_result rayleigh_schroedinger_pt_rf(struct nlse_settings settings, stru
 				f64 tmn = pt2_cache[PT2_CACHE_INDEX(m-1,n-m)];
 				const f64 delta_mn = (m == n) ? 1.0 : 0.0;
 
-				f64 v_mn_pq = G0(&pt,component,component)*V_closed(&pt, hermite_cache, component,component, m,n,p,q);
+				f64 v_mn_pq = G0(&pt,component,component)*V(&pt, component,component, m,n,p,q);
 				f64 tpq = pt2_cache[PT2_CACHE_INDEX(p-1,q-p)];
 
 				const f64 delta_pq = (p == q) ? 1.0 : 0.0;

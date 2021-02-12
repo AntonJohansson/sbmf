@@ -37,7 +37,7 @@ CUDA_FLAGS = -c -I $(CUDADIR)/include
 .PHONY: release
 release: PROJ_FLAGS += $(RELEASE_FLAGS)
 release: PROJ_FLAGS += $(PROJ_LIBS)
-release: CUDA_FLAGS := $(CUDA_FLAGS) -g -G -Xcompiler "$(CUDA_CC_FLAGS) $(RELEASE_FLAGS) $(PROJ_LIBS)"
+release: CUDA_FLAGS := $(CUDA_FLAGS) -Xcompiler "$(CUDA_CC_FLAGS) $(RELEASE_FLAGS) $(PROJ_LIBS)"
 release: $(BUILDDIR)/$(PROJECT).a
 
 .PHONY: debug

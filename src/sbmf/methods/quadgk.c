@@ -1,77 +1,6 @@
 typedef f64 coord_transform_input_func(f64 x, f64 a, f64 b);
 typedef f64 coord_transform_output_func(f64 x);
 
-struct gk_data gk7 = {
-	.kronod_nodes = {
-		9.9145537112081263920685469752598e-01,
-		9.4910791234275852452618968404809e-01,
-		8.6486442335976907278971278864098e-01,
-		7.415311855993944398638647732811e-01,
-		5.8608723546769113029414483825842e-01,
-		4.0584515137739716690660641207707e-01,
-		2.0778495500789846760068940377309e-01,
-		0.0
-	},
-	.kronod_weights = {
-		2.2935322010529224963732008059913e-02,
-		6.3092092629978553290700663189093e-02,
-		1.0479001032225018383987632254189e-01,
-		1.4065325971552591874518959051021e-01,
-		1.6900472663926790282658342659795e-01,
-		1.9035057806478540991325640242055e-01,
-		2.0443294007529889241416199923466e-01,
-		2.0948214108472782801299917489173e-01
-	},
-	.gauss_weights = {
-		1.2948496616886969327061143267787e-01,
-		2.797053914892766679014677714229e-01,
-		3.8183005050511894495036977548818e-01,
-		4.1795918367346938775510204081658e-01
-	},
-	.kronod_size = 8,
-	.gauss_size = 4,
-	.sample_size = 4*6+3,
-};
-
-struct gk_data gk10 = {
-	.kronod_nodes = {
-		9.956571630258080807355272806890028e-01,
-		9.739065285171717200779640120844521e-01,
-		9.301574913557082260012071800595083e-01,
-		8.650633666889845107320966884234930e-01,
-		7.808177265864168970637175783450424e-01,
-		6.794095682990244062343273651148736e-01,
-		5.627571346686046833390000992726941e-01,
-		4.333953941292471907992659431657842e-01,
-		2.943928627014601981311266031038656e-01,
-		1.488743389816312108848260011297200e-01,
-		0.0,
-	},
-	.kronod_weights = {
-		1.169463886737187427806439606219205e-02,
-		3.255816230796472747881897245938976e-02,
-		5.475589657435199603138130024458018e-02,
-		7.503967481091995276704314091619001e-02,
-		9.312545458369760553506546508336634e-02,
-		1.093871588022976418992105903258050e-01,
-		1.234919762620658510779581098310742e-01,
-		1.347092173114733259280540017717068e-01,
-		1.427759385770600807970942731387171e-01,
-		1.477391049013384913748415159720680e-01,
-		1.494455540029169056649364683898212e-01,
-	},
-	.gauss_weights = {
-		6.667134430868813759356880989333179e-02,
-		1.494513491505805931457763396576973e-01,
-		2.190863625159820439955349342281632e-01,
-		2.692667193099963550912269215694694e-01,
-		2.955242247147528701738929946513383e-01,
-	},
-	.kronod_size = 11,
-	.gauss_size = 5,
-	.sample_size = 4*10+3,
-};
-
 struct gk_data gk15 = {
 	.kronod_nodes = {
 		9.980022986933970602851728401522712e-01,
@@ -121,7 +50,7 @@ struct gk_data gk15 = {
 	},
 	.kronod_size = 16,
 	.gauss_size = 8,
-	.sample_size = 4*14+3,
+	.sample_size = 4*7+3,
 };
 
 struct gk_data gk20 = {
@@ -185,7 +114,7 @@ struct gk_data gk20 = {
 	},
 	.kronod_size = 21,
 	.gauss_size = 10,
-	.sample_size = 4*20+3,
+	.sample_size = 4*10+3,
 };
 
 
@@ -255,7 +184,6 @@ static void evaluate_rule(integrand_func* f, f64 start, f64 end, const struct qu
 	u32 size = gk->gauss_size - is_order_odd;
 
 	/* Compute all sample points */
-	u32 sample_size = 4*size + 3;
 	for (u32 i = 0; i < size; ++i) {
 		f64 xg = gk->kronod_nodes[2*i+1];
 		f64 xk = gk->kronod_nodes[2*i];
@@ -270,16 +198,16 @@ static void evaluate_rule(integrand_func* f, f64 start, f64 end, const struct qu
 	sample_points[4*size + 2] = start + (1+gk->kronod_nodes[gk->kronod_size-2])*mid;
 
 	/* Apply transform scaling to input */
-	for (u32 i = 0; i < sample_size; ++i) {
+	for (u32 i = 0; i < gk->sample_size; ++i) {
 		transformed_sample_points[i] = sample_points[i]/(1.0 - sample_points[i]*sample_points[i]);
 	}
 
 	/* Sample the function */
-	f(sample_output, transformed_sample_points, sample_size, settings->userdata);
+	f(sample_output, transformed_sample_points, gk->sample_size, settings->userdata);
 
 	/* Apply transform output scaling */
 	f64 one_minus_t2, scale;
-	for (u32 i = 0; i < sample_size; ++i) {
+	for (u32 i = 0; i < gk->sample_size; ++i) {
 		one_minus_t2 = (1.0 - sample_points[i]*sample_points[i]);
 		scale = (1.0 + sample_points[i]*sample_points[i]) / (one_minus_t2*one_minus_t2);
 		sample_output[i] *= scale;
@@ -334,7 +262,7 @@ static inline bool should_exit(const struct quadgk_settings* settings, struct qu
 }
 
 u32 quadgk_required_memory_size(const struct quadgk_settings* settings) {
-	return sizeof(struct segment)*(settings->max_iters+1) + 3*sizeof(f64)*settings->gk.sample_size;
+	return 10000*sizeof(struct segment)*(settings->max_iters+1) + 3*sizeof(f64)*settings->gk.sample_size;
 }
 
 void quadgk_infinite_interval(integrand_func* f, const struct quadgk_settings* settings, void* memory, struct quadgk_result* res) {

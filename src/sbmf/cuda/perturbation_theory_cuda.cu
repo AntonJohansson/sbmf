@@ -161,12 +161,18 @@ struct pt_result rspt_1comp_cuda(struct nlse_settings settings, struct nlse_resu
 		f64_normalize(&states.eigenvectors[j*res.coeff_count], &states.eigenvectors[j*res.coeff_count], res.coeff_count);
 	}
 
+	for (u32 i = 0; i < states_to_include; ++i) {
+		printf("TEST_____: %lf\n", states.eigenvectors[res.coeff_count + i]);
+	}
+
+
 	f64* device_states;
 	cudaMalloc(&device_states, states_to_include*states_to_include*sizeof(f64));
 	cudaMemcpy(device_states, states.eigenvectors, states_to_include*states_to_include*sizeof(f64), cudaMemcpyHostToDevice);
 
 	const u64 hermite_integral_count = size4_cuda(states_to_include-1);
 	const u64 hermite_cache_size = sizeof(f64)*hermite_integral_count;
+	u32 memory_marker = sbmf_stack_marker();
 	f64* hermite_cache = (f64*)sbmf_stack_push(hermite_cache_size);
 	{
 		sbmf_log_info("Precomputing %ld hermite integrals", hermite_integral_count);
@@ -204,6 +210,17 @@ struct pt_result rspt_1comp_cuda(struct nlse_settings settings, struct nlse_resu
 		E0 += N[component] * E(&pt, component, 0);
 	}
 	sbmf_log_info("\tE0: %e", E0);
+
+		{
+			const f64 v_m0_n0 = V_closed(hermite_cache, 
+					&states.eigenvectors[1*states_to_include],
+					&states.eigenvectors[0*states_to_include],
+					&states.eigenvectors[1*states_to_include],
+					&states.eigenvectors[0*states_to_include],
+					states_to_include);
+			printf("TEST: %lf\n", v_m0_n0);
+		}
+
 
 	/* First order PT */
 	sbmf_log_info("Starting first order PT");
@@ -283,8 +300,9 @@ struct pt_result rspt_1comp_cuda(struct nlse_settings settings, struct nlse_resu
 				m += 1;
 				n += 1;
 
-				f64 v_m0_n0 = G0(&pt,component,component)*V_closed(hermite_cache, PHI(&pt,component,m), PHI(&pt,component,0), PHI(&pt,component,n), PHI(&pt,component,0), states_to_include);
-				printf(":::::::----- %lf\n", v_m0_n0);
+				const f64 v_m0_n0 = G0(&pt,component,component)*V_closed(hermite_cache, PHI(&pt,component,m), PHI(&pt,component,0), PHI(&pt,component,n), PHI(&pt,component,0), states_to_include);
+
+				printf(":::::::::::: %u,%u -- %lf -- %lf\n", m,n, G0(&pt,component,component), v_m0_n0);
 
 				f64 sum = 0.0;
 				for (u32 p = 1; p < states_to_include; ++p) {
@@ -360,6 +378,8 @@ struct pt_result rspt_1comp_cuda(struct nlse_settings settings, struct nlse_resu
 	cudaFree(hermite_cache_device);
 	cudaFree(device_states);
 	cudaFree(device_pt2_cache);
+
+	sbmf_stack_free_to_marker(memory_marker);
 
 	return (struct pt_result) {
 		.E0 = E0,

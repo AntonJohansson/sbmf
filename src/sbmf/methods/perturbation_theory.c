@@ -50,13 +50,18 @@ struct V_params {
 void V_integrand(f64* out, f64* in, u32 len, void* data) {
 	struct V_params* p = data;
 
-	ho_sample(p->coeff_count, p->i, len, p->sample_i, in);
-	ho_sample(p->coeff_count, p->j, len, p->sample_j, in);
-	ho_sample(p->coeff_count, p->k, len, p->sample_k, in);
-	ho_sample(p->coeff_count, p->l, len, p->sample_l, in);
+	f64 sample_i[len];
+	f64 sample_j[len];
+	f64 sample_k[len];
+	f64 sample_l[len];
+
+	ho_sample(p->coeff_count, p->i, len, sample_i, in);
+	ho_sample(p->coeff_count, p->j, len, sample_j, in);
+	ho_sample(p->coeff_count, p->k, len, sample_k, in);
+	ho_sample(p->coeff_count, p->l, len, sample_l, in);
 
 	for (u32 i = 0; i < len; ++i) {
-		out[i] = p->sample_i[i]*p->sample_j[i]*p->sample_k[i]*p->sample_l[i];
+		out[i] = sample_i[i]*sample_j[i]*sample_k[i]*sample_l[i];
 	}
 }
 
@@ -93,10 +98,6 @@ static inline f64 V(struct pt_settings* pt, u32 A, u32 B, u32 i, u32 j, u32 k, u
     };
 
 	u8 quadgk_memory[quadgk_required_memory_size(&settings)];
-	f64 sample_i[settings.gk.sample_size];
-	f64 sample_j[settings.gk.sample_size];
-	f64 sample_k[settings.gk.sample_size];
-	f64 sample_l[settings.gk.sample_size];
 
 	struct V_params p = {
 		.coeff_count = pt->L,
@@ -104,10 +105,6 @@ static inline f64 V(struct pt_settings* pt, u32 A, u32 B, u32 i, u32 j, u32 k, u
 		.j = PHI(pt, B, j),
 		.k = PHI(pt, A, k),
 		.l = PHI(pt, B, l),
-		.sample_i = sample_i,
-		.sample_j = sample_j,
-		.sample_k = sample_k,
-		.sample_l = sample_l,
 	};
 
 	settings.userdata = &p;
@@ -127,11 +124,9 @@ static inline f64 rs_2nd_order_me(struct pt_settings* pt, u32 A, u32 B, u32 i, u
 	f64 me = 0.0;
 	if (A == B) {
 		f64 factor = (i == j) ? 1.0/sqrt(2.0) : 1.0;
-		me = factor * G0(pt,A,A) * sqrt(pt->particle_count[A] * (pt->particle_count[A] - 1))
-			* V(pt, A,A, i,j,0,0);
+		me = factor * G0(pt,A,A) * sqrt(pt->particle_count[A] * (pt->particle_count[A] - 1)) * V(pt, A,A, i,j,0,0);
 	} else {
-		me = G0(pt,A,B) * sqrt(pt->particle_count[A] * pt->particle_count[B])
-			* V(pt, A,B, i,j,0,0);
+		me = G0(pt,A,B) * sqrt(pt->particle_count[A] * pt->particle_count[B]) * V(pt, A,B, i,j,0,0);
 	}
 	return me;
 }
@@ -172,6 +167,7 @@ struct pt_result rayleigh_schroedinger_pt_rf(struct nlse_settings settings, stru
 
 	const u64 hermite_integral_count = size4(states_to_include-1);
 	const u64 hermite_cache_size = sizeof(f64)*hermite_integral_count;
+	u32 memory_marker = sbmf_stack_marker();
 	f64* hermite_cache = sbmf_stack_push(hermite_cache_size);
 	{
 		sbmf_log_info("Precomputing %ld hermite integrals", hermite_integral_count);
@@ -210,6 +206,11 @@ struct pt_result rayleigh_schroedinger_pt_rf(struct nlse_settings settings, stru
 #define PT2_CACHE_INDEX(i, j) \
 	((i)*states_to_include - (((i)*(i+1))/2) + j)
 
+		{
+				const f64 v_m0_n0 = V_closed(&pt, hermite_cache, component,component, 1,0,1,0);
+				printf("TSET M0N0: %lf\n", v_m0_n0);
+		}
+
 
 	/* Second order PT */
 	sbmf_log_info("Starting second order PT");
@@ -232,6 +233,12 @@ struct pt_result rayleigh_schroedinger_pt_rf(struct nlse_settings settings, stru
 		}
 	}
 	sbmf_log_info("\tE2: %e", E2);
+
+
+		{
+				const f64 v_m0_n0 = V_closed(&pt, hermite_cache, component,component, 1,0,1,0);
+				printf("TSET M0N0: %lf\n", v_m0_n0);
+		}
 
 	/* Third order PT */
 	sbmf_log_info("Starting third order PT");
@@ -269,6 +276,7 @@ struct pt_result rayleigh_schroedinger_pt_rf(struct nlse_settings settings, stru
 				n += 1;
 
 				const f64 v_m0_n0 = G0(&pt,component,component)*V_closed(&pt, hermite_cache, component,component, m,0,n,0);
+				printf(":::::::::::: %u,%u -- %lf -- %lf\n", m,n, G0(&pt,component,component), v_m0_n0);
 
 				f64 sum = 0.0;
 				for (u32 p = 1; p < states_to_include; ++p) {
@@ -343,6 +351,8 @@ struct pt_result rayleigh_schroedinger_pt_rf(struct nlse_settings settings, stru
 		E3 = E_00_00 + E_m0_n0 + E_mn_pq;
 	}
 	sbmf_log_info("\tE3: %e", E3);
+
+	sbmf_stack_free_to_marker(memory_marker);
 
 	return (struct pt_result) {
 		.E0 = E0,

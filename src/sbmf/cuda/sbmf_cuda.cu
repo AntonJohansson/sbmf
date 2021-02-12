@@ -9,6 +9,9 @@ extern "C" {
 __host__
 void* sbmf_stack_push_impl(u32 size_in_bytes, const u32 linenumber, const char file[], const char func[]);
 
+u32 sbmf_stack_marker();
+void sbmf_stack_free_to_marker(u32);
+
 #include "functions_cuda.cu"
 #include "basis_cuda.cu"
 #include "indices_cuda.cu"

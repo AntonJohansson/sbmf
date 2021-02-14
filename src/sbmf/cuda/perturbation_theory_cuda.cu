@@ -897,7 +897,7 @@ struct pt_result rspt_1comp_cuda_new(struct nlse_settings* settings, struct nlse
 	return ptres;
 }
 
-struct pt_result enpt_1compo_cuda_new(struct nlse_settings* settings, struct nlse_result res, u32 component, f64 g, i64 N) {
+struct pt_result enpt_1comp_cuda_new(struct nlse_settings* settings, struct nlse_result res, u32 component, f64 g, i64 N) {
 	/*
 	 * The number of single body (sb) states is equal to the number
 	 * of coefficients which is equal to the basis size

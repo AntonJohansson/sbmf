@@ -391,19 +391,7 @@ struct Vp_params {
 	nlse_operator_func* pert;
 };
 
-void Vp_integrand(f64* out, f64* in, u32 len, void* data) {
-	struct Vp_params* p = (struct Vp_params*) data;
-
-	f64 sample_i[len]; ho_sample(p->coeff_count, p->i, len, sample_i, in);
-	f64 sample_j[len]; ho_sample(p->coeff_count, p->j, len, sample_j, in);
-
-	f64 sample_pert[len];
-	p->pert(len, sample_pert, in, 0, NULL, NULL);
-
-	for (u32 i = 0; i < len; ++i) {
-		out[i] = sample_i[i]*sample_pert[i]*sample_j[i];
-	}
-}
+void Vp_integrand(f64* out, f64* in, u32 len, void* data);
 
 static inline f64 en_nhn(struct pt_settings* pt, u32 A, u32 i, u32 j) {
 	f64 sum = 0;

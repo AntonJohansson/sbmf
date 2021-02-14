@@ -14,7 +14,7 @@
 
 __host__ __device__
 static inline void sort4_cuda(u32* arr) {
-#define SWAP(x,y) if (arr[x] > arr[y]) { int tmp = arr[x]; arr[x] = arr[y]; arr[y] = tmp; }
+#define SWAP(x,y) if (arr[x] > arr[y]) { u32 tmp = arr[x]; arr[x] = arr[y]; arr[y] = tmp; }
     SWAP(0,1);
     SWAP(2,3);
     SWAP(0,2);
@@ -22,7 +22,6 @@ static inline void sort4_cuda(u32* arr) {
     SWAP(1,2);
 #undef SWAP
 }
-
 
 /*
  * In general, a method to construct the map F: (i,j,k,l, ...) -> I is by defining maps f1,f2,... for each index and settings F: (i,j,k,l) -> f1(i) + f2(j) + f3(k) + f4(l) +  ..., where the maps f1,... can be defined recursively as
@@ -35,6 +34,7 @@ static inline void sort4_cuda(u32* arr) {
  * 		  .
  * 		  .
  *
+
  * there is also some very nice graphical intuition as to why this works, but I won't get into that. The maps f1,f2,f3,f4 also have a closed form so we can avoid for loops, probably holds for larger f's, let wolfram alpha figure it out.
  */
 
@@ -71,6 +71,14 @@ static inline u32 index4_cuda(u32 i, u32 j, u32 k, u32 l) {
     return arr[0] + subindex2_cuda(arr[1]) + subindex3_cuda(arr[2]) + subindex4_cuda(arr[3]);
 }
 
+__host__ __device__
+static inline u32 index2_cuda(u32 i, u32 j) {
+	/* swap i and j if necessary */
+	if (j < i) {u32 tmp = i; i = j; j = tmp;}
+
+	return i + subindex2_cuda(j);
+}
+
 /*
  * Lastly it's nice to include a wrapper to calculate the size of
  * these linear arrays
@@ -79,4 +87,9 @@ static inline u32 index4_cuda(u32 i, u32 j, u32 k, u32 l) {
 __host__ __device__
 static inline u64 size4_cuda(u64 N) {
 	return index4_cuda(N-1, N-1, N-1, N-1) + 1;
+}
+
+__host__ __device__
+static inline u64 size2_cuda(u64 N) {
+	return index2_cuda(N-1, N-1) + 1;
 }

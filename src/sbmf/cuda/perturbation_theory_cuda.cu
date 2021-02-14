@@ -92,8 +92,14 @@ static void device_sum_reduction(f64* out, f64* arr, const u32 len) {
 	*out = sum;
 }
 
+enum pt_mode {
+	MODE_RSPT = 0,
+	MODE_ENPT = 1,
+};
+
 __global__
 static void rspt_3_mnpq(
+		enum pt_mode mode,
 		f64* g0,
 		const u32 num_sb_states, const u32 num_mb_states, const u32 num_interactions,
 		f64* pt2_cache,
@@ -118,9 +124,16 @@ static void rspt_3_mnpq(
 	map_to_triangular_index(k1, num_sb_states-1, &p, &q);
 	p += 1; q += 1;
 
-	f64 factor = 2.0;
-	if (k0 == k1)
-		factor = 1.0;
+	f64 factor = 1.0;
+	if (mode == MODE_RSPT) {
+		factor = 2.0;
+		if (k0 == k1)
+			factor = 1.0;
+	} else if (mode == MODE_ENPT) {
+		if (k0 == k1) {
+			return;
+		}
+	}
 
 #define PT2_CACHE_INDEX(i, j) \
 	((i)*num_sb_states - (((i)*(i+1))/2) + j)
@@ -331,6 +344,7 @@ struct pt_result rspt_1comp_cuda(struct nlse_settings settings, struct nlse_resu
 
 			const u32 blocks = (num_interactions > 256) ? num_interactions/256 : 1;
 			rspt_3_mnpq<<<blocks, 256>>>(
+					MODE_RSPT,
 					g0,
 					states_to_include, num_mb_states, num_interactions,
 					device_pt2_cache,
@@ -441,10 +455,7 @@ struct pt_result enpt_1comp_cuda(struct nlse_settings settings, struct nlse_resu
 	sbmf_log_info("running 1comp ENPT:\n    components: %u\n    states: %u\n", res.component_count, states_to_include);
 	const u32 A = 0;
 
-	struct eigen_result_real states;
-	states = find_eigenpairs_full_real(res.hamiltonian[component]);
-	for (u32 j = 0; j < states_to_include; ++j) {
-		f64_normalize(&states.eigenvectors[j*res.coeff_count], &states.eigenvectors[j*res.coeff_count], res.coeff_count);
+	struct eigen_result_real states; states = find_eigenpairs_full_real(res.hamiltonian[component]); for (u32 j = 0; j < states_to_include; ++j) { f64_normalize(&states.eigenvectors[j*res.coeff_count], &states.eigenvectors[j*res.coeff_count], res.coeff_count);
 	}
 
 	f64* device_states;
@@ -466,6 +477,10 @@ struct pt_result enpt_1comp_cuda(struct nlse_settings settings, struct nlse_resu
 			}
 		}
 	}
+
+	f64* hermite_cache_device;
+	cudaMalloc(&hermite_cache_device, hermite_cache_size);
+	cudaMemcpy(hermite_cache_device, hermite_cache, hermite_cache_size, cudaMemcpyHostToDevice);
 
 	struct pt_settings pt = {
 		.res = &res,
@@ -525,6 +540,10 @@ struct pt_result enpt_1comp_cuda(struct nlse_settings settings, struct nlse_resu
 	}
 	sbmf_log_info("\tE2: %e", E2);
 
+	f64* device_pt2_cache;
+	cudaMalloc(&device_pt2_cache, pt2_cache_size*sizeof(f64));
+	cudaMemcpy(device_pt2_cache, pt2_cache, pt2_cache_size*sizeof(f64), cudaMemcpyHostToDevice);
+
 	/* Third order PT */
 	sbmf_log_info("Starting third order PT");
 	f64 E3 = 0.0;
@@ -583,46 +602,49 @@ struct pt_result enpt_1comp_cuda(struct nlse_settings settings, struct nlse_resu
 
 		f64 E_mn_pq = 0;
 		{
-			const f64 c_root_2_minus_2 = sqrt(2.0) - 2.0;
-			const f64 c_3_minus_2_root_2 = 3.0 - 2.0*sqrt(2.0);
 
-			const u32 INDS_N = ((states_to_include-1)*states_to_include)/2;
+			const u32 num_mb_states = ((states_to_include-1)*states_to_include)/2;
+			const u32 num_interactions = (num_mb_states*(num_mb_states+1))/2;
 
-#pragma omp parallel for reduction(+: E_mn_pq)
-			for (u32 k = 0; k < INDS_N*(INDS_N+1)/2; ++k) {
-				u32 k0, k1;
-				map_to_triangular_index(k, INDS_N, &k0, &k1);
+			f64* device_output;
+			cudaMalloc(&device_output, num_interactions*sizeof(f64));
 
-				/* Skip <k|V|k> terms */
-				if (k0 == k1)
-					continue;
+			f64* g0;
+			cudaMalloc(&g0, sizeof(f64));
+			cudaMemcpy(g0, &pt.g0[0], sizeof(f64), cudaMemcpyHostToDevice);
 
-				u32 m, n;
-				map_to_triangular_index(k0, states_to_include-1, &m, &n);
-				m += 1; n += 1;
+			const u32 blocks = (num_interactions > 256) ? num_interactions/256 : 1;
+			rspt_3_mnpq<<<blocks, 256>>>(
+					MODE_ENPT,
+					g0,
+					states_to_include, num_mb_states, num_interactions,
+					device_pt2_cache,
+					hermite_cache_device,
+					device_states,
+					device_output
+					);
 
-				u32 p, q;
-				map_to_triangular_index(k1, states_to_include-1, &p, &q);
-				p += 1; q += 1;
+			cudaFree(g0);
 
+			f64* res;
+			cudaMalloc(&res, sizeof(f64));
+			device_sum_reduction<<<1,1>>>(res, device_output, num_interactions);
+			cudaMemcpy(&E_mn_pq, res, sizeof(f64), cudaMemcpyDeviceToHost);
+			cudaFree(res);
 
-				f64 tmn = pt2_cache[PT2_CACHE_INDEX(m-1,n-m)];
-				const f64 delta_mn = (m == n) ? 1.0 : 0.0;
-
-				f64 v_mn_pq = G0(&pt,component,component)*V_closed(hermite_cache, PHI(&pt,A,m), PHI(&pt,A,n), PHI(&pt,A,p), PHI(&pt,A,q), states_to_include);
-				f64 tpq = pt2_cache[PT2_CACHE_INDEX(p-1,q-p)];
-
-				const f64 delta_pq = (p == q) ? 1.0 : 0.0;
-				const f64 coeff = 2.0 + c_root_2_minus_2*(delta_mn + delta_pq) + c_3_minus_2_root_2*(delta_mn*delta_pq);
-				E_mn_pq += 2.0*coeff*tmn*tpq*v_mn_pq;
-			}
-
+			cudaFree(device_output);
 		}
 		sbmf_log_info("\t\tmn,pq: %.10e", E_mn_pq);
 
 		E3 = E_m0_n0 + E_mn_pq;
 	}
 	sbmf_log_info("\tE3: %e", E3);
+
+	cudaFree(hermite_cache_device);
+	cudaFree(device_states);
+	cudaFree(device_pt2_cache);
+
+	sbmf_stack_free_to_marker(memory_marker);
 
 	return (struct pt_result) {
 		.E0 = E0,

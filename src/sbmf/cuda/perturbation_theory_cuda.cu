@@ -667,7 +667,7 @@ static struct pt_result perturbation_theory_1comp(f64 g, i64 N, const struct eig
 
 	/* Zeroth order PT */
 	sbmf_log_info("Starting zeroth order PT");
-	f64 E0 = N * double_subst_energies[index2_cuda(0,0)];
+	f64 E0 = double_subst_energies[index2_cuda(0,0)];
 	sbmf_log_info("\tE0: %e", E0);
 
 	/* This particular integral shows up in zeroth and third order rspt */
@@ -711,7 +711,7 @@ static struct pt_result perturbation_theory_1comp(f64 g, i64 N, const struct eig
 				const f64 me = factor*g*sqrt(N*(N-1))*v_mn_00;
 
 				const u32 index = index2_cuda(m-1,n-1);
-				const f64 Ediff = double_subst_energies[index2_cuda(0,0)] - double_subst_energies[index];
+				const f64 Ediff = E0 - double_subst_energies[index];
 
 				pt2_cache[index] = me/Ediff;
 

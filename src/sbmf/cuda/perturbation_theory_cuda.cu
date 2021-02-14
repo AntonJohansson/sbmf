@@ -773,7 +773,7 @@ static struct pt_result perturbation_theory_1comp(enum pt_mode mode, f64 g, i64 
 			for (u32 k = 0; k < num_mb_states; ++k) {
 				u32 m, n;
 				map_to_triangular_index(k, num_sb_states-1, &m, &n);
-				if (m == n)
+				if (mode == MODE_ENPT && m == n)
 					continue;
 
 				m += 1;

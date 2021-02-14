@@ -116,6 +116,14 @@ static void rspt_3_mnpq(
 	u32 k0, k1;
 	map_to_triangular_index(k, num_mb_states, &k0, &k1);
 
+	f64 factor = 2.0;
+	if (k0 == k1) {
+		if (mode == MODE_RSPT)
+			factor = 1.0;
+		else if (mode == MODE_ENPT)
+			return;
+	}
+
 	u32 m, n;
 	map_to_triangular_index(k0, num_sb_states-1, &m, &n);
 	m += 1; n += 1;
@@ -123,17 +131,6 @@ static void rspt_3_mnpq(
 	u32 p, q;
 	map_to_triangular_index(k1, num_sb_states-1, &p, &q);
 	p += 1; q += 1;
-
-	f64 factor = 1.0;
-	if (mode == MODE_RSPT) {
-		factor = 2.0;
-		if (k0 == k1)
-			factor = 1.0;
-	} else if (mode == MODE_ENPT) {
-		if (k0 == k1) {
-			return;
-		}
-	}
 
 #define PT2_CACHE_INDEX(i, j) \
 	((i)*num_sb_states - (((i)*(i+1))/2) + j)

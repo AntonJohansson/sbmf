@@ -339,7 +339,7 @@ struct pt_result rspt_1comp_cuda(struct nlse_settings settings, struct nlse_resu
 			cudaMalloc(&g0, sizeof(f64));
 			cudaMemcpy(g0, &pt.g0[0], sizeof(f64), cudaMemcpyHostToDevice);
 
-			const u32 blocks = (num_interactions > 256) ? num_interactions/256 : 1;
+			const u32 blocks = num_interactions/256+1;
 			rspt_3_mnpq<<<blocks, 256>>>(
 					MODE_RSPT,
 					g0,
@@ -610,7 +610,7 @@ struct pt_result enpt_1comp_cuda(struct nlse_settings settings, struct nlse_resu
 			cudaMalloc(&g0, sizeof(f64));
 			cudaMemcpy(g0, &pt.g0[0], sizeof(f64), cudaMemcpyHostToDevice);
 
-			const u32 blocks = (num_interactions > 256) ? num_interactions/256 : 1;
+			const u32 blocks = num_interactions/256+1;
 			rspt_3_mnpq<<<blocks, 256>>>(
 					MODE_ENPT,
 					g0,

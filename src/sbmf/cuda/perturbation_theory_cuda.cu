@@ -676,7 +676,7 @@ struct pt_result enpt_1comp_cuda(struct nlse_settings settings, struct nlse_resu
 	};
 }
 
-static struct pt_result perturbation_theory_1comp(f64 g, i64 N, const f64* hermite_cache, const u32 hermite_cache_size, const struct eigen_result_real* states, const f64* double_subst_energies, const u32 num_sb_states) {
+static struct pt_result perturbation_theory_1comp(enum pt_mode mode, f64 g, i64 N, const f64* hermite_cache, const u32 hermite_cache_size, const struct eigen_result_real* states, const f64* double_subst_energies, const u32 num_sb_states) {
 	f64* device_states;
 	cudaMalloc(&device_states, num_sb_states*num_sb_states*sizeof(f64));
 	cudaMemcpy(device_states, states->eigenvectors, num_sb_states*num_sb_states*sizeof(f64), cudaMemcpyHostToDevice);
@@ -699,13 +699,12 @@ static struct pt_result perturbation_theory_1comp(f64 g, i64 N, const f64* hermi
 			num_sb_states);
 
 	/* First order PT */
-	sbmf_log_info("Starting first order PT");
 	f64 E1 = 0.0;
-	{
-		/* Handles interaction within component */
+	if (mode == MODE_RSPT) {
+		sbmf_log_info("Starting first order PT");
 		E1 = -0.5*g*N*(N-1)*v_00_00;
+		sbmf_log_info("\tE1: %e", E1);
 	}
-	sbmf_log_info("\tE1: %e", E1);
 
 	const u32 pt2_cache_size = size2_cuda(num_sb_states-1);
 	f64 pt2_cache[pt2_cache_size];
@@ -749,7 +748,7 @@ static struct pt_result perturbation_theory_1comp(f64 g, i64 N, const f64* hermi
 	f64 E3 = 0.0;
 	{
 		f64 E_00_00 = 0;
-		{
+		if (mode == MODE_RSPT) {
 #pragma omp parallel for reduction(+: E_00_00)
 			for (u32 m = 1; m < num_sb_states; ++m) {
 				for (u32 n = m; n < num_sb_states; ++n) {
@@ -759,8 +758,8 @@ static struct pt_result perturbation_theory_1comp(f64 g, i64 N, const f64* hermi
 			}
 
 			E_00_00 *= g*v_00_00;
+			sbmf_log_info("\t\t00,00: %.10e", E_00_00);
 		}
-		sbmf_log_info("\t\t00,00: %.10e", E_00_00);
 
 		/* Number of many-body states, excludes 0,0 */
 		const u32 num_mb_states = size2_cuda(num_sb_states-1);
@@ -774,6 +773,9 @@ static struct pt_result perturbation_theory_1comp(f64 g, i64 N, const f64* hermi
 			for (u32 k = 0; k < num_mb_states; ++k) {
 				u32 m, n;
 				map_to_triangular_index(k, num_sb_states-1, &m, &n);
+				if (m == n)
+					continue;
+
 				m += 1;
 				n += 1;
 
@@ -815,7 +817,7 @@ static struct pt_result perturbation_theory_1comp(f64 g, i64 N, const f64* hermi
 
 			const u32 blocks = num_interactions/256 + 1;
 			rspt_3_mnpq<<<blocks, 256>>>(
-					MODE_RSPT,
+					mode,
 					g,
 					num_sb_states, num_mb_states, num_interactions,
 					device_pt2_cache,
@@ -891,7 +893,7 @@ struct pt_result rspt_1comp_cuda_new(struct nlse_settings* settings, struct nlse
 		}
 	}
 
-	struct pt_result ptres = perturbation_theory_1comp(g, N, hermite_cache, hermite_cache_size, &states, double_subst_energies, num_sb_states);
+	struct pt_result ptres = perturbation_theory_1comp(MODE_RSPT, g, N, hermite_cache, hermite_cache_size, &states, double_subst_energies, num_sb_states);
 	sbmf_stack_free_to_marker(memory_marker);
 
 	return ptres;
@@ -971,7 +973,7 @@ struct pt_result enpt_1comp_cuda_new(struct nlse_settings* settings, struct nlse
 		}
 	}
 
-	struct pt_result ptres = perturbation_theory_1comp(g, N, hermite_cache, hermite_cache_size, &states, double_subst_energies, num_sb_states);
+	struct pt_result ptres = perturbation_theory_1comp(MODE_ENPT, g, N, hermite_cache, hermite_cache_size, &states, double_subst_energies, num_sb_states);
 	sbmf_stack_free_to_marker(memory_marker);
 
 	return ptres;

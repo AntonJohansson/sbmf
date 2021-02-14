@@ -41,7 +41,7 @@ static inline f64* PHI(struct pt_settings* pt, u32 A, u32 i) {
 }
 
 __host__ __device__
-static inline f64 V_closed(f64* cache, f64* phi_a, f64* phi_b, f64* phi_c, f64* phi_d, const u32 size) {
+static inline f64 V_closed(const f64* cache, const f64* phi_a, const f64* phi_b, const f64* phi_c, const f64* phi_d, const u32 size) {
 	f64 sum = 0.0;
 	for (u32 a = 0; a < size; ++a) {
 		for (u32 b = 0; b < size; ++b) {
@@ -435,6 +435,47 @@ static inline f64 en_nhn(struct pt_settings* pt, u32 A, u32 i, u32 j) {
 	return sum;
 }
 
+static inline f64 en_nhn_new(f64* phi_m, f64* phi_n, const u32 num_sb_states, nlse_operator_func* pert) {
+	f64 sum = 0;
+	for (u32 k = 0; k < num_sb_states; ++k) {
+		sum += phi_m[k]*phi_n[k]*ho_eigenval(k);
+
+	}
+
+	/*
+	 * In the case that we're dealing with a perturbation to the
+	 * basis potential, we need to compute <i|Vp|j> numerically
+	 * with Vp being the pertubation
+	 */
+
+	if (pert) {
+		struct Vp_params p = {
+			.coeff_count = num_sb_states,
+			.i = phi_m,
+			.j = phi_n,
+			.pert = pert,
+		};
+
+		struct quadgk_settings settings = {
+			.gk = gk20,
+			.abs_error_tol = 1e-15,
+			.rel_error_tol = 1e-15,
+			.max_iters = 500,
+			.userdata = &p,
+		};
+
+		u8 quadgk_memory[quadgk_required_memory_size(&settings)];
+
+		struct quadgk_result res;
+		quadgk_infinite_interval(Vp_integrand, &settings, quadgk_memory, &res);
+		assert(res.converged);
+
+		sum += res.integral;
+	}
+
+	return sum;
+}
+
 struct pt_result enpt_1comp_cuda(struct nlse_settings settings, struct nlse_result res, u32 component, f64* g0, i64* particle_count) {
 	/* order of hamiltonians, that is include all states */
 	const u32 states_to_include = res.coeff_count;
@@ -635,27 +676,10 @@ struct pt_result enpt_1comp_cuda(struct nlse_settings settings, struct nlse_resu
 	};
 }
 
-static struct pt_result perturbation_theory_1comp(f64 g, i64 N, const struct eigen_result_real* states, const f64* double_subst_energies, const u32 num_sb_states) {
+static struct pt_result perturbation_theory_1comp(f64 g, i64 N, const f64* hermite_cache, const u32 hermite_cache_size, const struct eigen_result_real* states, const f64* double_subst_energies, const u32 num_sb_states) {
 	f64* device_states;
 	cudaMalloc(&device_states, num_sb_states*num_sb_states*sizeof(f64));
 	cudaMemcpy(device_states, states->eigenvectors, num_sb_states*num_sb_states*sizeof(f64), cudaMemcpyHostToDevice);
-
-	const u64 hermite_integral_count = size4_cuda(num_sb_states);
-	const u64 hermite_cache_size = sizeof(f64)*hermite_integral_count;
-	u32 memory_marker = sbmf_stack_marker();
-	f64* hermite_cache = (f64*)sbmf_stack_push(hermite_cache_size);
-	{
-		sbmf_log_info("Precomputing %ld hermite integrals", hermite_integral_count);
-		for (u32 i = 0; i < num_sb_states; ++i) {
-			for (u32 j = i; j < num_sb_states; ++j) {
-				for (u32 k = j; k < num_sb_states; ++k) {
-					for (u32 l = k; l < num_sb_states; ++l) {
-						hermite_cache[index4_cuda(i,j,k,l)] = hermite_integral_4_cuda(i,j,k,l);
-					}
-				}
-			}
-		}
-	}
 
 	f64* hermite_cache_device;
 	cudaMalloc(&hermite_cache_device, hermite_cache_size);
@@ -819,8 +843,6 @@ static struct pt_result perturbation_theory_1comp(f64 g, i64 N, const struct eig
 	cudaFree(device_states);
 	cudaFree(device_pt2_cache);
 
-	sbmf_stack_free_to_marker(memory_marker);
-
 	return (struct pt_result) {
 		.E0 = E0,
 		.E1 = E1,
@@ -829,7 +851,7 @@ static struct pt_result perturbation_theory_1comp(f64 g, i64 N, const struct eig
 	};
 }
 
-struct pt_result rspt_1comp_cuda_new(struct nlse_result res, u32 component, f64 g, i64 particle_count) {
+struct pt_result rspt_1comp_cuda_new(struct nlse_settings* settings, struct nlse_result res, u32 component, f64 g, i64 N) {
 	/*
 	 * The number of single body (sb) states is equal to the number
 	 * of coefficients which is equal to the basis size
@@ -843,13 +865,114 @@ struct pt_result rspt_1comp_cuda_new(struct nlse_result res, u32 component, f64 
 		f64_normalize(&states.eigenvectors[j*num_sb_states], &states.eigenvectors[j*num_sb_states], num_sb_states);
 	}
 
+	const u64 hermite_integral_count = size4_cuda(num_sb_states);
+	const u64 hermite_cache_size = sizeof(f64)*hermite_integral_count;
+	u32 memory_marker = sbmf_stack_marker();
+	f64* hermite_cache = (f64*)sbmf_stack_push(hermite_cache_size);
+	{
+		sbmf_log_info("Precomputing %ld hermite integrals", hermite_integral_count);
+		for (u32 i = 0; i < num_sb_states; ++i) {
+			for (u32 j = i; j < num_sb_states; ++j) {
+				for (u32 k = j; k < num_sb_states; ++k) {
+					for (u32 l = k; l < num_sb_states; ++l) {
+						hermite_cache[index4_cuda(i,j,k,l)] = hermite_integral_4_cuda(i,j,k,l);
+					}
+				}
+			}
+		}
+	}
+
+
 	/* Energies of double substitution states including the zero states */
 	f64 double_subst_energies[size2_cuda(num_sb_states)];
 	for (u32 m = 0; m < num_sb_states; ++m) {
 		for (u32 n = m; n < num_sb_states; ++n) {
-			double_subst_energies[index2_cuda(m,n)] = (particle_count-2)*states.eigenvalues[0] + states.eigenvalues[m] + states.eigenvalues[n];
+			double_subst_energies[index2_cuda(m,n)] = (N-2)*states.eigenvalues[0] + states.eigenvalues[m] + states.eigenvalues[n];
 		}
 	}
 
-	return perturbation_theory_1comp(g, particle_count, &states, double_subst_energies, num_sb_states);
+	struct pt_result ptres = perturbation_theory_1comp(g, N, hermite_cache, hermite_cache_size, &states, double_subst_energies, num_sb_states);
+	sbmf_stack_free_to_marker(memory_marker);
+
+	return ptres;
+}
+
+struct pt_result enpt_1compo_cuda_new(struct nlse_settings* settings, struct nlse_result res, u32 component, f64 g, i64 N) {
+	/*
+	 * The number of single body (sb) states is equal to the number
+	 * of coefficients which is equal to the basis size
+	 */
+	const u32 num_sb_states = res.coeff_count;
+
+	/* Find all eigenstates and eigenenergies of the hamiltonian passed in */
+	struct eigen_result_real states;
+	states = find_eigenpairs_full_real(res.hamiltonian[component]);
+	for (u32 j = 0; j < num_sb_states; ++j) {
+		f64_normalize(&states.eigenvectors[j*num_sb_states], &states.eigenvectors[j*num_sb_states], num_sb_states);
+	}
+
+	const u64 hermite_integral_count = size4_cuda(num_sb_states);
+	const u64 hermite_cache_size = sizeof(f64)*hermite_integral_count;
+	u32 memory_marker = sbmf_stack_marker();
+	f64* hermite_cache = (f64*)sbmf_stack_push(hermite_cache_size);
+	{
+		sbmf_log_info("Precomputing %ld hermite integrals", hermite_integral_count);
+		for (u32 i = 0; i < num_sb_states; ++i) {
+			for (u32 j = i; j < num_sb_states; ++j) {
+				for (u32 k = j; k < num_sb_states; ++k) {
+					for (u32 l = k; l < num_sb_states; ++l) {
+						hermite_cache[index4_cuda(i,j,k,l)] = hermite_integral_4_cuda(i,j,k,l);
+					}
+				}
+			}
+		}
+	}
+
+	/* Energies of double substitution states including the zero states */
+	f64 double_subst_energies[size2_cuda(num_sb_states)];
+
+	const f64 v_00_00 = V_closed(hermite_cache,
+			&states.eigenvectors[0],
+			&states.eigenvectors[0],
+			&states.eigenvectors[0],
+			&states.eigenvectors[0],
+			num_sb_states);
+	double_subst_energies[index2_cuda(0,0)] = N*en_nhn_new(&states.eigenvectors[0*num_sb_states], &states.eigenvectors[0*num_sb_states], num_sb_states, settings->spatial_pot_perturbation) + 0.5*g*N*(N-1)*v_00_00;
+
+	for (u32 m = 1; m < num_sb_states; ++m) {
+		for (u32 n = m; n < num_sb_states; ++n) {
+			const f64 v_mn_mn = V_closed(hermite_cache,
+					&states.eigenvectors[m*num_sb_states],
+					&states.eigenvectors[n*num_sb_states],
+					&states.eigenvectors[m*num_sb_states],
+					&states.eigenvectors[n*num_sb_states],
+					num_sb_states);
+			const f64 v_m0_m0 = V_closed(hermite_cache,
+					&states.eigenvectors[m*num_sb_states],
+					&states.eigenvectors[0*num_sb_states],
+					&states.eigenvectors[m*num_sb_states],
+					&states.eigenvectors[0*num_sb_states],
+					num_sb_states);
+			const f64 v_n0_n0 = (m == n) ? v_m0_m0 : V_closed(hermite_cache,
+					&states.eigenvectors[n*num_sb_states],
+					&states.eigenvectors[0*num_sb_states],
+					&states.eigenvectors[n*num_sb_states],
+					&states.eigenvectors[0*num_sb_states],
+					num_sb_states);
+
+			const f64 dmn = (m == n) ? 1.0 : 0.0;
+			f64 energy =
+				(N-2)*en_nhn_new(&states.eigenvectors[0*num_sb_states], &states.eigenvectors[0*num_sb_states], num_sb_states, settings->spatial_pot_perturbation)
+				+en_nhn_new(&states.eigenvectors[m*num_sb_states], &states.eigenvectors[m*num_sb_states], num_sb_states, settings->spatial_pot_perturbation)
+				+en_nhn_new(&states.eigenvectors[n*num_sb_states], &states.eigenvectors[n*num_sb_states], num_sb_states, settings->spatial_pot_perturbation)
+				+ g*((2.0-dmn)*v_mn_mn + 2.0*(N-2)*(v_m0_m0+v_n0_n0) + 0.5*(N-2)*(N-3)*v_00_00);
+
+			double_subst_energies[index2_cuda(m,n)] = energy;
+		}
+	}
+
+	struct pt_result ptres = perturbation_theory_1comp(g, N, hermite_cache, hermite_cache_size, &states, double_subst_energies, num_sb_states);
+	sbmf_stack_free_to_marker(memory_marker);
+
+	return ptres;
 }

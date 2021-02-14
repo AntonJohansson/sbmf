@@ -710,10 +710,9 @@ static struct pt_result perturbation_theory_1comp(f64 g, i64 N, const struct eig
 				const f64 factor = (m == n) ? 1.0/sqrt(2.0) : 1.0;
 				const f64 me = factor*g*sqrt(N*(N-1))*v_mn_00;
 
-				const u32 index = index2_cuda(m-1,n-1);
-				const f64 Ediff = E0 - double_subst_energies[index];
+				const f64 Ediff = E0 - double_subst_energies[index2_cuda(m,n)];
 
-				pt2_cache[index] = me/Ediff;
+				pt2_cache[index2_cuda(m-1,n-1)] = me/Ediff;
 
 				E2 += me*me/(Ediff);
 			}

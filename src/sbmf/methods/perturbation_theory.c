@@ -600,8 +600,6 @@ static inline f64 Vp(struct pt_settings* pt, u32 A, u32 i, u32 j) {
 	return res.integral;
 }
 
-
-
 static inline f64 en_nhn(struct pt_settings* pt, u32 A, u32 i, u32 j) {
 	f64 sum = 0;
 	for (u32 k = 0; k < pt->L; ++k) {
@@ -614,7 +612,6 @@ static inline f64 en_nhn(struct pt_settings* pt, u32 A, u32 i, u32 j) {
 
 	return sum;
 }
-
 
 static inline f64 en_nHn(struct pt_settings* pt, u32 A, u32 i, u32 j) {
 	if (i == j) {
@@ -642,15 +639,6 @@ static inline f64 en_nHn(struct pt_settings* pt, u32 A, u32 i, u32 j) {
 					);
 	}
 }
-
-
-
-
-
-
-
-
-
 
 struct pt_result en_pt_rf(struct nlse_settings settings, struct nlse_result res, u32 component, f64* g0, i64* particle_count) {
 	/* order of hamiltonians, that is include all states */
@@ -831,39 +819,6 @@ struct pt_result en_pt_rf(struct nlse_settings settings, struct nlse_result res,
 	};
 }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 struct pt_result en_pt_2comp(struct nlse_settings settings, struct nlse_result res, f64* g0, i64* particle_count) {
 	/* order of hamiltonians, that is include all states */
 	const u32 states_to_include = res.coeff_count;
@@ -891,48 +846,6 @@ struct pt_result en_pt_2comp(struct nlse_settings settings, struct nlse_result r
 
 	const u32 A = 0;
 	const u32 B = 1;
-
-#if 0
-	{
-		f64 f1 = 0;
-		struct timespec t0,t1;
-
-
-		t0 = current_time();
-		for (u32 i = 0; i < 1000; ++i)
-			f1 = V(&pt, A,A, 30,15,24,48);
-		t1 = current_time();
-		sbmf_log_info("-------:	V:        %.15e ------ %lf", f1, elapsed_time(t0,t1));
-
-		f64* cache = malloc(sizeof(f64)*size4(states_to_include-1));
-		{
-			t0 = current_time();
-			for (u32 i = 0; i < states_to_include; ++i) {
-				for (u32 j = i; j < states_to_include; ++j) {
-					for (u32 k = j; k < states_to_include; ++k) {
-						for (u32 l = k; l < states_to_include; ++l) {
-							cache[index4(i,j,k,l)] = hermite_integral_4(i,j,k,l);
-						}
-					}
-				}
-			}
-			t1 = current_time();
-			sbmf_log_info("-------:	precomp: %lf", elapsed_time(t0,t1));
-		}
-
-		f64 f2 = 0;
-		t0 = current_time();
-		for (u32 i = 0; i < 1000; ++i)
-			f2 = V_closed(&pt, cache, A,A, 30,15,24,48);
-		t1 = current_time();
-		sbmf_log_info("-------:	V_closed: %.15e ------ %lf", f2, elapsed_time(t0,t1));
-
-		sbmf_log_info("-------------------------------------------------");
-
-		free(cache);
-		assert(0);
-	}
-#endif
 
 	/* Zeroth order PT */
 	sbmf_log_info("Starting zeroth order PT");

@@ -132,12 +132,8 @@ static void rspt_3_mnpq(
 	map_to_triangular_index(k1, num_sb_states-1, &p, &q);
 	p += 1; q += 1;
 
-#define PT2_CACHE_INDEX(i, j) \
-	((i)*num_sb_states - (((i)*(i+1))/2) + j)
-
-	f64 tmn = pt2_cache[PT2_CACHE_INDEX(m-1,n-m)];
-	f64 tpq = pt2_cache[PT2_CACHE_INDEX(p-1,q-p)];
-#undef PT2_CACHE_INDEX
+	const f64 tmn = pt2_cache[index2_cuda(m-1,n-1)];
+	const f64 tpq = pt2_cache[index2_cuda(p-1,q-1)];
 
 	const f64 delta_mn = (m == n) ? 1.0 : 0.0;
 	const f64 delta_pq = (p == q) ? 1.0 : 0.0;

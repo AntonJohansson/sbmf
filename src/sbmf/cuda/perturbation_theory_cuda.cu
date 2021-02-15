@@ -1000,26 +1000,58 @@ static struct pt_result perturbation_theory_2comp(enum pt_mode mode, f64 gAA, f6
 
 		f64 E_mn_pq = 0;
 		{
-#pragma omp parallel for collapse(4) reduction(+: E_mn_pq)
-			for (u32 m = 1; m < num_sb_states; ++m) {
-				for (u32 n = 1; n < num_sb_states; ++n) {
-					for (u32 p = 1; p < num_sb_states; ++p) {
-						for (u32 q = 1; q < num_sb_states; ++q) {
-							if (mode == MODE_ENPT && m == p && n == q)
-								continue;
-							const f64 tmn = pt2_cache[PT2_CACHE_INDEX(m-1, n-1)];
-							const f64 tpq = pt2_cache[PT2_CACHE_INDEX(p-1, q-1)];
-							const f64 v_mn_pq = gAB * V_closed(hermite_cache,
-									&statesA->eigenvectors[m*num_sb_states],
-									&statesB->eigenvectors[n*num_sb_states],
-									&statesA->eigenvectors[p*num_sb_states],
-									&statesB->eigenvectors[q*num_sb_states],
-									num_sb_states);
-							E_mn_pq += v_mn_pq*tmn*tpq;
-						}
-					}
+			const u32 num_mb_states = (num_sb_states-1)*(num_sb_states-1);
+			const u32 num_interactions = (num_mb_states*(num_mb_states+1))/2;
+
+#pragma omp parallel for reduction(+: E_mn_pq)
+			for (u32 k = 0; k < num_interactions; ++k) {
+				u32 k0, k1;
+				map_to_triangular_index(k, num_mb_states, &k0, &k1);
+
+				f64 factor = 2.0;
+				if (k0 == k1) {
+					if (mode == MODE_RSPT)
+						factor = 1.0;
+					else if (mode == MODE_ENPT)
+						continue;
 				}
+
+				const u32 m = k0 % (num_sb_states-1) + 1;
+				const u32 n = k0 / (num_sb_states-1) + 1;
+				const u32 p = k1 % (num_sb_states-1) + 1;
+				const u32 q = k1 / (num_sb_states-1) + 1;
+
+				const f64 tmn = pt2_cache[PT2_CACHE_INDEX(m-1, n-1)];
+				const f64 tpq = pt2_cache[PT2_CACHE_INDEX(p-1, q-1)];
+				const f64 v_mn_pq = gAB * V_closed(hermite_cache,
+						&statesA->eigenvectors[m*num_sb_states],
+						&statesB->eigenvectors[n*num_sb_states],
+						&statesA->eigenvectors[p*num_sb_states],
+						&statesB->eigenvectors[q*num_sb_states],
+						num_sb_states);
+				E_mn_pq += factor*v_mn_pq*tmn*tpq;
 			}
+
+//#pragma omp parallel for collapse(4) reduction(+: E_mn_pq)
+			//for (u32 m = 1; m < num_sb_states; ++m) {
+			//	for (u32 n = 1; n < num_sb_states; ++n) {
+			//		for (u32 p = 1; p < num_sb_states; ++p) {
+			//			for (u32 q = 1; q < num_sb_states; ++q) {
+			//				if (mode == MODE_ENPT && m == p && n == q)
+			//					continue;
+			//				const f64 tmn = pt2_cache[PT2_CACHE_INDEX(m-1, n-1)];
+			//				const f64 tpq = pt2_cache[PT2_CACHE_INDEX(p-1, q-1)];
+			//				const f64 v_mn_pq = gAB * V_closed(hermite_cache,
+			//						&statesA->eigenvectors[m*num_sb_states],
+			//						&statesB->eigenvectors[n*num_sb_states],
+			//						&statesA->eigenvectors[p*num_sb_states],
+			//						&statesB->eigenvectors[q*num_sb_states],
+			//						num_sb_states);
+			//				E_mn_pq += v_mn_pq*tmn*tpq;
+			//			}
+			//		}
+			//	}
+			//}
 		}
 		sbmf_log_info("\t\tmn,pq: %.10e", E_mn_pq);
 

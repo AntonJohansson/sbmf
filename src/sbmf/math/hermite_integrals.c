@@ -10,7 +10,7 @@ static inline f128 hermite_integral_3(u32 i, u32 j, u32 k) {
 	return f1*f2*f3;
 }
 
-static inline f64 hermite_integral_4(u32 i, u32 j, u32 k, u32 l) {
+f64 hermite_integral_4(u32 i, u32 j, u32 k, u32 l) {
 	u32 m_max = (i < j) ? i : j;
 
 	f128 sum = 0.0;

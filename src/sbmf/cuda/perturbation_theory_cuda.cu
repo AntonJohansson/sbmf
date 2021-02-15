@@ -1069,7 +1069,7 @@ struct pt_result rspt_1comp_cuda_new(struct nlse_settings* settings, struct nlse
 	f64 double_subst_energy_diffs[size2_cuda(num_sb_states-1)];
 	for (u32 m = 1; m < num_sb_states; ++m) {
 		for (u32 n = m; n < num_sb_states; ++n) {
-			double_subst_energy_diffs[index2_cuda(m-1,n-1)] = 2*states.eigenvalues[0] - states.eigenvalues[m] + states.eigenvalues[n];
+			double_subst_energy_diffs[index2_cuda(m-1,n-1)] = 2*states.eigenvalues[0] - states.eigenvalues[m] - states.eigenvalues[n];
 		}
 	}
 

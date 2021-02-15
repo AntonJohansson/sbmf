@@ -98,15 +98,7 @@ enum pt_mode {
 };
 
 __global__
-static void rspt_3_mnpq(
-		enum pt_mode mode,
-		f64 g,
-		const u32 num_sb_states, const u32 num_mb_states, const u32 num_interactions,
-		f64* pt2_cache,
-		f64* hermite_cache,
-		f64* coeffs,
-		f64* output
-		) {
+static void rspt_3_mnpq_1comp(enum pt_mode mode, f64 g, const u32 num_sb_states, const u32 num_mb_states, const u32 num_interactions, f64* pt2_cache, f64* hermite_cache, f64* coeffs, f64* output) {
 	const f64 c_root_2_minus_2 = sqrt(2.0) - 2.0;
 	const f64 c_3_minus_2_root_2 = 3.0 - 2.0*sqrt(2.0);
 
@@ -148,6 +140,44 @@ static void rspt_3_mnpq(
 
 	const f64 coeff = 2.0 + c_root_2_minus_2*(delta_mn + delta_pq) + c_3_minus_2_root_2*(delta_mn*delta_pq);
 	output[k] = factor*coeff*tmn*tpq*v_mn_pq;
+}
+
+__global__
+static void rspt_3_mnpq_2comp(enum pt_mode mode, f64 g, const u32 num_sb_states, const u32 num_mb_states, const u32 num_interactions, f64* pt2_cache, f64* hermite_cache, f64* coeffsA, f64* coeffsB, f64* output) {
+	const u32 k = blockIdx.x*blockDim.x + threadIdx.x;
+	if (k >= num_interactions)
+		return;
+
+	u32 k0, k1;
+	map_to_triangular_index(k, num_mb_states, &k0, &k1);
+
+	f64 factor = 2.0;
+	if (k0 == k1) {
+		if (mode == MODE_RSPT)
+			factor = 1.0;
+		else if (mode == MODE_ENPT)
+			return;
+	}
+
+	const u32 m = k0 % (num_sb_states-1) + 1;
+	const u32 n = k0 / (num_sb_states-1) + 1;
+	const u32 p = k1 % (num_sb_states-1) + 1;
+	const u32 q = k1 / (num_sb_states-1) + 1;
+
+#define PT2_CACHE_INDEX(i, j) \
+	(i)*(num_sb_states-1) + (j)
+
+	const f64 tmn = pt2_cache[PT2_CACHE_INDEX(m-1, n-1)];
+	const f64 tpq = pt2_cache[PT2_CACHE_INDEX(p-1, q-1)];
+#undef PT2_CACHE_INDEX
+
+	const f64 v_mn_pq = g * V_closed(hermite_cache,
+			&coeffsA[m*num_sb_states],
+			&coeffsB[n*num_sb_states],
+			&coeffsA[p*num_sb_states],
+			&coeffsB[q*num_sb_states],
+			num_sb_states);
+	output[k] = factor*v_mn_pq*tmn*tpq;
 }
 
 /*
@@ -816,7 +846,7 @@ static struct pt_result perturbation_theory_1comp(enum pt_mode mode, f64 g, i64 
 			cudaMalloc(&device_output, num_interactions*sizeof(f64));
 
 			const u32 blocks = num_interactions/256 + 1;
-			rspt_3_mnpq<<<blocks, 256>>>(
+			rspt_3_mnpq_1comp<<<blocks, 256>>>(
 					mode,
 					g,
 					num_sb_states, num_mb_states, num_interactions,
@@ -859,6 +889,17 @@ static struct pt_result perturbation_theory_2comp(enum pt_mode mode, f64 gAA, f6
 		const f64* double_subst_energy_diffs_BB,
 		const f64* double_subst_energy_diffs_AB,
 		const u32 num_sb_states) {
+
+	f64* device_states_A;
+	f64* device_states_B;
+	cudaMalloc(&device_states_A, num_sb_states*num_sb_states*sizeof(f64));
+	cudaMemcpy(device_states_A, statesA->eigenvectors, num_sb_states*num_sb_states*sizeof(f64), cudaMemcpyHostToDevice);
+	cudaMalloc(&device_states_B, num_sb_states*num_sb_states*sizeof(f64));
+	cudaMemcpy(device_states_B, statesB->eigenvectors, num_sb_states*num_sb_states*sizeof(f64), cudaMemcpyHostToDevice);
+
+	f64* hermite_cache_device;
+	cudaMalloc(&hermite_cache_device, hermite_cache_size);
+	cudaMemcpy(hermite_cache_device, hermite_cache, hermite_cache_size, cudaMemcpyHostToDevice);
 
 	struct pt_result res_A = perturbation_theory_1comp(mode, gAA, NA, hermite_cache, hermite_cache_size, statesA, groundstate_energy, double_subst_energy_diffs_AA, num_sb_states);
 	struct pt_result res_B = perturbation_theory_1comp(mode, gAA, NB, hermite_cache, hermite_cache_size, statesB, groundstate_energy, double_subst_energy_diffs_BB, num_sb_states);
@@ -917,6 +958,10 @@ static struct pt_result perturbation_theory_2comp(enum pt_mode mode, f64 gAA, f6
 		}
 	}
 	sbmf_log_info("\tE2: %e", E2);
+
+	f64* device_pt2_cache;
+	cudaMalloc(&device_pt2_cache, pt2_cache_size*sizeof(f64));
+	cudaMemcpy(device_pt2_cache, pt2_cache, pt2_cache_size*sizeof(f64), cudaMemcpyHostToDevice);
 
 	sbmf_log_info("Starting third order PT");
 	f64 E3 = 0.0;
@@ -1003,61 +1048,39 @@ static struct pt_result perturbation_theory_2comp(enum pt_mode mode, f64 gAA, f6
 			const u32 num_mb_states = (num_sb_states-1)*(num_sb_states-1);
 			const u32 num_interactions = (num_mb_states*(num_mb_states+1))/2;
 
-#pragma omp parallel for reduction(+: E_mn_pq)
-			for (u32 k = 0; k < num_interactions; ++k) {
-				u32 k0, k1;
-				map_to_triangular_index(k, num_mb_states, &k0, &k1);
+			f64* device_output;
+			cudaMalloc(&device_output, num_interactions*sizeof(f64));
 
-				f64 factor = 2.0;
-				if (k0 == k1) {
-					if (mode == MODE_RSPT)
-						factor = 1.0;
-					else if (mode == MODE_ENPT)
-						continue;
-				}
+			const u32 blocks = num_interactions/256 + 1;
+			rspt_3_mnpq_2comp<<<blocks, 256>>>(
+					mode,
+					gAB,
+					num_sb_states, num_mb_states, num_interactions,
+					device_pt2_cache,
+					hermite_cache_device,
+					device_states_A,
+					device_states_B,
+					device_output
+					);
 
-				const u32 m = k0 % (num_sb_states-1) + 1;
-				const u32 n = k0 / (num_sb_states-1) + 1;
-				const u32 p = k1 % (num_sb_states-1) + 1;
-				const u32 q = k1 / (num_sb_states-1) + 1;
+			f64* res;
+			cudaMalloc(&res, sizeof(f64));
+			device_sum_reduction<<<1,1>>>(res, device_output, num_interactions);
+			cudaMemcpy(&E_mn_pq, res, sizeof(f64), cudaMemcpyDeviceToHost);
+			cudaFree(res);
 
-				const f64 tmn = pt2_cache[PT2_CACHE_INDEX(m-1, n-1)];
-				const f64 tpq = pt2_cache[PT2_CACHE_INDEX(p-1, q-1)];
-				const f64 v_mn_pq = gAB * V_closed(hermite_cache,
-						&statesA->eigenvectors[m*num_sb_states],
-						&statesB->eigenvectors[n*num_sb_states],
-						&statesA->eigenvectors[p*num_sb_states],
-						&statesB->eigenvectors[q*num_sb_states],
-						num_sb_states);
-				E_mn_pq += factor*v_mn_pq*tmn*tpq;
-			}
-
-//#pragma omp parallel for collapse(4) reduction(+: E_mn_pq)
-			//for (u32 m = 1; m < num_sb_states; ++m) {
-			//	for (u32 n = 1; n < num_sb_states; ++n) {
-			//		for (u32 p = 1; p < num_sb_states; ++p) {
-			//			for (u32 q = 1; q < num_sb_states; ++q) {
-			//				if (mode == MODE_ENPT && m == p && n == q)
-			//					continue;
-			//				const f64 tmn = pt2_cache[PT2_CACHE_INDEX(m-1, n-1)];
-			//				const f64 tpq = pt2_cache[PT2_CACHE_INDEX(p-1, q-1)];
-			//				const f64 v_mn_pq = gAB * V_closed(hermite_cache,
-			//						&statesA->eigenvectors[m*num_sb_states],
-			//						&statesB->eigenvectors[n*num_sb_states],
-			//						&statesA->eigenvectors[p*num_sb_states],
-			//						&statesB->eigenvectors[q*num_sb_states],
-			//						num_sb_states);
-			//				E_mn_pq += v_mn_pq*tmn*tpq;
-			//			}
-			//		}
-			//	}
-			//}
+			cudaFree(device_output);
 		}
 		sbmf_log_info("\t\tmn,pq: %.10e", E_mn_pq);
 
 		E3 += E_00_00 + E_m0_n0 + E_mn_pq;
 	}
 	sbmf_log_info("\tE3: %e", E3);
+
+	cudaFree(device_pt2_cache);
+	cudaFree(hermite_cache_device);
+	cudaFree(device_states_A);
+	cudaFree(device_states_B);
 
 	return (struct pt_result) {
 		.E0 = E0,

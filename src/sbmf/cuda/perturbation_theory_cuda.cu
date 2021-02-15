@@ -1116,7 +1116,7 @@ struct pt_result rspt_1comp_cuda_new(struct nlse_settings* settings, struct nlse
 			for (u32 j = i; j < num_sb_states; ++j) {
 				for (u32 k = j; k < num_sb_states; ++k) {
 					for (u32 l = k; l < num_sb_states; ++l) {
-						hermite_cache[index4_cuda(i,j,k,l)] = hermite_integral_4_cuda(i,j,k,l);
+						hermite_cache[index4_cuda(i,j,k,l)] = hermite_integral_4(i,j,k,l);
 					}
 				}
 			}
@@ -1163,7 +1163,7 @@ struct pt_result enpt_1comp_cuda_new(struct nlse_settings* settings, struct nlse
 			for (u32 j = i; j < num_sb_states; ++j) {
 				for (u32 k = j; k < num_sb_states; ++k) {
 					for (u32 l = k; l < num_sb_states; ++l) {
-						hermite_cache[index4_cuda(i,j,k,l)] = hermite_integral_4_cuda(i,j,k,l);
+						hermite_cache[index4_cuda(i,j,k,l)] = hermite_integral_4(i,j,k,l);
 					}
 				}
 			}
@@ -1245,7 +1245,7 @@ struct pt_result rspt_2comp_cuda_new(struct nlse_settings* settings, struct nlse
 			for (u32 j = i; j < num_sb_states; ++j) {
 				for (u32 k = j; k < num_sb_states; ++k) {
 					for (u32 l = k; l < num_sb_states; ++l) {
-						hermite_cache[index4_cuda(i,j,k,l)] = hermite_integral_4_cuda(i,j,k,l);
+						hermite_cache[index4_cuda(i,j,k,l)] = hermite_integral_4(i,j,k,l);
 					}
 				}
 			}
@@ -1303,7 +1303,7 @@ struct pt_result enpt_2comp_cuda_new(struct nlse_settings* settings, struct nlse
 			for (u32 j = i; j < num_sb_states; ++j) {
 				for (u32 k = j; k < num_sb_states; ++k) {
 					for (u32 l = k; l < num_sb_states; ++l) {
-						hermite_cache[index4_cuda(i,j,k,l)] = hermite_integral_4_cuda(i,j,k,l);
+						hermite_cache[index4_cuda(i,j,k,l)] = hermite_integral_4(i,j,k,l);
 					}
 				}
 			}

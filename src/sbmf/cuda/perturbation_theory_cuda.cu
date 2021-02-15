@@ -1401,7 +1401,7 @@ struct pt_result enpt_2comp_cuda_new(struct nlse_settings* settings, struct nlse
 		}
 	}
 
-	struct pt_result ptres = perturbation_theory_2comp(MODE_RSPT, gAA, gAB, NA, NB, hermite_cache, hermite_cache_size, &statesA, &statesB, groundstate_energy, double_subst_energy_diffs_AA, double_subst_energy_diffs_BB, double_subst_energy_diffs_AB, num_sb_states);
+	struct pt_result ptres = perturbation_theory_2comp(MODE_ENPT, gAA, gAB, NA, NB, hermite_cache, hermite_cache_size, &statesA, &statesB, groundstate_energy, double_subst_energy_diffs_AA, double_subst_energy_diffs_BB, double_subst_energy_diffs_AB, num_sb_states);
 	sbmf_stack_free_to_marker(memory_marker);
 
 	return ptres;

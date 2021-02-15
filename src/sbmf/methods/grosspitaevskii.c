@@ -135,22 +135,23 @@ f64 grosspitaevskii_energy(struct nlse_settings settings, const u32 coeff_count,
 		}
 	}
 
-	/* |a|^2|b|^2 terms */
+	/* |a|^4 terms within comp */
 	int_settings.userdata = &p;
 	struct quadgk_result ires;
 	for (u32 i = 0; i < comp_count; ++i) {
-		for (u32 j = 0; j < comp_count; ++j) {
-			f64 factor = 0.0;
-			if (i == j)
-				factor = 0.5*(occupations[i]-1);
-			else
-				factor = occupations[j];
+		p.coeff_a = &coeff[i*coeff_count];
+		p.coeff_b = &coeff[i*coeff_count];
+		quadgk_infinite_interval(full_energy_integrand, &int_settings, quadgk_memory, &ires);
+		E += 0.5 * g0[i*comp_count + i] * occupations[i] * (occupations[i]-1) * ires.integral;
+	}
 
-
+	/* |a|^2|b|^2 terms between comps */
+	for (u32 i = 0; i < comp_count; ++i) {
+		for (u32 j = i+1; j < comp_count; ++j) {
 			p.coeff_a = &coeff[i*coeff_count];
 			p.coeff_b = &coeff[j*coeff_count];
 			quadgk_infinite_interval(full_energy_integrand, &int_settings, quadgk_memory, &ires);
-			E += g0[i*comp_count + j] * occupations[i] * factor * ires.integral;
+			E += g0[i*comp_count + j] * occupations[i] * occupations[j] * ires.integral;
 		}
 	}
 

@@ -21,7 +21,7 @@
 #define USE_TF_GUESS 0
 #define USE_GAUSSIAN_GUESS 0
 #define USE_RANDOM_GUESS 0
-#define COMPONENT_COUNT 1
+#define COMPONENT_COUNT 2
 
 //#define PERTURBATION(x) 2*gaussian(x, 0, 0.2)
 #define PERTURBATION(x) 0.0
@@ -141,7 +141,7 @@ void expnx(f64* out, f64* in, u32 len, void* p) {
 
 
 int main() {
-	//OMEGA = 1.0;
+	OMEGA = 1.0;
 	sbmf_set_log_callback(log_callback);
 	sbmf_init();
 
@@ -216,7 +216,7 @@ int main() {
 
 	nlse_write_to_binary_file("outbin", res);
 
-#if 0
+#if 1
 	{
 		const u32 N = 256;
 		plot_init(800, 600, "gp2c");
@@ -323,7 +323,7 @@ int main() {
 	}
 #endif
 
-#if 0
+#if 1
 	{
 		struct pt_result ptres;
 		if (component_count == 2)

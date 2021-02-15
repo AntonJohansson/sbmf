@@ -902,7 +902,7 @@ static struct pt_result perturbation_theory_2comp(enum pt_mode mode, f64 gAA, f6
 							&statesB->eigenvectors[0*num_sb_states],
 							num_sb_states);
 
-				f64 Ediff = double_subst_energies_AB[0] - double_subst_energies_BB[m*num_sb_states + n];
+				f64 Ediff = double_subst_energies_AB[0] - double_subst_energies_AB[m*num_sb_states + n];
 
 				pt2_cache[PT2_CACHE_INDEX(m-1,n-1)] = me/Ediff;
 

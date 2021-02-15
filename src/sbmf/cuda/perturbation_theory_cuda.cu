@@ -948,9 +948,11 @@ static struct pt_result perturbation_theory_2comp(enum pt_mode mode, f64 gAA, f6
 		f64 E_m0_n0 = 0.0;
 		{
 			{
-#pragma omp parallel for reduction(+: E_m0_n0)
+#pragma omp parallel for collapse(2) reduction(+: E_m0_n0)
 				for (u32 m = 1; m < num_sb_states; ++m) {
 					for (u32 n = 1; n < num_sb_states; ++n) {
+						if (mode == MODE_ENPT && m == n)
+							continue;
 
 						f64 sumA = 0;
 						f64 sumB = 0;
@@ -998,11 +1000,13 @@ static struct pt_result perturbation_theory_2comp(enum pt_mode mode, f64 gAA, f6
 
 		f64 E_mn_pq = 0;
 		{
-#pragma omp parallel for reduction(+: E_mn_pq)
+#pragma omp parallel for collapse(4) reduction(+: E_mn_pq)
 			for (u32 m = 1; m < num_sb_states; ++m) {
 				for (u32 n = 1; n < num_sb_states; ++n) {
 					for (u32 p = 1; p < num_sb_states; ++p) {
 						for (u32 q = 1; q < num_sb_states; ++q) {
+							if (mode == MODE_ENPT && m == p && n == q)
+								continue;
 							const f64 tmn = pt2_cache[PT2_CACHE_INDEX(m-1, n-1)];
 							const f64 tpq = pt2_cache[PT2_CACHE_INDEX(p-1, q-1)];
 							const f64 v_mn_pq = gAB * V_closed(hermite_cache,

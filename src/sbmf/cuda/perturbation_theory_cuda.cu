@@ -854,14 +854,16 @@ static struct pt_result perturbation_theory_1comp(enum pt_mode mode, f64 g, i64 
 }
 
 static struct pt_result perturbation_theory_2comp(enum pt_mode mode, f64 gAA, f64 gAB, i64 NA, i64 NB, const f64* hermite_cache, const u32 hermite_cache_size, const struct eigen_result_real* statesA, const struct eigen_result_real* statesB,
-		const f64 groundstate_energy,
+		const f64 groundstate_energy_AA,
+		const f64 groundstate_energy_BB,
+		const f64 groundstate_energy_AB,
 		const f64* double_subst_energy_diffs_AA,
 		const f64* double_subst_energy_diffs_BB,
 		const f64* double_subst_energy_diffs_AB,
 		const u32 num_sb_states) {
 
-	struct pt_result res_A = perturbation_theory_1comp(mode, gAA, NA, hermite_cache, hermite_cache_size, statesA, groundstate_energy, double_subst_energy_diffs_AA, num_sb_states);
-	struct pt_result res_B = perturbation_theory_1comp(mode, gAA, NB, hermite_cache, hermite_cache_size, statesB, groundstate_energy, double_subst_energy_diffs_BB, num_sb_states);
+	struct pt_result res_A = perturbation_theory_1comp(mode, gAA, NA, hermite_cache, hermite_cache_size, statesA, groundstate_energy_AA, double_subst_energy_diffs_AA, num_sb_states);
+	struct pt_result res_B = perturbation_theory_1comp(mode, gAA, NB, hermite_cache, hermite_cache_size, statesB, groundstate_energy_BB, double_subst_energy_diffs_BB, num_sb_states);
 
 	sbmf_log_info("Starting zeroth order PT");
 	f64 E0 = res_A.E0 + res_B.E0;
@@ -1192,7 +1194,9 @@ struct pt_result rspt_2comp_cuda_new(struct nlse_settings* settings, struct nlse
 		}
 	}
 
-	const f64 groundstate_energy = NA*statesA.eigenvalues[0] + NB*statesB.eigenvalues[0];
+	const f64 groundstate_energy_AA = NA*statesA.eigenvalues[0];
+	const f64 groundstate_energy_BB = NB*statesB.eigenvalues[0];
+	const f64 groundstate_energy_AB = NA*statesA.eigenvalues[0] + NB*statesB.eigenvalues[0];
 
 	/* Energies of double substitution states including the zero states */
 	f64 double_subst_energies_AA[size2_cuda(num_sb_states-1)];
@@ -1211,7 +1215,11 @@ struct pt_result rspt_2comp_cuda_new(struct nlse_settings* settings, struct nlse
 		}
 	}
 
-	struct pt_result ptres = perturbation_theory_2comp(MODE_RSPT, gAA, gAB, NA, NB, hermite_cache, hermite_cache_size, &statesA, &statesB, groundstate_energy, double_subst_energies_AA, double_subst_energies_BB, double_subst_energies_AB, num_sb_states);
+	struct pt_result ptres = perturbation_theory_2comp(MODE_RSPT, gAA, gAB, NA, NB, hermite_cache, hermite_cache_size, &statesA, &statesB,
+			groundstate_energy_AA,
+			groundstate_energy_BB,
+			groundstate_energy_AB,
+			double_subst_energies_AA, double_subst_energies_BB, double_subst_energies_AB, num_sb_states);
 	sbmf_stack_free_to_marker(memory_marker);
 
 	return ptres;
@@ -1400,7 +1408,11 @@ struct pt_result enpt_2comp_cuda_new(struct nlse_settings* settings, struct nlse
 		}
 	}
 
-	struct pt_result ptres = perturbation_theory_2comp(MODE_RSPT, gAA, gAB, NA, NB, hermite_cache, hermite_cache_size, &statesA, &statesB, groundstate_energy, double_subst_energy_diffs_AA, double_subst_energy_diffs_BB, double_subst_energy_diffs_AB, num_sb_states);
+	struct pt_result ptres = perturbation_theory_2comp(MODE_ENPT, gAA, gAB, NA, NB, hermite_cache, hermite_cache_size, &statesA, &statesB,
+			groundstate_energy,
+			groundstate_energy,
+			groundstate_energy,
+			double_subst_energy_diffs_AA, double_subst_energy_diffs_BB, double_subst_energy_diffs_AB, num_sb_states);
 	sbmf_stack_free_to_marker(memory_marker);
 
 	return ptres;

@@ -676,7 +676,7 @@ static inline f64 en_nhn_new(f64* phi_m, f64* phi_n, const u32 num_sb_states, nl
 //	};
 //}
 //
-static struct pt_result perturbation_theory_1comp(enum pt_mode mode, f64 g, i64 N, const f64* hermite_cache, const u32 hermite_cache_size, const struct eigen_result_real* states, const f64* double_subst_energies, const u32 num_sb_states) {
+static struct pt_result perturbation_theory_1comp(enum pt_mode mode, f64 g, i64 N, const f64* hermite_cache, const u32 hermite_cache_size, const struct eigen_result_real* states, const f64 groundstate_energy, const f64* double_subst_energy_diffs, const u32 num_sb_states) {
 	f64* device_states;
 	cudaMalloc(&device_states, num_sb_states*num_sb_states*sizeof(f64));
 	cudaMemcpy(device_states, states->eigenvectors, num_sb_states*num_sb_states*sizeof(f64), cudaMemcpyHostToDevice);
@@ -687,7 +687,7 @@ static struct pt_result perturbation_theory_1comp(enum pt_mode mode, f64 g, i64 
 
 	/* Zeroth order PT */
 	sbmf_log_info("Starting zeroth order PT");
-	f64 E0 = double_subst_energies[index2_cuda(0,0)];
+	f64 E0 = groundstate_energy;
 	sbmf_log_info("\tE0: %e", E0);
 
 	/* This particular integral shows up in zeroth and third order rspt */
@@ -729,7 +729,7 @@ static struct pt_result perturbation_theory_1comp(enum pt_mode mode, f64 g, i64 
 				const f64 factor = (m == n) ? 1.0/sqrt(2.0) : 1.0;
 				const f64 me = factor*g*sqrt(N*(N-1))*v_mn_00;
 
-				const f64 Ediff = E0 - double_subst_energies[index2_cuda(m,n)];
+				const f64 Ediff = double_subst_energy_diffs[index2_cuda(m-1,n-1)];
 
 				pt2_cache[index2_cuda(m-1,n-1)] = me/Ediff;
 
@@ -853,10 +853,15 @@ static struct pt_result perturbation_theory_1comp(enum pt_mode mode, f64 g, i64 
 	};
 }
 
-static struct pt_result perturbation_theory_2comp(enum pt_mode mode, f64 gAA, f64 gAB, i64 NA, i64 NB, const f64* hermite_cache, const u32 hermite_cache_size, const struct eigen_result_real* statesA, const struct eigen_result_real* statesB, const f64* double_subst_energies_AA, const f64* double_subst_energies_BB, const f64* double_subst_energies_AB, const u32 num_sb_states) {
+static struct pt_result perturbation_theory_2comp(enum pt_mode mode, f64 gAA, f64 gAB, i64 NA, i64 NB, const f64* hermite_cache, const u32 hermite_cache_size, const struct eigen_result_real* statesA, const struct eigen_result_real* statesB,
+		const f64 groundstate_energy,
+		const f64* double_subst_energy_diffs_AA,
+		const f64* double_subst_energy_diffs_BB,
+		const f64* double_subst_energy_diffs_AB,
+		const u32 num_sb_states) {
 
-	struct pt_result res_A = perturbation_theory_1comp(mode, gAA, NA, hermite_cache, hermite_cache_size, statesA, double_subst_energies_AA, num_sb_states);
-	struct pt_result res_B = perturbation_theory_1comp(mode, gAA, NB, hermite_cache, hermite_cache_size, statesB, double_subst_energies_BB, num_sb_states);
+	struct pt_result res_A = perturbation_theory_1comp(mode, gAA, NA, hermite_cache, hermite_cache_size, statesA, groundstate_energy, double_subst_energy_diffs_AA, num_sb_states);
+	struct pt_result res_B = perturbation_theory_1comp(mode, gAA, NB, hermite_cache, hermite_cache_size, statesB, groundstate_energy, double_subst_energy_diffs_BB, num_sb_states);
 
 	sbmf_log_info("Starting zeroth order PT");
 	f64 E0 = res_A.E0 + res_B.E0;
@@ -902,7 +907,7 @@ static struct pt_result perturbation_theory_2comp(enum pt_mode mode, f64 gAA, f6
 							&statesB->eigenvectors[0*num_sb_states],
 							num_sb_states);
 
-				f64 Ediff = double_subst_energies_AB[0] - double_subst_energies_AB[m*num_sb_states + n];
+				const f64 Ediff = double_subst_energy_diffs_AB[(m-1)*(num_sb_states-1) + (n-1)];
 
 				pt2_cache[PT2_CACHE_INDEX(m-1,n-1)] = me/Ediff;
 
@@ -1059,15 +1064,16 @@ struct pt_result rspt_1comp_cuda_new(struct nlse_settings* settings, struct nlse
 	}
 
 
+	f64 groundstate_energy = N*states.eigenvalues[0];
 	/* Energies of double substitution states including the zero states */
-	f64 double_subst_energies[size2_cuda(num_sb_states)];
-	for (u32 m = 0; m < num_sb_states; ++m) {
+	f64 double_subst_energy_diffs[size2_cuda(num_sb_states-1)];
+	for (u32 m = 1; m < num_sb_states; ++m) {
 		for (u32 n = m; n < num_sb_states; ++n) {
-			double_subst_energies[index2_cuda(m,n)] = (N-2)*states.eigenvalues[0] + states.eigenvalues[m] + states.eigenvalues[n];
+			double_subst_energy_diffs[index2_cuda(m-1,n-1)] = 2*states.eigenvalues[0] - states.eigenvalues[m] + states.eigenvalues[n];
 		}
 	}
 
-	struct pt_result ptres = perturbation_theory_1comp(MODE_RSPT, g, N, hermite_cache, hermite_cache_size, &states, double_subst_energies, num_sb_states);
+	struct pt_result ptres = perturbation_theory_1comp(MODE_RSPT, g, N, hermite_cache, hermite_cache_size, &states, groundstate_energy, double_subst_energy_diffs, num_sb_states);
 	sbmf_stack_free_to_marker(memory_marker);
 
 	return ptres;
@@ -1105,7 +1111,7 @@ struct pt_result enpt_1comp_cuda_new(struct nlse_settings* settings, struct nlse
 	}
 
 	/* Energies of double substitution states including the zero states */
-	f64 double_subst_energies[size2_cuda(num_sb_states)];
+	f64 double_subst_energy_diffs[size2_cuda(num_sb_states-1)];
 
 	const f64 v_00_00 = V_closed(hermite_cache,
 			&states.eigenvectors[0],
@@ -1113,7 +1119,7 @@ struct pt_result enpt_1comp_cuda_new(struct nlse_settings* settings, struct nlse
 			&states.eigenvectors[0],
 			&states.eigenvectors[0],
 			num_sb_states);
-	double_subst_energies[index2_cuda(0,0)] = N*en_nhn_new(&states.eigenvectors[0*num_sb_states], &states.eigenvectors[0*num_sb_states], num_sb_states, settings->spatial_pot_perturbation) + 0.5*g*N*(N-1)*v_00_00;
+	f64 groundstate_energy = N*en_nhn_new(&states.eigenvectors[0*num_sb_states], &states.eigenvectors[0*num_sb_states], num_sb_states, settings->spatial_pot_perturbation) + 0.5*g*N*(N-1)*v_00_00;
 
 	for (u32 m = 1; m < num_sb_states; ++m) {
 		for (u32 n = m; n < num_sb_states; ++n) {
@@ -1138,16 +1144,16 @@ struct pt_result enpt_1comp_cuda_new(struct nlse_settings* settings, struct nlse
 
 			const f64 dmn = (m == n) ? 1.0 : 0.0;
 			f64 energy =
-				(N-2)*en_nhn_new(&states.eigenvectors[0*num_sb_states], &states.eigenvectors[0*num_sb_states], num_sb_states, settings->spatial_pot_perturbation)
-				+en_nhn_new(&states.eigenvectors[m*num_sb_states], &states.eigenvectors[m*num_sb_states], num_sb_states, settings->spatial_pot_perturbation)
-				+en_nhn_new(&states.eigenvectors[n*num_sb_states], &states.eigenvectors[n*num_sb_states], num_sb_states, settings->spatial_pot_perturbation)
-				+ g*((2.0-dmn)*v_mn_mn + 2.0*(N-2)*(v_m0_m0+v_n0_n0) + 0.5*(N-2)*(N-3)*v_00_00);
+				2*en_nhn_new(&states.eigenvectors[0*num_sb_states], &states.eigenvectors[0*num_sb_states], num_sb_states, settings->spatial_pot_perturbation)
+				-en_nhn_new(&states.eigenvectors[m*num_sb_states], &states.eigenvectors[m*num_sb_states], num_sb_states, settings->spatial_pot_perturbation)
+				-en_nhn_new(&states.eigenvectors[n*num_sb_states], &states.eigenvectors[n*num_sb_states], num_sb_states, settings->spatial_pot_perturbation)
+				- g*((2.0-dmn)*v_mn_mn + 2.0*(N-2)*(v_m0_m0+v_n0_n0) - (2*N-3)*v_00_00);
 
-			double_subst_energies[index2_cuda(m,n)] = energy;
+			double_subst_energy_diffs[index2_cuda(m-1,n-1)] = energy;
 		}
 	}
 
-	struct pt_result ptres = perturbation_theory_1comp(MODE_ENPT, g, N, hermite_cache, hermite_cache_size, &states, double_subst_energies, num_sb_states);
+	struct pt_result ptres = perturbation_theory_1comp(MODE_ENPT, g, N, hermite_cache, hermite_cache_size, &states, groundstate_energy, double_subst_energy_diffs, num_sb_states);
 	sbmf_stack_free_to_marker(memory_marker);
 
 	return ptres;
@@ -1186,25 +1192,215 @@ struct pt_result rspt_2comp_cuda_new(struct nlse_settings* settings, struct nlse
 		}
 	}
 
+	const f64 groundstate_energy = NA*statesA.eigenvalues[0] + NB*statesB.eigenvalues[0];
 
 	/* Energies of double substitution states including the zero states */
-	f64 double_subst_energies_AA[size2_cuda(num_sb_states)];
-	f64 double_subst_energies_BB[size2_cuda(num_sb_states)];
-	for (u32 m = 0; m < num_sb_states; ++m) {
+	f64 double_subst_energies_AA[size2_cuda(num_sb_states-1)];
+	f64 double_subst_energies_BB[size2_cuda(num_sb_states-1)];
+	for (u32 m = 1; m < num_sb_states; ++m) {
 		for (u32 n = m; n < num_sb_states; ++n) {
-			double_subst_energies_AA[index2_cuda(m,n)] = (NA-2)*statesA.eigenvalues[0] + statesA.eigenvalues[m] + statesA.eigenvalues[n];
-			double_subst_energies_BB[index2_cuda(m,n)] = (NB-2)*statesA.eigenvalues[0] + statesB.eigenvalues[m] + statesB.eigenvalues[n];
+			double_subst_energies_AA[index2_cuda(m-1,n-1)] = 2*statesA.eigenvalues[0] - statesA.eigenvalues[m] - statesA.eigenvalues[n];
+			double_subst_energies_BB[index2_cuda(m-1,n-1)] = 2*statesB.eigenvalues[0] - statesB.eigenvalues[m] - statesB.eigenvalues[n];
 		}
 	}
 
-	f64 double_subst_energies_AB[num_sb_states*num_sb_states];
-	for (u32 m = 0; m < num_sb_states; ++m) {
-		for (u32 n = 0; n < num_sb_states; ++n) {
-			double_subst_energies_AB[m*num_sb_states + n] = (NA-1)*statesA.eigenvalues[0] + (NB-1)*statesB.eigenvalues[0] + statesA.eigenvalues[m] + statesB.eigenvalues[n];
+	f64 double_subst_energies_AB[(num_sb_states-1)*(num_sb_states-1)];
+	for (u32 m = 1; m < num_sb_states; ++m) {
+		for (u32 n = 1; n < num_sb_states; ++n) {
+			double_subst_energies_AB[(m-1)*(num_sb_states-1) + (n-1)] = statesA.eigenvalues[0] + statesB.eigenvalues[0] - statesA.eigenvalues[m] - statesB.eigenvalues[n];
 		}
 	}
 
-	struct pt_result ptres = perturbation_theory_2comp(MODE_RSPT, gAA, gAB, NA, NB, hermite_cache, hermite_cache_size, &statesA, &statesB, double_subst_energies_AA, double_subst_energies_BB, double_subst_energies_AB, num_sb_states);
+	struct pt_result ptres = perturbation_theory_2comp(MODE_RSPT, gAA, gAB, NA, NB, hermite_cache, hermite_cache_size, &statesA, &statesB, groundstate_energy, double_subst_energies_AA, double_subst_energies_BB, double_subst_energies_AB, num_sb_states);
+	sbmf_stack_free_to_marker(memory_marker);
+
+	return ptres;
+}
+
+struct pt_result enpt_2comp_cuda_new(struct nlse_settings* settings, struct nlse_result res, u32 compA, u32 compB, f64 gAA, f64 gAB, i64 NA, i64 NB) {
+	/*
+	 * The number of single body (sb) states is equal to the number
+	 * of coefficients which is equal to the basis size
+	 */
+	const u32 num_sb_states = res.coeff_count;
+
+	/* Find all eigenstates and eigenenergies of the hamiltonian passed in */
+	struct eigen_result_real statesA, statesB;
+	statesA = find_eigenpairs_full_real(res.hamiltonian[compA]);
+	statesB = find_eigenpairs_full_real(res.hamiltonian[compB]);
+	for (u32 j = 0; j < num_sb_states; ++j) {
+		f64_normalize(&statesA.eigenvectors[j*num_sb_states], &statesA.eigenvectors[j*num_sb_states], num_sb_states);
+		f64_normalize(&statesB.eigenvectors[j*num_sb_states], &statesB.eigenvectors[j*num_sb_states], num_sb_states);
+	}
+
+	const u64 hermite_integral_count = size4_cuda(num_sb_states);
+	const u64 hermite_cache_size = sizeof(f64)*hermite_integral_count;
+	u32 memory_marker = sbmf_stack_marker();
+	f64* hermite_cache = (f64*)sbmf_stack_push(hermite_cache_size);
+	{
+		sbmf_log_info("Precomputing %ld hermite integrals", hermite_integral_count);
+		for (u32 i = 0; i < num_sb_states; ++i) {
+			for (u32 j = i; j < num_sb_states; ++j) {
+				for (u32 k = j; k < num_sb_states; ++k) {
+					for (u32 l = k; l < num_sb_states; ++l) {
+						hermite_cache[index4_cuda(i,j,k,l)] = hermite_integral_4_cuda(i,j,k,l);
+					}
+				}
+			}
+		}
+	}
+
+	const f64 v_AA_00_00 = V_closed(hermite_cache,
+			&statesA.eigenvectors[0],
+			&statesA.eigenvectors[0],
+			&statesA.eigenvectors[0],
+			&statesA.eigenvectors[0],
+			num_sb_states);
+	const f64 v_BB_00_00 = V_closed(hermite_cache,
+			&statesB.eigenvectors[0],
+			&statesB.eigenvectors[0],
+			&statesB.eigenvectors[0],
+			&statesB.eigenvectors[0],
+			num_sb_states);
+	const f64 v_AB_00_00 = V_closed(hermite_cache,
+			&statesA.eigenvectors[0],
+			&statesB.eigenvectors[0],
+			&statesA.eigenvectors[0],
+			&statesB.eigenvectors[0],
+			num_sb_states);
+	const f64 groundstate_energy =
+		NA*en_nhn_new(&statesA.eigenvectors[0], &statesA.eigenvectors[0], num_sb_states, settings->spatial_pot_perturbation) + 0.5*gAA*NA*(NA-1)*v_AA_00_00
+		+ NB*en_nhn_new(&statesB.eigenvectors[0], &statesB.eigenvectors[0], num_sb_states, settings->spatial_pot_perturbation) + 0.5*gAA*NB*(NB-1)*v_BB_00_00
+		+ gAB*NA*NB*v_AB_00_00;
+
+	/* Energies of double substitution states including the zero states */
+	f64 double_subst_energy_diffs_AA[size2_cuda(num_sb_states-1)];
+	f64 double_subst_energy_diffs_BB[size2_cuda(num_sb_states-1)];
+	for (u32 m = 1; m < num_sb_states; ++m) {
+		for (u32 n = m; n < num_sb_states; ++n) {
+			f64 delta_mn = (m == n) ? 1.0 : 0.0;
+			const f64 v_AA_mn_mn = V_closed(hermite_cache,
+					&statesA.eigenvectors[m*num_sb_states],
+					&statesA.eigenvectors[n*num_sb_states],
+					&statesA.eigenvectors[m*num_sb_states],
+					&statesA.eigenvectors[n*num_sb_states],
+					num_sb_states);
+			const f64 v_AA_m0_m0 = V_closed(hermite_cache,
+					&statesA.eigenvectors[m*num_sb_states],
+					&statesA.eigenvectors[0*num_sb_states],
+					&statesA.eigenvectors[m*num_sb_states],
+					&statesA.eigenvectors[0*num_sb_states],
+					num_sb_states);
+			const f64 v_AA_n0_n0 = (m == n) ? v_AA_m0_m0 : V_closed(hermite_cache,
+					&statesA.eigenvectors[n*num_sb_states],
+					&statesA.eigenvectors[0*num_sb_states],
+					&statesA.eigenvectors[n*num_sb_states],
+					&statesA.eigenvectors[0*num_sb_states],
+					num_sb_states);
+			const f64 v_AB_m0_m0 = V_closed(hermite_cache,
+					&statesA.eigenvectors[m*num_sb_states],
+					&statesB.eigenvectors[0*num_sb_states],
+					&statesA.eigenvectors[m*num_sb_states],
+					&statesB.eigenvectors[0*num_sb_states],
+					num_sb_states);
+			const f64 v_AB_n0_n0 = (m == n) ? v_AB_m0_m0 : V_closed(hermite_cache,
+					&statesA.eigenvectors[n*num_sb_states],
+					&statesB.eigenvectors[0*num_sb_states],
+					&statesA.eigenvectors[n*num_sb_states],
+					&statesB.eigenvectors[0*num_sb_states],
+					num_sb_states);
+			double_subst_energy_diffs_AA[index2_cuda(m-1,n-1)] =
+				  2*en_nhn_new(&statesA.eigenvectors[0], &statesA.eigenvectors[0], num_sb_states, settings->spatial_pot_perturbation)
+				  - en_nhn_new(&statesA.eigenvectors[m*num_sb_states], &statesA.eigenvectors[m*num_sb_states], num_sb_states, settings->spatial_pot_perturbation)
+				  - en_nhn_new(&statesA.eigenvectors[n*num_sb_states], &statesA.eigenvectors[n*num_sb_states], num_sb_states, settings->spatial_pot_perturbation)
+				  - gAA*((2.0-delta_mn)*v_AA_mn_mn + 2.0*(NA-2)*(v_AA_m0_m0 + v_AA_n0_n0) - (2.0*NA-3.0)*v_AA_00_00)
+				  - gAB*NB*(v_AB_m0_m0 + v_AB_n0_n0 - 2.0*v_AB_00_00);
+
+
+			const f64 v_BB_mn_mn = V_closed(hermite_cache,
+					&statesB.eigenvectors[m*num_sb_states],
+					&statesB.eigenvectors[n*num_sb_states],
+					&statesB.eigenvectors[m*num_sb_states],
+					&statesB.eigenvectors[n*num_sb_states],
+					num_sb_states);
+			const f64 v_BB_m0_m0 = V_closed(hermite_cache,
+					&statesB.eigenvectors[m*num_sb_states],
+					&statesB.eigenvectors[0*num_sb_states],
+					&statesB.eigenvectors[m*num_sb_states],
+					&statesB.eigenvectors[0*num_sb_states],
+					num_sb_states);
+			const f64 v_BB_n0_n0 = (m == n) ? v_AA_m0_m0 : V_closed(hermite_cache,
+					&statesB.eigenvectors[n*num_sb_states],
+					&statesB.eigenvectors[0*num_sb_states],
+					&statesB.eigenvectors[n*num_sb_states],
+					&statesB.eigenvectors[0*num_sb_states],
+					num_sb_states);
+			const f64 v_AB_0m_0m = V_closed(hermite_cache,
+					&statesA.eigenvectors[0*num_sb_states],
+					&statesB.eigenvectors[m*num_sb_states],
+					&statesA.eigenvectors[0*num_sb_states],
+					&statesB.eigenvectors[m*num_sb_states],
+					num_sb_states);
+			const f64 v_AB_0n_0n = (m == n) ? v_AB_m0_m0 : V_closed(hermite_cache,
+					&statesA.eigenvectors[0*num_sb_states],
+					&statesB.eigenvectors[n*num_sb_states],
+					&statesA.eigenvectors[0*num_sb_states],
+					&statesB.eigenvectors[n*num_sb_states],
+					num_sb_states);
+			double_subst_energy_diffs_BB[index2_cuda(m-1,n-1)] =
+				  2*en_nhn_new(&statesB.eigenvectors[0], &statesB.eigenvectors[0], num_sb_states, settings->spatial_pot_perturbation)
+				  - en_nhn_new(&statesB.eigenvectors[m*num_sb_states], &statesB.eigenvectors[m*num_sb_states], num_sb_states, settings->spatial_pot_perturbation)
+				  - en_nhn_new(&statesB.eigenvectors[n*num_sb_states], &statesB.eigenvectors[n*num_sb_states], num_sb_states, settings->spatial_pot_perturbation)
+				  - gAA*((2.0-delta_mn)*v_BB_mn_mn + 2.0*(NB-2)*(v_BB_m0_m0 + v_BB_n0_n0) - (2.0*NB-3.0)*v_BB_00_00)
+				  - gAB*NB*(v_AB_0m_0m + v_AB_0n_0n - 2.0*v_AB_00_00);
+		}
+	}
+
+	f64 double_subst_energy_diffs_AB[(num_sb_states-1)*(num_sb_states-1)];
+	for (u32 m = 1; m < num_sb_states; ++m) {
+		for (u32 n = 1; n < num_sb_states; ++n) {
+			const f64 v_AA_m0_m0 = V_closed(hermite_cache,
+					&statesA.eigenvectors[m*num_sb_states],
+					&statesA.eigenvectors[0*num_sb_states],
+					&statesA.eigenvectors[m*num_sb_states],
+					&statesA.eigenvectors[0*num_sb_states],
+					num_sb_states);
+			const f64 v_BB_n0_n0 = V_closed(hermite_cache,
+					&statesB.eigenvectors[n*num_sb_states],
+					&statesB.eigenvectors[0*num_sb_states],
+					&statesB.eigenvectors[n*num_sb_states],
+					&statesB.eigenvectors[0*num_sb_states],
+					num_sb_states);
+			const f64 v_AB_mn_mn = V_closed(hermite_cache,
+					&statesA.eigenvectors[m*num_sb_states],
+					&statesB.eigenvectors[n*num_sb_states],
+					&statesA.eigenvectors[m*num_sb_states],
+					&statesB.eigenvectors[n*num_sb_states],
+					num_sb_states);
+			const f64 v_AB_m0_m0 = V_closed(hermite_cache,
+					&statesA.eigenvectors[m*num_sb_states],
+					&statesB.eigenvectors[0*num_sb_states],
+					&statesA.eigenvectors[m*num_sb_states],
+					&statesB.eigenvectors[0*num_sb_states],
+					num_sb_states);
+			const f64 v_AB_0n_0n = V_closed(hermite_cache,
+					&statesA.eigenvectors[0*num_sb_states],
+					&statesB.eigenvectors[n*num_sb_states],
+					&statesA.eigenvectors[0*num_sb_states],
+					&statesB.eigenvectors[n*num_sb_states],
+					num_sb_states);
+			double_subst_energy_diffs_AB[(m-1)*(num_sb_states-1) + (n-1)] =
+				    en_nhn_new(&statesA.eigenvectors[0], &statesA.eigenvectors[0], num_sb_states, settings->spatial_pot_perturbation)
+				  - en_nhn_new(&statesA.eigenvectors[m*num_sb_states], &statesA.eigenvectors[m*num_sb_states], num_sb_states, settings->spatial_pot_perturbation)
+				  - gAA*(2.0*(NA-1)*v_AA_m0_m0 - (NA-1)*v_AA_00_00)
+				  + en_nhn_new(&statesB.eigenvectors[0], &statesB.eigenvectors[0], num_sb_states, settings->spatial_pot_perturbation)
+				  - en_nhn_new(&statesB.eigenvectors[n*num_sb_states], &statesB.eigenvectors[n*num_sb_states], num_sb_states, settings->spatial_pot_perturbation)
+				  - gAA*(2.0*(NB-1)*v_BB_n0_n0 - (NB-1)*v_BB_00_00)
+				  - gAB*(v_AB_mn_mn + (NB-1)*v_AB_m0_m0 + (NA-1)*v_AB_0n_0n - (NA + NB - 1)*v_AB_00_00);
+		}
+	}
+
+	struct pt_result ptres = perturbation_theory_2comp(MODE_RSPT, gAA, gAB, NA, NB, hermite_cache, hermite_cache_size, &statesA, &statesB, groundstate_energy, double_subst_energy_diffs_AA, double_subst_energy_diffs_BB, double_subst_energy_diffs_AB, num_sb_states);
 	sbmf_stack_free_to_marker(memory_marker);
 
 	return ptres;

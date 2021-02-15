@@ -1,5 +1,7 @@
 #define SQRT_PI_OVER_2 (1.2533141373155002512078826424055226265034933703049691583149617881)
 
+f64 ho_K(const u32 n);
+
 __host__
 static inline f128 hermite_integral_3_cuda(u32 i, u32 j, u32 k) {
 	if ((i+j+k) % 2 != 0)
@@ -25,7 +27,7 @@ static inline f64 hermite_integral_4_cuda(u32 i, u32 j, u32 k, u32 l) {
 		f128 b2 = n_choose_k_cuda(j, m);
 		f128 m_fact = factorial_128_cuda(m);
 
-		sum += (ho_K_cuda(i)*b1)*(ho_K_cuda(j)*b2)*(ho_K_cuda(k)*m_fact)*(ho_K_cuda(l)*pow(2.0,m))*integral;
+		sum += (ho_K(i)*b1)*(ho_K(j)*b2)*(ho_K(k)*m_fact)*(ho_K(l)*pow(2.0,m))*integral;
 	}
 
 	return SQRT_PI_OVER_2*sum;

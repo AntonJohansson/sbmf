@@ -141,7 +141,7 @@ void expnx(f64* out, f64* in, u32 len, void* p) {
 
 
 int main() {
-	OMEGA = 1.0;
+	OMEGA = 0.1;
 	sbmf_set_log_callback(log_callback);
 	sbmf_init();
 
@@ -193,7 +193,7 @@ int main() {
 		.max_quadgk_iters = 500,
 		.error_tol = 1e-14,
 
-        .num_basis_funcs = 4,
+        .num_basis_funcs = 16,
 		.basis = ho_basis,
 
 		.zero_threshold = 1e-10,
@@ -211,8 +211,6 @@ int main() {
 	struct nlse_result res = grosspitaevskii(settings, component_count, occupations, guesses, g0);
 	f64 Efull = grosspitaevskii_energy(settings, res.coeff_count, component_count, res.coeff, occupations, g0);
 	printf("\nfull energy: %lf\n", Efull);
-	printf("\nfull energy per particle: %lf\n", Efull/((f64)NA+(f64)NB));
-
 
 	nlse_write_to_binary_file("outbin", res);
 

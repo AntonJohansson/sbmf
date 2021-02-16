@@ -808,8 +808,14 @@ struct pt_result enpt_2comp_cuda_new(struct nlse_settings* settings, struct nlse
 			&statesA.eigenvectors[0],
 			&statesB.eigenvectors[0],
 			num_sb_states);
+	{
+		f64 f1 = NA*en_nhn_new(&statesA.eigenvectors[0], &statesA.eigenvectors[0], num_sb_states, settings->spatial_pot_perturbation) + 0.5*gAA*NA*(NA-1)*v_AA_00_00;
+		f64 f2 = NB*en_nhn_new(&statesB.eigenvectors[0], &statesB.eigenvectors[0], num_sb_states, settings->spatial_pot_perturbation) + 0.5*gAA*NB*(NB-1)*v_BB_00_00;
+		f64 f3 = gAB*NA*NB*v_AB_00_00;
+		sbmf_log_info("%lf + %lf + %lf = %lf", f1, f2, f3, f1+f2+f3);
+	}
 	const f64 groundstate_energy =
-		NA*en_nhn_new(&statesA.eigenvectors[0], &statesA.eigenvectors[0], num_sb_states, settings->spatial_pot_perturbation) + 0.5*gAA*NA*(NA-1)*v_AA_00_00
+		  NA*en_nhn_new(&statesA.eigenvectors[0], &statesA.eigenvectors[0], num_sb_states, settings->spatial_pot_perturbation) + 0.5*gAA*NA*(NA-1)*v_AA_00_00
 		+ NB*en_nhn_new(&statesB.eigenvectors[0], &statesB.eigenvectors[0], num_sb_states, settings->spatial_pot_perturbation) + 0.5*gAA*NB*(NB-1)*v_BB_00_00
 		+ gAB*NA*NB*v_AB_00_00;
 

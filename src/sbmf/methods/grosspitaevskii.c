@@ -97,14 +97,11 @@ void full_energy_integrand(f64* out, f64* in, u32 len, void* data) {
 
 f64 grosspitaevskii_energy(struct nlse_settings settings, const u32 coeff_count, const u32 comp_count, f64* coeff, i64* occupations, f64* g0) {
 	f64 E = 0.0;
-	f64 f1 = 0, f2 = 0, f3 = 0;
 
 	for (u32 i = 0; i < comp_count;++i) {
 		for (u32 j = 0; j < coeff_count; ++j) {
 			f64 c = fabs(coeff[i*coeff_count + j]);
 			E += occupations[i]*settings.basis.eigenval(j)*c*c;
-			if (i == 0) f1 += occupations[i]*settings.basis.eigenval(j)*c*c;
-			if (i == 1) f2 += occupations[i]*settings.basis.eigenval(j)*c*c;
 		}
 	}
 
@@ -147,9 +144,6 @@ f64 grosspitaevskii_energy(struct nlse_settings settings, const u32 coeff_count,
 		p.coeff_b = &coeff[i*coeff_count];
 		quadgk_infinite_interval(full_energy_integrand, &int_settings, quadgk_memory, &ires);
 		E += 0.5 * g0[i*comp_count + i] * occupations[i] * (occupations[i]-1) * ires.integral;
-
-		if (i == 0) f1 += 0.5 * g0[i*comp_count + i] * occupations[i] * (occupations[i]-1) * ires.integral;
-		if (i == 1) f2 += 0.5 * g0[i*comp_count + i] * occupations[i] * (occupations[i]-1) * ires.integral;
 	}
 
 	/* |a|^2|b|^2 terms between comps */
@@ -159,10 +153,8 @@ f64 grosspitaevskii_energy(struct nlse_settings settings, const u32 coeff_count,
 			p.coeff_b = &coeff[j*coeff_count];
 			quadgk_infinite_interval(full_energy_integrand, &int_settings, quadgk_memory, &ires);
 			E += g0[i*comp_count + j] * occupations[i] * occupations[j] * ires.integral;
-			f3 += g0[i*comp_count + j] * occupations[i] * occupations[j] * ires.integral;
 		}
 	}
-	sbmf_log_info("%lf + %lf + %lf = %lf", f1, f2, f3, f1+f2+f3);
 
 	return E;
 }

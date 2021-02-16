@@ -103,8 +103,8 @@ f64 grosspitaevskii_energy(struct nlse_settings settings, const u32 coeff_count,
 		for (u32 j = 0; j < coeff_count; ++j) {
 			f64 c = fabs(coeff[i*coeff_count + j]);
 			E += occupations[i]*settings.basis.eigenval(j)*c*c;
-			if (i == 0) f1 = occupations[i]*settings.basis.eigenval(j)*c*c;
-			if (i == 1) f2 = occupations[i]*settings.basis.eigenval(j)*c*c;
+			if (i == 0) f1 += occupations[i]*settings.basis.eigenval(j)*c*c;
+			if (i == 1) f2 += occupations[i]*settings.basis.eigenval(j)*c*c;
 		}
 	}
 

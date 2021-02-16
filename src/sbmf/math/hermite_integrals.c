@@ -26,5 +26,7 @@ f64 hermite_integral_4(u32 i, u32 j, u32 k, u32 l) {
 		sum += (ho_K(i)*b1)*(ho_K(j)*b2)*(ho_K(k)*m_fact)*(ho_K(l)*pow(2,m))*integral;
 	}
 
-	return SQRT_PI_OVER_2*sum;
+	const f64 one_over_sqrt_omega = 1.0/sqrt(OMEGA);
+
+	return one_over_sqrt_omega*SQRT_PI_OVER_2*sum;
 }

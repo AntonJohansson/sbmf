@@ -1,6 +1,6 @@
 f64 hermite_integral_4(u32 i, u32 j, u32 k, u32 l) {
-	if ((i+j+k+l) % 2 != 0)
-		return 0.0;
+	//if ((i+j+k+l) % 2 != 0)
+	//	return 0.0;
 
 	u32 m_max = (i < j) ? i : j;
 
@@ -12,6 +12,8 @@ f64 hermite_integral_4(u32 i, u32 j, u32 k, u32 l) {
 
 	f128 sum = 0.0;
 	for (u32 m = 0; m <= m_max; ++m) {
+		if (((i+j-2*m)+k+l) % 2 != 0)
+			continue;
 
 		f128 df1 = double_factorial_128( (i+j-2*m) + k - l - 1);
 		f128 df2 = double_factorial_128( (i+j-2*m) - k + l - 1);

@@ -1,6 +1,10 @@
+#include <fenv.h>
+
 f64 hermite_integral_4(u32 i, u32 j, u32 k, u32 l) {
 	if ((i+j+k+l) % 2 != 0)
 		return 0.0;
+
+	feclearexcept(FE_ALL_EXCEPT);
 
 	u32 m_max = (i < j) ? i : j;
 
@@ -28,6 +32,11 @@ f64 hermite_integral_4(u32 i, u32 j, u32 k, u32 l) {
 	}
 
 	const f64 sqrt_omega_over_2pi = sqrt(OMEGA/(2.0*M_PI));
+	int raised = fetestexcept(FE_ALL_EXCEPT);
+	if (raised) {
+		sbmf_log_error("FPE ERROR!!");
+		feclearexcept(FE_ALL_EXCEPT);
+	}
 	return sqrt_omega_over_2pi * sum;
 
 	//return sqrt_omega_over_2pi*sqrt(((fi/fk)*(fj/fl)))/pow(2,(i+j+k+l)/2)*sum;

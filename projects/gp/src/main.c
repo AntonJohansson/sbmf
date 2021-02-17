@@ -141,7 +141,7 @@ void expnx(f64* out, f64* in, u32 len, void* p) {
 
 
 int main() {
-	OMEGA = 0.1;
+	//OMEGA = 0.1;
 	sbmf_set_log_callback(log_callback);
 	sbmf_init();
 

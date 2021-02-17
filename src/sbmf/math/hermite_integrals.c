@@ -1,17 +1,14 @@
-#include <fenv.h>
-
 f64 hermite_integral_4(u32 i, u32 j, u32 k, u32 l) {
 	if ((i+j+k+l) % 2 != 0)
 		return 0.0;
 
-	feclearexcept(FE_ALL_EXCEPT);
-
 	u32 m_max = (i < j) ? i : j;
 
-	f128 ni = 1.0/sqrt(factorial_128(i)*pow(2,i));
-	f128 nj = 1.0/sqrt(factorial_128(j)*pow(2,j));
-	f128 nk = 1.0/sqrt(factorial_128(k)*pow(2,k));
-	f128 nl = 1.0/sqrt(factorial_128(l)*pow(2,l));
+	const f64 pi_factor = pow(OMEGA/M_PI,0.25);
+	f128 ni = pi_factor*1.0/sqrt(factorial_128(i)*pow(2,i));
+	f128 nj = pi_factor*1.0/sqrt(factorial_128(j)*pow(2,j));
+	f128 nk = pi_factor*1.0/sqrt(factorial_128(k)*pow(2,k));
+	f128 nl = pi_factor*1.0/sqrt(factorial_128(l)*pow(2,l));
 
 	f128 sum = 0.0;
 	for (u32 m = 0; m <= m_max; ++m) {
@@ -31,13 +28,9 @@ f64 hermite_integral_4(u32 i, u32 j, u32 k, u32 l) {
 		sum += (b1*ni)*(b2*nj)*(fm*nk)*(pow(2,m)*nl)*(df1*df2*df3);
 	}
 
-	const f64 sqrt_omega_over_2pi = sqrt(OMEGA/(2.0*M_PI));
-	int raised = fetestexcept(FE_ALL_EXCEPT);
-	if (raised) {
-		sbmf_log_error("FPE ERROR!!");
-		feclearexcept(FE_ALL_EXCEPT);
-	}
-	return sqrt_omega_over_2pi * sum;
+	//const f64 sqrt_omega_over_2pi = sqrt(OMEGA/(2.0*M_PI));
+	const f64 coeff = sqrt(M_PI/2.0)*1.0/sqrt(OMEGA);
+	return coeff * sum;
 
 	//return sqrt_omega_over_2pi*sqrt(((fi/fk)*(fj/fl)))/pow(2,(i+j+k+l)/2)*sum;
 }

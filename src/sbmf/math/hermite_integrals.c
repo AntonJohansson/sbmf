@@ -1,38 +1,28 @@
 f64 hermite_integral_4(u32 i, u32 j, u32 k, u32 l) {
-	//if ((i+j+k+l) % 2 != 0)
-	//	return 0.0;
+	if ((i+j+k+l) % 2 != 0)
+		return 0.0;
 
 	u32 m_max = (i < j) ? i : j;
 
-	const f64 pi_factor = pow(OMEGA/M_PI,0.25);
-	f128 ni = pi_factor*1.0/sqrt(factorial_128(i)*pow(2,i));
-	f128 nj = pi_factor*1.0/sqrt(factorial_128(j)*pow(2,j));
-	f128 nk = pi_factor*1.0/sqrt(factorial_128(k)*pow(2,k));
-	f128 nl = pi_factor*1.0/sqrt(factorial_128(l)*pow(2,l));
-
 	f128 sum = 0.0;
 	for (u32 m = 0; m <= m_max; ++m) {
-		if (((i+j-2*m)+k+l) % 2 != 0)
-			continue;
 
 		f128 df1 = double_factorial_128( (i+j-2*m) + k - l - 1);
 		f128 df2 = double_factorial_128( (i+j-2*m) - k + l - 1);
 		f128 df3 = double_factorial_128(-(i+j-2*m) + k + l - 1);
 
-		f128 b1 = n_choose_k(i,m);
-		f128 b2 = n_choose_k(j,m);
+		f128 f1 = factorial_128(m);
+		f128 f2 = factorial_128(i-m);
+		f128 f3 = factorial_128(j-m);
 
-		f128 fm = factorial_128(m);
-		//f128 f2 = factorial_128(i-m);
-		//f128 f3 = factorial_128(j-m);
-
-		//sum += (pow(2,m)/f1)*(1/f2)*(1/f3)*(df1*df2*df3);
-		sum += (b1*ni)*(b2*nj)*(fm*nk)*(pow(2,m)*nl)*(df1*df2*df3);
+		sum += (pow(2,m)/f1)*(df1/f2)*(df2/f3)*df3;
 	}
 
-	//const f64 sqrt_omega_over_2pi = sqrt(OMEGA/(2.0*M_PI));
-	const f64 coeff = sqrt(M_PI/2.0)*1.0/sqrt(OMEGA);
-	return coeff * sum;
+	const f64 sqrt_omega_over_2pi = sqrt(OMEGA/(2.0*M_PI));
+	f128 f1 = factorial_128(i);
+	f128 f2 = factorial_128(j);
+	f128 f3 = factorial_128(k);
+	f128 f4 = factorial_128(l);
 
-	//return sqrt_omega_over_2pi*sqrt(((fi/fk)*(fj/fl)))/pow(2,(i+j+k+l)/2)*sum;
+	return sqrt_omega_over_2pi*sqrt(((f1/f3)*(f2/f4)))/pow(2,(i+j+k+l)/2)*sum;
 }

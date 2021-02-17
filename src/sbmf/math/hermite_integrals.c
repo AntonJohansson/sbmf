@@ -24,5 +24,11 @@ f64 hermite_integral_4(u32 i, u32 j, u32 k, u32 l) {
 	f128 f3 = factorial_128(k);
 	f128 f4 = factorial_128(l);
 
-	return sqrt_omega_over_2pi*sqrt(((f1/f3)*(f2/f4)))/sqrt(pow(2,i+j+k+l))*sum;
+	//return sqrt_omega_over_2pi*sqrt(((f1/f3)*(f2/f4)))/pow(2,(i+j+k+l)/2)*sum;
+	return sqrt_omega_over_2pi*
+		*sqrt(f1/pow(2,i))
+		*sqrt(f2/pow(2,j))
+		*sqrt(f3/pow(2,k))
+		*sqrt(f4/pow(2,l))
+		*sum;
 }

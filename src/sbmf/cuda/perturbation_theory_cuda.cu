@@ -104,17 +104,16 @@ static void rspt_3_mnpq_2comp(enum pt_mode mode, f64 g, const u32 num_sb_states,
 	if (k0 == k1) {
 		if (mode == MODE_RSPT)
 			factor = 1.0;
-		else if (mode == MODE_ENPT)
+		else if (mode == MODE_ENPT) {
+			output[k] = 0;
 			return;
+		}
 	}
 
 	const u32 m = k0 % (num_sb_states-1) + 1;
 	const u32 n = k0 / (num_sb_states-1) + 1;
 	const u32 p = k1 % (num_sb_states-1) + 1;
 	const u32 q = k1 / (num_sb_states-1) + 1;
-
-	if (mode == MODE_ENPT && m == p && n == q)
-		return;
 
 #define PT2_CACHE_INDEX(i, j) \
 	(i)*(num_sb_states-1) + (j)

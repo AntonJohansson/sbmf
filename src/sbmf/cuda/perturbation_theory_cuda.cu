@@ -15,7 +15,10 @@ static inline f64 V_closed(const f64* cache, const f64* phi_a, const f64* phi_b,
 		for (u32 b = 0; b < size; ++b) {
 			for (u32 c = 0; c < size; ++c) {
 				for (u32 d = 0; d < size; ++d) {
-					f64 L = phi_a[a]*phi_b[b]*phi_c[c]*phi_d[d];//*ho_K(a)*ho_K(b)*ho_K(c)*ho_K(d);
+					if ((a+b+c+d) % 2 != 0)
+						continue;
+
+					f64 L = phi_a[a]*phi_b[b]*phi_c[c]*phi_d[d];
 					if (fabs(L) < 1e-10)
 						continue;
 					f64 integral = cache[index4_cuda(a,b,c,d)];
@@ -59,10 +62,13 @@ static void rspt_3_mnpq_1comp(enum pt_mode mode, f64 g, const u32 num_sb_states,
 
 	f64 factor = 2.0;
 	if (k0 == k1) {
-		if (mode == MODE_RSPT)
+		if (mode == MODE_RSPT) {
 			factor = 1.0;
-		else if (mode == MODE_ENPT)
+		}
+		else if (mode == MODE_ENPT) {
+			output[k] = 0;
 			return;
+		}
 	}
 
 	u32 m, n;
@@ -102,8 +108,9 @@ static void rspt_3_mnpq_2comp(enum pt_mode mode, f64 g, const u32 num_sb_states,
 
 	f64 factor = 2.0;
 	if (k0 == k1) {
-		if (mode == MODE_RSPT)
+		if (mode == MODE_RSPT) {
 			factor = 1.0;
+		}
 		else if (mode == MODE_ENPT) {
 			output[k] = 0;
 			return;

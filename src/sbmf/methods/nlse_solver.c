@@ -114,7 +114,8 @@ struct nlse_result nlse_solver(struct nlse_settings settings, const u32 componen
 		.component_count = component_count,
 		.coeff_count = N,
 		.coeff 		 = sbmf_stack_push(component_count*(N*sizeof(f64))),
-		.error 		 = sbmf_stack_push(component_count*sizeof(f64)),
+		.abs_error 	 = sbmf_stack_push(component_count*sizeof(f64)),
+		.rel_error 	 = sbmf_stack_push(component_count*sizeof(f64)),
 		.energy 	 = sbmf_stack_push(component_count*sizeof(f64)),
 		.residual 	 = sbmf_stack_push(component_count*sizeof(f64)),
 		.hamiltonian = sbmf_stack_push(component_count * sizeof(struct symmetric_bandmat)),
@@ -417,20 +418,23 @@ struct nlse_result nlse_solver(struct nlse_settings settings, const u32 componen
 
 		/* Calculate error */
 		for (u32 i = 0; i < component_count; ++i) {
-			f64 sum = 0.0;
+			f64 sum_diff = 0.0;
+			f64 sum_prev = 0.0;
 			for (u32 j = 0; j < res.coeff_count; ++j) {
 				f64 diff = fabs(res.coeff[i*res.coeff_count + j]) - fabs(old_coeff[i*res.coeff_count + j]);
-				sum += diff*diff;
+				sum_diff += diff*diff;
+				sum_prev += old_coeff[i*res.coeff_count + j]*old_coeff[i*res.coeff_count + j];
 			}
-			res.error[i] = sqrt(sum);
+			res.abs_error[i] = sqrt(sum_diff);
+			res.rel_error[i] = (sum_prev < 1e-10) ? 0.0 : res.abs_error[i] / sqrt(sum_prev);
 		}
 
 		/* Break condition */
 		bool should_exit = true;
 		for (u32 i = 0; i < component_count; ++i) {
-			if (res.error[i] > settings.error_tol)
+			if (res.abs_error[i] > settings.abs_error_tol && res.rel_error[i] > settings.rel_error_tol)
 				should_exit = false;
-			sbmf_log_info("\t[%u] -- error: %.10e, energy: %.10e", i, res.error[i], res.energy[i]);
+			sbmf_log_info("\t[%u] -- error: [abs: %.10e, rel: %.10e]energy: %.10e", i, res.abs_error[i], res.rel_error[i], res.energy[i]);
 		}
 
 		if (should_exit) {
@@ -479,7 +483,8 @@ void nlse_write_to_binary_file(const char* file, struct nlse_result res) {
 	fwrite(&res.coeff_count, 	 sizeof(u32), 1, fd);
 
 	fwrite(res.coeff,  sizeof(f64), res.coeff_count*res.component_count, fd);
-	fwrite(res.error,  sizeof(f64), res.component_count, fd);
+	fwrite(res.abs_error,  sizeof(f64), res.component_count, fd);
+	fwrite(res.rel_error,  sizeof(f64), res.component_count, fd);
 	fwrite(res.energy, sizeof(f64), res.component_count, fd);
 
 	for (u32 i = 0; i < res.component_count; ++i) {
@@ -505,8 +510,10 @@ struct nlse_result nlse_read_from_binary_file(const char* file) {
 	res.coeff = sbmf_stack_push(sizeof(f64)*res.coeff_count*res.component_count);
 	fread(res.coeff,  sizeof(f64), res.coeff_count*res.component_count, fd);
 
-	res.error = sbmf_stack_push(sizeof(f64)*res.component_count);
-	fread(res.error,  sizeof(f64), res.component_count, fd);
+	res.abs_error = sbmf_stack_push(sizeof(f64)*res.component_count);
+	res.rel_error = sbmf_stack_push(sizeof(f64)*res.component_count);
+	fread(res.abs_error,  sizeof(f64), res.component_count, fd);
+	fread(res.rel_error,  sizeof(f64), res.component_count, fd);
 
 	res.energy = sbmf_stack_push(sizeof(f64)*res.component_count);
 	fread(res.energy, sizeof(f64), res.component_count, fd);

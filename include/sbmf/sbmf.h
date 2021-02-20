@@ -246,7 +246,8 @@ enum nlse_orbital_choice {
 struct nlse_settings {
 	u32 max_iterations;
 	u32 max_quadgk_iters;
-	f64 error_tol;
+	f64 abs_error_tol;
+	f64 rel_error_tol;
 
 	/* Separating out the spatial potentiential
 	 * allows for optimizations */
@@ -322,7 +323,8 @@ struct nlse_result {
 	u32 component_count;
 	u32 coeff_count;
 	f64* coeff;
-	f64* error;
+	f64* abs_error;
+	f64* rel_error;
 	f64* energy;
 	f64* residual;
 	struct symmetric_bandmat* hamiltonian;

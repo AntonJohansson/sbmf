@@ -247,7 +247,6 @@ struct nlse_settings {
 	u32 max_iterations;
 	u32 max_quadgk_iters;
 	f64 abs_error_tol;
-	f64 rel_error_tol;
 
 	/* Separating out the spatial potentiential
 	 * allows for optimizations */
@@ -353,20 +352,22 @@ f64 grosspitaevskii_energy(struct nlse_settings settings, const u32 coeff_count,
  * Best mean-field
  */
 
-struct bestmf_result {
-	f64 energy;
-	u32 coeff_count;
-	u32 comp_count;
-	f64* coeff;
-	f64 n1;
-	f64 n2;
-};
+//struct bestmf_result {
+//	f64 energy;
+//	u32 coeff_count;
+//	u32 comp_count;
+//	f64* coeff;
+//	f64 n1;
+//	f64 n2;
+//};
+//
+//struct bestmf_result best_meanfield(struct nlse_settings settings,
+//		const i64 particle_count, f64 g0, struct nlse_guess* guesses);
+//
+///* coeff[coeff_count] */
+//f64 best_meanfield_energy(struct nlse_settings settings, const u32 coeff_count, f64* coeff, i64 n1, i64 n2, f64 g0);
 
-struct bestmf_result best_meanfield(struct nlse_settings settings,
-		const i64 particle_count, f64 g0, struct nlse_guess* guesses);
-
-/* coeff[coeff_count] */
-f64 best_meanfield_energy(struct nlse_settings settings, const u32 coeff_count, f64* coeff, i64 n1, i64 n2, f64 g0);
+f64 bestmf_find_fractional_occupation(struct nlse_settings settings, const i64 particle_count, f64 g0, struct nlse_guess* guesses);
 
 /*
  * Perturbation theory

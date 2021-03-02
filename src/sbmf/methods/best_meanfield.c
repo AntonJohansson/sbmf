@@ -75,7 +75,6 @@ static void compute_occupations(struct nlse_settings settings, const i64 particl
 }
 
 
-
 static void compute_wavefunctions(struct nlse_settings settings, const u32 particle_count, const u32 coeff_count, f64* coeff, const f64 n1, const f64 n2, f64* out) {
 		SBMF_UNUSED(settings);
 		/* P1 = sqrt(n1/N)p1 + sqrt(n2/N)p2
@@ -146,7 +145,7 @@ f64 best_meanfield_energy(struct nlse_settings settings, const u32 coeff_count, 
 
 
 
-struct bestmf_result best_meanfield(struct nlse_settings settings, const i64 particle_count, f64 g0, struct nlse_guess* guesses) {
+f64 bestmf_find_fractional_occupation(struct nlse_settings settings, const i64 particle_count, f64 g0, struct nlse_guess* guesses) {
 	settings.post_normalize_userdata = &particle_count;
 	//settings.post_normalize_callback = ensure_structure;
 
@@ -168,25 +167,36 @@ struct bestmf_result best_meanfield(struct nlse_settings settings, const i64 par
 
 	struct nlse_result res = nlse_solver(settings, 2, comps);
 
-	i64 n1, n2;
-	compute_occupations(settings, particle_count, res.coeff_count, res.coeff, &n1, &n2);
+	f64 n1_over_N;
+	{
+		/* Computes inner product <1|2> */
+		struct quadgk_result ires;
+		{
+			struct inner_product_integrand_params p = {
+				.coeff_a = &res.coeff[0],
+				.coeff_b = &res.coeff[res.coeff_count],
+				.coeff_count = res.coeff_count,
+				.basis = settings.basis,
+			};
 
+			struct quadgk_settings int_settings = {
+				.gk = gk15,
+				.abs_error_tol = 1e-10,
+				.max_iters = settings.max_quadgk_iters,
+				.userdata = &p,
+			};
 
-	/* Find the wavefunctions */
-	sbmf_log_info("best_meanfield: finding wavefunctions");
-	f64* p = (f64*)sbmf_stack_push(2*res.coeff_count*sizeof(f64));
-	memset(p, 0, 2*res.coeff_count*sizeof(f64));
-	compute_wavefunctions(settings, particle_count, res.coeff_count, res.coeff, n1, n2, p);
+			u8 quadgk_memory[quadgk_required_memory_size(&int_settings)];
 
-	//sbmf_log_info("best_meanfield: finding energy");
-	f64 E = best_meanfield_energy(settings, res.coeff_count, p, n1,n2, g0);
+			quadgk_infinite_interval(inner_product_integrand, &int_settings, quadgk_memory, &ires);
+		}
 
-	return (struct bestmf_result) {
-		.energy = E,
-		.coeff_count = res.coeff_count,
-		.comp_count = res.component_count,
-		.coeff = p,
-		.n1 = n1,
-		.n2 = n2,
-	};
+		/*
+		 * <1|2> = (n2-n1)/N = (N-n1-n1)/N = 1 - 2n1/N
+		 *  => n1/N = (1 - <1|2>)/2
+		 */
+		n1_over_N =  (1.0 - ires.integral)/2.0;
+	}
+
+	return n1_over_N;
 }

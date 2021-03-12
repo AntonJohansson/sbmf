@@ -13,7 +13,7 @@
 
 #define NA 4
 #define NB 4
-#define GAA (1.0/3.0)
+#define GAA (4.0/3.0)
 #define GAB (-1.0/6.0)
 #define GBA (-1.0/6.0)
 #define GBB (1.0/3.0)
@@ -21,7 +21,7 @@
 #define USE_TF_GUESS 0
 #define USE_GAUSSIAN_GUESS 0
 #define USE_RANDOM_GUESS 0
-#define COMPONENT_COUNT 2
+#define COMPONENT_COUNT 1
 
 //#define PERTURBATION(x) 2*gaussian(x, 0, 0.2)
 #define PERTURBATION(x) 0.0
@@ -80,7 +80,7 @@ void debug_callback(struct nlse_settings settings, struct nlse_result res) {
 		plot_shutdown();
 #endif
 
-#if 0
+#if 1
 		{
 			FILE* fd = fopen("debug_out", "a");
 			fprintf(fd, "%u\t%lf\n", res.iterations, res.energy[0]);
@@ -141,7 +141,7 @@ void expnx(f64* out, f64* in, u32 len, void* p) {
 
 
 int main() {
-	OMEGA = 0.1;
+	//OMEGA = 0.1;
 	sbmf_set_log_callback(log_callback);
 	sbmf_init();
 
@@ -187,21 +187,27 @@ int main() {
 
 	i64 occupations[] = {NA,NB};
 
+	// ham 0.6 -> upper
+	// ham 0.1 -> lower
 	struct nlse_settings settings = {
         .spatial_pot_perturbation = perturbation,
 		.max_iterations = 1000,
 		.max_quadgk_iters = 500,
-		.error_tol = 1e-14,
+		.abs_error_tol = 1e-14,
 
         .num_basis_funcs = 16,
 		.basis = ho_basis,
 
 		.zero_threshold = 1e-10,
-		.orbital_mixing = 0.0,
-		.hamiltonian_mixing = 0.5,
-		.mix_until_iteration = 0,
+		.orbital_mixing = 0.95,
+		.hamiltonian_mixing = 0.0,
+		//.mix_until_iteration = 10,
 
-		.measure_every = 0,
+		//.orbital_choice = NLSE_ORBITAL_MAXIMUM_OVERLAP,
+		//.mom_orbitals_to_consider = 5,
+		//.mom_enable_at_iteration = 1,
+
+		.measure_every = 1,
 		.debug_callback = debug_callback,
 		.gk=gk20
     };
@@ -212,9 +218,9 @@ int main() {
 	f64 Efull = grosspitaevskii_energy(settings, res.coeff_count, component_count, res.coeff, occupations, g0);
 	printf("\nfull energy: %lf\n", Efull);
 
-	nlse_write_to_binary_file("outbin", res);
+	//nlse_write_to_binary_file("outbin", res);
 
-#if 1
+#if 0
 	{
 		const u32 N = 256;
 		plot_init(800, 600, "gp2c");
@@ -302,7 +308,7 @@ int main() {
 	}
 #endif
 
-#if 1
+#if 0
 	{
 		struct pt_result ptres;
 		if (component_count == 2)
@@ -321,7 +327,7 @@ int main() {
 	}
 #endif
 
-#if 1
+#if 0
 	{
 		struct pt_result ptres;
 		if (component_count == 2)

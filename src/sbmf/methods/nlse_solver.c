@@ -278,7 +278,6 @@ struct nlse_result nlse_solver(struct nlse_settings settings, const u32 componen
 	/* Do the actual iterations */
 	for (; res.iterations < settings.max_iterations; ++res.iterations) {
 		sbmf_log_info("nlse starting iteration %u", res.iterations);
-		memcpy(old_coeff, res.coeff, res.component_count * N * sizeof(f64));
 		memcpy(old_energy, res.energy, res.component_count * sizeof(f64));
 
 		/* Call debug callback if requested by user */
@@ -299,6 +298,20 @@ struct nlse_result nlse_solver(struct nlse_settings settings, const u32 componen
 		if (settings.orbital_choice != NLSE_ORBITAL_MAXIMUM_OVERLAP && settings.mom_enable_at_iteration > 0 && res.iterations == settings.mom_enable_at_iteration) {
 			settings.orbital_choice = NLSE_ORBITAL_MAXIMUM_OVERLAP;
 		}
+
+		/* Apply orbital mixing */
+		for (u32 i = 0; i < component_count; ++i) {
+			if (settings.orbital_mixing > 0.0) {
+				//res.energy[i] = (1.0 - settings.orbital_mixing) * res.energy[i] + settings.orbital_mixing*old_energy[i];
+
+				for (u32 j = 0; j < res.coeff_count; ++j) {
+					res.coeff[i*res.coeff_count + j] =
+						(1.0 - settings.orbital_mixing) * res.coeff[i*res.coeff_count + j] + settings.orbital_mixing * old_coeff[i*res.coeff_count + j];
+				}
+				f64_normalize(&res.coeff[i*res.coeff_count], &res.coeff[i*res.coeff_count], res.coeff_count);
+			}
+		}
+		memcpy(old_coeff, res.coeff, res.component_count * N * sizeof(f64));
 
 		/*
 		 * Construct all the Hamiltonians
@@ -402,16 +415,16 @@ struct nlse_result nlse_solver(struct nlse_settings settings, const u32 componen
 			}
 			f64_normalize(&res.coeff[i*res.coeff_count], &res.coeff[i*res.coeff_count], res.coeff_count);
 
-			/* Apply orbital mixing */
-			if (settings.orbital_mixing > 0.0) {
-				res.energy[i] = (1.0 - settings.orbital_mixing) * res.energy[i] + settings.orbital_mixing*old_energy[i];
+			///* Apply orbital mixing */
+			//if (settings.orbital_mixing > 0.0) {
+			//	res.energy[i] = (1.0 - settings.orbital_mixing) * res.energy[i] + settings.orbital_mixing*old_energy[i];
 
-				for (u32 j = 0; j < res.coeff_count; ++j) {
-					res.coeff[i*res.coeff_count + j] =
-						(1.0 - settings.orbital_mixing) * res.coeff[i*res.coeff_count + j] + settings.orbital_mixing * old_coeff[i*res.coeff_count + j];
-				}
-				f64_normalize(&res.coeff[i*res.coeff_count], &res.coeff[i*res.coeff_count], res.coeff_count);
-			}
+			//	for (u32 j = 0; j < res.coeff_count; ++j) {
+			//		res.coeff[i*res.coeff_count + j] =
+			//			(1.0 - settings.orbital_mixing) * res.coeff[i*res.coeff_count + j] + settings.orbital_mixing * old_coeff[i*res.coeff_count + j];
+			//	}
+			//	f64_normalize(&res.coeff[i*res.coeff_count], &res.coeff[i*res.coeff_count], res.coeff_count);
+			//}
 
 		}
 

@@ -20,12 +20,10 @@ set format y '%.1f';
 set size 1.0,0.75;
 
 set xlabel 'Iteration (a.\,u.)';
-set ylabel 'Chemical potential $\mu$ (a.\,u.)';
+set ylabel 'Eigenvalue $\mu$ (a.\,u.)';
 set yrange [1.2:1.9];
 
 set multiplot layout 1,3;
-
-set key at graph 0.75,0.5;
 
 set label 1 at graph 0.25, 0.20 'pure SCF'
 
@@ -55,18 +53,24 @@ plot \
     'out_ham_0.4' u 1:2 w lines ls 2 lw 3 lc rgb '#AF2922' title '', \
     'out_ham_0.5' u 1:2 w lines ls 2 lw 4 lc rgb '#890F08' title '', \
 
-set label 1 at graph 0.25, 0.10 '\footnotesize{$\beta = 0.90$}'
-set label 2 at graph 0.25, 0.20 '\footnotesize{$\beta = 0.95$}'
+#set label 1 front at graph 0.115, 0.10 '\scriptsize{$\beta = 0.90$}'
+#set label 2 front at graph 0.455, 0.60 '\scriptsize{$\beta = 0.95$}'
+unset label 1
+unset label 2
 unset label 3
 unset label 4
 unset label 5
 
-set arrow 1 front from graph 0.65,0.1 to graph 0.78,0.1 lw 2 lc rgb '#4E9D5C'
-set arrow 2 front from graph 0.65,0.2 to graph 0.82,0.3 lw 2 lc rgb '#01400C'
+#set arrow 1 front from graph 0.65,0.1 to graph 0.78,0.1 lw 2 lc rgb '#4E9D5C'
+#set arrow 2 front from graph 0.65,0.2 to graph 0.82,0.3 lw 2 lc rgb '#01400C'
 
-set xrange [-100:1100]
-set xtics 0,500,1000
+set xrange [-100:950]
+set xtics 0,400,1000
+set key spacing 1
+set key width -1
+set key at graph 0.95,0.25 box opaque samplen 2
+set key invert
 @TBMARGIN; @RMARGIN;
 plot \
-    'out_orb_0.9'  u 1:2 w lines ls 2 lw 3 lc rgb '#4E9D5C' title '', \
-    'out_orb_0.95' u 1:2 w lines ls 2 lw 4 lc rgb '#01400C' title '', \
+    'out_orb_0.9'  u 1:2 w lines ls 2 lw 3 lc rgb '#4E9D5C' title '\scriptsize{$\beta=0.90$}', \
+    'out_orb_0.95' u 1:2 w lines ls 2 lw 4 lc rgb '#01400C' title '\scriptsize{$\beta=0.95$}', \

@@ -27,6 +27,8 @@ void sbmf_init() {
 		return;
 	}
 
+	srand(time(NULL));
+
 	sbmf_log_info("Initializing");
 
 	signal(SIGINT,  interrupt_handler);

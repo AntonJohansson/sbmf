@@ -41,7 +41,7 @@ void sbmf_init() {
 
 		_state.thread_storage = xmalloc(_state.thread_count*sizeof(struct thread_local_storage));
 		for (u32 i = 0; i < _state.thread_count; ++i) {
-			_state.thread_storage[i].stack = sa_make(32*1024*1024);
+			_state.thread_storage[i].stack = sa_make(96*1024*1024);
 		}
 	}
 

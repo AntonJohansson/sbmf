@@ -1,3 +1,5 @@
+static u32 thread_storage_size = 96*1024*1024;
+
 struct thread_local_storage {
 	struct stack_allocator* stack;
 };
@@ -18,6 +20,10 @@ static void interrupt_handler(int dummy) {
 	SBMF_UNUSED(dummy);
 	sbmf_shutdown();
 	exit(1);
+}
+
+void sbmf_set_thread_storage_size(u32 size) {
+	thread_storage_size = size;
 }
 
 
@@ -41,7 +47,7 @@ void sbmf_init() {
 
 		_state.thread_storage = xmalloc(_state.thread_count*sizeof(struct thread_local_storage));
 		for (u32 i = 0; i < _state.thread_count; ++i) {
-			_state.thread_storage[i].stack = sa_make(96*1024*1024);
+			_state.thread_storage[i].stack = sa_make(thread_storage_size);
 		}
 	}
 

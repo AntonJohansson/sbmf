@@ -27,6 +27,7 @@ typedef long double 		f128;
  * Initialization
  */
 
+void sbmf_set_thread_storage_size(u32 size);
 void sbmf_init();
 void sbmf_shutdown();
 

@@ -1,8 +1,6 @@
 PROJECT = sbmf
 BUILDDIR = build
-INSTALLDIR = ~/.local
 CUDADIR = /usr/local/cuda
-#CUDADIR = /opt/cuda
 
 CC = gcc
 NVCC = $(CUDADIR)/bin/nvcc
@@ -46,13 +44,6 @@ debug: PROJ_FLAGS += $(PROJ_LIBS)
 debug: CUDA_FLAGS := $(CUDA_FLAGS) -g -G -Xcompiler "$(CUDA_CC_FLAGS) $(DEBUG_FLAGS) $(PROJ_LIBS)"
 debug: $(BUILDDIR)/$(PROJECT).a
 
-.PHONY: install
-install:
-	mkdir -p $(INSTALLDIR)/lib
-	mkdir -p $(INSTALLDIR)/include/
-	cp $(BUILDDIR)/$(PROJECT).a $(INSTALLDIR)/lib/
-	cp -r include/sbmf $(INSTALLDIR)/include/
-
 $(BUILDDIR):
 	mkdir -p $(shell find src -type d | sed -e "s/^/$(BUILDDIR)\//")
 
@@ -71,7 +62,6 @@ $(BUILDDIR)/$(PROJECT).a: $(BUILDDIR) $(PROJ_OBJS) $(CUDA_OBJS)
 	cd $(BUILDDIR)/tmp && ar x ../../third_party/lib/libopenblas.a
 	ar rcs $@ $(PROJ_OBJS) $(CUDA_OBJS) $(BUILDDIR)/tmp/*.o
 	rm -r $(BUILDDIR)/tmp
-
 
 .PHONY: clean
 clean:

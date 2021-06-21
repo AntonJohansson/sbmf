@@ -135,7 +135,7 @@ static inline f64 rs_2nd_order_ediff(struct pt_settings* pt, u32 A, u32 B, u32 i
  * Main function for Rayleigh-Schrodinger perturbation theory
  */
 
-struct pt_result rayleigh_schroedinger_pt_rf(struct nlse_settings settings, struct nlse_result res, u32 component, f64* g0, i64* particle_count) {
+struct pt_result rspt_1comp(struct nlse_settings settings, struct nlse_result res, u32 component, f64* g0, i64* particle_count) {
 	/* order of hamiltonians, that is include all states */
 	const u32 states_to_include = res.coeff_count;
 	const i64* N = particle_count;
@@ -346,7 +346,7 @@ struct pt_result rayleigh_schroedinger_pt_rf(struct nlse_settings settings, stru
 	};
 }
 
-struct pt_result rayleigh_schroedinger_pt_rf_2comp(struct nlse_settings settings, struct nlse_result res, f64* g0, i64* particle_count) {
+struct pt_result rspt_2comp(struct nlse_settings settings, struct nlse_result res, f64* g0, i64* particle_count) {
 	/* order of hamiltonians, that is include all states */
 	const u32 states_to_include = res.coeff_count;
 	const i64* N = particle_count;
@@ -371,8 +371,8 @@ struct pt_result rayleigh_schroedinger_pt_rf_2comp(struct nlse_settings settings
 		.settings = &settings,
 	};
 
-	struct pt_result res_comp_A = rayleigh_schroedinger_pt_rf(settings, res, 0, g0, particle_count);
-	struct pt_result res_comp_B = rayleigh_schroedinger_pt_rf(settings, res, 1, g0, particle_count);
+	struct pt_result res_comp_A = rspt_1comp(settings, res, 0, g0, particle_count);
+	struct pt_result res_comp_B = rspt_1comp(settings, res, 1, g0, particle_count);
 
 	/* Zeroth order PT */
 	sbmf_log_info("Starting zeroth order PT");
@@ -640,7 +640,7 @@ static inline f64 en_nHn(struct pt_settings* pt, u32 A, u32 i, u32 j) {
 	}
 }
 
-struct pt_result en_pt_rf(struct nlse_settings settings, struct nlse_result res, u32 component, f64* g0, i64* particle_count) {
+struct pt_result enpt_1comp(struct nlse_settings settings, struct nlse_result res, u32 component, f64* g0, i64* particle_count) {
 	/* order of hamiltonians, that is include all states */
 	const u32 states_to_include = res.coeff_count;
 	const i64* N = particle_count;
@@ -819,7 +819,7 @@ struct pt_result en_pt_rf(struct nlse_settings settings, struct nlse_result res,
 	};
 }
 
-struct pt_result en_pt_2comp(struct nlse_settings settings, struct nlse_result res, f64* g0, i64* particle_count) {
+struct pt_result enpt_2comp(struct nlse_settings settings, struct nlse_result res, f64* g0, i64* particle_count) {
 	/* order of hamiltonians, that is include all states */
 	const u32 states_to_include = res.coeff_count;
 	const i64* N = particle_count;

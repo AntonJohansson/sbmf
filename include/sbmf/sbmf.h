@@ -1,7 +1,6 @@
 #pragma once
 
 #include <stdint.h>
-//#include <complex.h>
 #include <math.h>
 #include <stdbool.h>
 
@@ -19,9 +18,6 @@ typedef __uint128_t 		u128;
 typedef float 				f32;
 typedef double 				f64;
 typedef long double 		f128;
-//typedef float complex 		c32;
-//typedef double complex 		c64;
-//typedef long double complex c128;
 
 /*
  * Initialization
@@ -88,6 +84,7 @@ static inline u32 symmetric_bandmat_element_count(const u32 size) {
 	return size*(size+1)/2;
 }
 
+/* Performs matrix vector multiplication */
 void symmetric_bandmat_mulv(f64* ans_vec, struct symmetric_bandmat bm, f64* vec);
 
 enum which_eigenpairs {
@@ -117,12 +114,12 @@ struct eigen_result_real find_eigenpairs_full_real(struct symmetric_bandmat bm);
 
 /*
  * Find _some_ eigenpairs (specified by the enum which_eigenpairs)
- * for a dense, upper tridiagonal matrix.
+ * for a sparse, upper tridiagonal matrix.
  */
 struct eigen_result_real find_eigenpairs_sparse_real(struct symmetric_bandmat bm, u32 num_eigenvalues, enum which_eigenpairs which);
 
 /*
- * QUADGK
+ * Numerical integraion: QUADGK implementation
  */
 
 #define MAX_GAUSS_POINTS 20
@@ -157,13 +154,15 @@ struct quadgk_settings {
 struct quadgk_result {
 	f64 integral;
 	f64 error;
-	//i32 performed_evals;
 	u32 performed_iters;
 	bool converged;
 };
 
+/* Function definition for integrand. Works on arrays instead of single values */
 typedef void integrand_func(f64*,f64*,u32,void*);
 
+/* Returns required amount of memory to perform integration, so preallocation can
+ * be done */
 u32 quadgk_required_memory_size(const struct quadgk_settings* settings);
 
 void quadgk_infinite_interval(integrand_func* f, const struct quadgk_settings* settings, void* memory, struct quadgk_result* res);
@@ -206,11 +205,13 @@ struct basis {
 	basis_energy_eigenval_func* eigenval;
 	basis_sample_func*          sample;
 };
-extern f64 OMEGA;
 
 /*
  * Harmonic oscillator stuff
  */
+
+/* The "width" of the harmonic trap V(x) = 1/2 * OMEGA *x^2 */
+extern f64 OMEGA;
 
 void ho_eigenfunc(const u32 n, const u32 len, f64* out, f64* in);
 f64 ho_eigenval(const u32 n);
@@ -222,7 +223,7 @@ void ho_potential_vec(f64* out, f64* in, u32 len);
 extern struct basis ho_basis;
 
 /*
- * NLSE solving
+ * NLSE solving (SCF method)
  */
 
 /*
@@ -278,10 +279,13 @@ struct nlse_settings {
 	u32 num_basis_funcs;
 	struct basis basis;
 
-	/* Everything below the zero_threshold is considered
-	 * 0 in the Hamiltonian. */
+	/* Everything with an absolute values below the zero_threshold
+	 * is considered 0 in the Hamiltonian. */
 	f64 zero_threshold;
 
+	/* How we choose the eigenstate for the next iteration.
+	 * E.g. smallest eigenvalue? Largest orbital overlap with
+	 * previous iter (mom)? */
 	enum nlse_orbital_choice orbital_choice;
 	u32 mom_orbitals_to_consider;
 	u32 mom_enable_at_iteration;
@@ -335,7 +339,8 @@ struct nlse_result {
 /* components[component_count] */
 struct nlse_result nlse_solver(struct nlse_settings settings, const u32 component_count, struct nlse_component* components);
 
-/* basic serialization */
+/* Basic serialization, writing the nlse_result structure to memory as binary.
+ * NOTE: THIS IS NOT COMPATIBLE ACROSS CPUS. */
 void nlse_write_to_binary_file(const char* file, struct nlse_result res);
 struct nlse_result nlse_read_from_binary_file(const char* file);
 
@@ -343,9 +348,11 @@ struct nlse_result nlse_read_from_binary_file(const char* file);
  * Gross-pitaevskii solving
  */
 
+/* Uses nlse_solver to solve the Gross-Pitavevskii equation with comp_count components. */
 /* occupations[comp_count], guesses[comp_count], g0[comp_count*comp_count] */
 struct nlse_result grosspitaevskii(struct nlse_settings settings, const u32 comp_count, i64* occupations, struct nlse_guess* guesses, f64* g0);
 
+/* Uses the Gross-Pitaevskii energry functional to compute the energy of the ground state. */
 /* coeff[coeff_count*comp_count], occupations[comp_count] g0[comp_count*comp_count] */
 f64 grosspitaevskii_energy(struct nlse_settings settings, const u32 coeff_count, const u32 comp_count, f64* coeff, i64* occupations, f64* g0);
 
@@ -353,21 +360,8 @@ f64 grosspitaevskii_energy(struct nlse_settings settings, const u32 coeff_count,
  * Best mean-field
  */
 
-//struct bestmf_result {
-//	f64 energy;
-//	u32 coeff_count;
-//	u32 comp_count;
-//	f64* coeff;
-//	f64 n1;
-//	f64 n2;
-//};
-//
-//struct bestmf_result best_meanfield(struct nlse_settings settings,
-//		const i64 particle_count, f64 g0, struct nlse_guess* guesses);
-//
-///* coeff[coeff_count] */
-//f64 best_meanfield_energy(struct nlse_settings settings, const u32 coeff_count, f64* coeff, i64 n1, i64 n2, f64 g0);
-
+/* Uses nlse_solver to solve the best mean-field equations and then compute the fractional
+ * occupation of the best mean-field states. */
 f64 bestmf_find_fractional_occupation(struct nlse_settings settings, const i64 particle_count, f64 g0, struct nlse_guess* guesses);
 
 /*
@@ -378,15 +372,15 @@ struct pt_result {
 	f64 E0, E1, E2, E3;
 };
 
-struct pt_result rayleigh_schroedinger_pt_rf(struct nlse_settings settings, struct nlse_result res, u32 component, f64* g0, i64* particle_count);
-struct pt_result rayleigh_schroedinger_pt_rf_2comp(struct nlse_settings settings, struct nlse_result res, f64* g0, i64* particle_count);
-struct pt_result en_pt_rf(struct nlse_settings settings, struct nlse_result res, u32 component, f64* g0, i64* particle_count);
-struct pt_result en_pt_2comp(struct nlse_settings settings, struct nlse_result res, f64* g0, i64* particle_count);
+/* Computes energy correction up to third order using either Rayleigh-Schrödinger perturbation theory (rspt) or Epstein-Nestbet (enpt).
+ * Component count is hard-coded to either one or two components. */
+struct pt_result rspt_1comp(struct nlse_settings settings, struct nlse_result res, u32 component, f64* g0, i64* particle_count);
+struct pt_result enpt_1comp(struct nlse_settings settings, struct nlse_result res, u32 component, f64* g0, i64* particle_count);
+struct pt_result rspt_2comp(struct nlse_settings settings, struct nlse_result res, f64* g0, i64* particle_count);
+struct pt_result enpt_2comp(struct nlse_settings settings, struct nlse_result res, f64* g0, i64* particle_count);
 
-struct pt_result rspt_1comp_cuda_new(struct nlse_settings* settings, struct nlse_result res, u32 component, f64 g0, i64 particle_count);
-struct pt_result enpt_1comp_cuda_new(struct nlse_settings* settings, struct nlse_result res, u32 component, f64 g0, i64 particle_count);
-struct pt_result rspt_2comp_cuda_new(struct nlse_settings* settings, struct nlse_result res, u32 compA, u32 compB, f64 gAA, f64 gAB, i64 NA, i64 NB);
-struct pt_result enpt_2comp_cuda_new(struct nlse_settings* settings, struct nlse_result res, u32 compA, u32 compB, f64 gAA, f64 gAB, i64 NA, i64 NB);
-
-struct pt_result rspt_1comp_cuda(struct nlse_settings settings, struct nlse_result res, u32 component, f64* g0, i64* particle_count);
-struct pt_result enpt_1comp_cuda(struct nlse_settings settings, struct nlse_result res, u32 component, f64* g0, i64* particle_count);
+/* Exactly same as above but parallelizes on the GPU using CUDA */
+struct pt_result rspt_1comp_cuda(struct nlse_settings* settings, struct nlse_result res, u32 component, f64 g0, i64 particle_count);
+struct pt_result enpt_1comp_cuda(struct nlse_settings* settings, struct nlse_result res, u32 component, f64 g0, i64 particle_count);
+struct pt_result rspt_2comp_cuda(struct nlse_settings* settings, struct nlse_result res, u32 compA, u32 compB, f64 gAA, f64 gAB, i64 NA, i64 NB);
+struct pt_result enpt_2comp_cuda(struct nlse_settings* settings, struct nlse_result res, u32 compA, u32 compB, f64 gAA, f64 gAB, i64 NA, i64 NB);

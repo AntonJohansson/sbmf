@@ -581,7 +581,7 @@ static struct pt_result perturbation_theory_2comp(enum pt_mode mode, f64 gAA, f6
 
 /**************************************************************************************************************************************************/
 
-struct pt_result rspt_1comp_cuda_new(struct nlse_settings* settings, struct nlse_result res, u32 component, f64 g, i64 N) {
+struct pt_result rspt_1comp_cuda(struct nlse_settings* settings, struct nlse_result res, u32 component, f64 g, i64 N) {
 	/*
 	 * The number of single body (sb) states is equal to the number
 	 * of coefficients which is equal to the basis size
@@ -628,7 +628,7 @@ struct pt_result rspt_1comp_cuda_new(struct nlse_settings* settings, struct nlse
 	return ptres;
 }
 
-struct pt_result enpt_1comp_cuda_new(struct nlse_settings* settings, struct nlse_result res, u32 component, f64 g, i64 N) {
+struct pt_result enpt_1comp_cuda(struct nlse_settings* settings, struct nlse_result res, u32 component, f64 g, i64 N) {
 	/*
 	 * The number of single body (sb) states is equal to the number
 	 * of coefficients which is equal to the basis size
@@ -708,7 +708,7 @@ struct pt_result enpt_1comp_cuda_new(struct nlse_settings* settings, struct nlse
 	return ptres;
 }
 
-struct pt_result rspt_2comp_cuda_new(struct nlse_settings* settings, struct nlse_result res, u32 compA, u32 compB, f64 gAA, f64 gAB, i64 NA, i64 NB) {
+struct pt_result rspt_2comp_cuda(struct nlse_settings* settings, struct nlse_result res, u32 compA, u32 compB, f64 gAA, f64 gAB, i64 NA, i64 NB) {
 	/*
 	 * The number of single body (sb) states is equal to the number
 	 * of coefficients which is equal to the basis size
@@ -766,7 +766,7 @@ struct pt_result rspt_2comp_cuda_new(struct nlse_settings* settings, struct nlse
 	return ptres;
 }
 
-struct pt_result enpt_2comp_cuda_new(struct nlse_settings* settings, struct nlse_result res, u32 compA, u32 compB, f64 gAA, f64 gAB, i64 NA, i64 NB) {
+struct pt_result enpt_2comp_cuda(struct nlse_settings* settings, struct nlse_result res, u32 compA, u32 compB, f64 gAA, f64 gAB, i64 NA, i64 NB) {
 	/*
 	 * The number of single body (sb) states is equal to the number
 	 * of coefficients which is equal to the basis size

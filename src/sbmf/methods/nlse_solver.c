@@ -271,8 +271,10 @@ struct nlse_result nlse_solver(struct nlse_settings settings, const u32 componen
 #endif
 
 	struct symmetric_bandmat old_Hs[res.component_count];
+	struct symmetric_bandmat premix_Hs[res.component_count];
 	for (u32 i = 0; i < res.component_count; ++i) {
 		old_Hs[i] = symmetric_bandmat_new(N,N);
+		premix_Hs[i] = symmetric_bandmat_new(N,N);
 	}
 
 	/* Do the actual iterations */
@@ -360,6 +362,7 @@ struct nlse_result nlse_solver(struct nlse_settings settings, const u32 componen
 
 				u32 me_index = symmetric_bandmat_index(res.hamiltonian[i], r,c);
 				res.hamiltonian[i].data[me_index] = linear_hamiltonian.data[me_index] + int_res.integral;
+				premix_Hs[i].data[me_index] = res.hamiltonian[i].data[me_index];
 
 				if (settings.hamiltonian_mixing > 0) {
 					res.hamiltonian[i].data[me_index] = (1.0 - settings.hamiltonian_mixing)*res.hamiltonian[i].data[me_index] + settings.hamiltonian_mixing*old_Hs[i].data[me_index];
@@ -464,7 +467,7 @@ struct nlse_result nlse_solver(struct nlse_settings settings, const u32 componen
 	/* Compute residuals */
 	for (u32 i = 0; i < component_count; ++i) {
 		f64 ans1[N], ans2[N];
-		symmetric_bandmat_mulv(ans1, res.hamiltonian[i], &res.coeff[i*N]);
+		symmetric_bandmat_mulv(ans1, premix_Hs[i], &res.coeff[i*N]);
 
 		for (u32 j = 0; j < N; ++j) {
 			ans2[j] = res.energy[i] * res.coeff[i*N + j];
